@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: limited-goods-reservation
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/limited_goods_reservation}
+    username: ${SPRING_DATASOURCE_USERNAME:limited_goods}
+    password: ${SPRING_DATASOURCE_PASSWORD:limited_goods}
+    driver-class-name: org.postgresql.Driver
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}

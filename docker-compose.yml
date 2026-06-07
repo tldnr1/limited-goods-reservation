@@ -1,0 +1,48 @@
+services:
+  api:
+    build:
+      context: .
+    container_name: limited-goods-api
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/limited_goods_reservation
+      SPRING_DATASOURCE_USERNAME: limited_goods
+      SPRING_DATASOURCE_PASSWORD: limited_goods
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: limited-goods-postgres
+    environment:
+      POSTGRES_DB: limited_goods_reservation
+      POSTGRES_USER: limited_goods
+      POSTGRES_PASSWORD: limited_goods
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U limited_goods -d limited_goods_reservation"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  k6:
+    image: grafana/k6:0.54.0
+    container_name: limited-goods-k6
+    profiles:
+      - load-test
+    environment:
+      BASE_URL: http://api:8080
+    volumes:
+      - ./k6:/scripts:ro
+    command: ["run", "/scripts/v0/smoke.js"]
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:

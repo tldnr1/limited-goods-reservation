@@ -1,0 +1,8 @@
+.gradle
+build
+out
+.git
+.github
+docs
+README.md
+AGENTS.md
