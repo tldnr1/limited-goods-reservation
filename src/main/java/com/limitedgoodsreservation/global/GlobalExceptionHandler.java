@@ -1,6 +1,6 @@
 package com.limitedgoodsreservation.global;
 
-import com.limitedgoodsreservation.purchase.service.SoldOutException;
+import com.limitedgoodsreservation.stock.application.SoldOutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;

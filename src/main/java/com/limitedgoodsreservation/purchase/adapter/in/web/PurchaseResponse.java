@@ -1,6 +1,6 @@
-package com.limitedgoodsreservation.purchase.dto;
+package com.limitedgoodsreservation.purchase.adapter.in.web;
 
-import com.limitedgoodsreservation.order.entity.Order;
+import com.limitedgoodsreservation.order.domain.Order;
 
 public record PurchaseResponse(
         Long orderId,

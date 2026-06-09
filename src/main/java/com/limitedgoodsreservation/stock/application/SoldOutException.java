@@ -1,4 +1,4 @@
-package com.limitedgoodsreservation.purchase.service;
+package com.limitedgoodsreservation.stock.application;
 
 public class SoldOutException extends RuntimeException {
 

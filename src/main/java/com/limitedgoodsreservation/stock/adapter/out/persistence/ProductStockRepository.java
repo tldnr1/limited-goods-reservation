@@ -1,6 +1,6 @@
-package com.limitedgoodsreservation.product.repository;
+package com.limitedgoodsreservation.stock.adapter.out.persistence;
 
-import com.limitedgoodsreservation.product.entity.ProductStock;
+import com.limitedgoodsreservation.stock.domain.ProductStock;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 

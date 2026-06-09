@@ -13,9 +13,9 @@ This project reproduces and improves limited-sale backend failures step by step.
 
 ## Current Status
 
-The project is in **v1 naive purchase baseline** stage.
+The project is in **v2 stock strategy comparison foundation** stage.
 
-v1 reproduces oversell with a deliberately naive RDB read-check-write purchase flow.
+The default v2 adapter still uses the v1 naive RDB read-check-write flow so strategy experiments can compare against the same failure baseline.
 
 ---
 
@@ -33,7 +33,7 @@ Run the Docker Compose API:
 docker compose up --build
 ```
 
-Run the v1 k6 oversell baseline through the Compose profile:
+Run the v2 stock strategy baseline through the Compose profile:
 
 ```text
 docker compose --profile load-test up --build k6

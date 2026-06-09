@@ -1,12 +1,13 @@
-package com.limitedgoodsreservation.purchase.service;
+package com.limitedgoodsreservation.purchase.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.limitedgoodsreservation.order.repository.OrderRepository;
-import com.limitedgoodsreservation.product.entity.ProductStock;
-import com.limitedgoodsreservation.product.repository.ProductStockRepository;
-import com.limitedgoodsreservation.purchase.dto.PurchaseResponse;
+import com.limitedgoodsreservation.order.adapter.out.persistence.OrderRepository;
+import com.limitedgoodsreservation.purchase.adapter.in.web.PurchaseResponse;
+import com.limitedgoodsreservation.stock.adapter.out.persistence.ProductStockRepository;
+import com.limitedgoodsreservation.stock.application.SoldOutException;
+import com.limitedgoodsreservation.stock.domain.ProductStock;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

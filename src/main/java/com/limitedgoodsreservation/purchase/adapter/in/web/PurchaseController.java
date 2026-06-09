@@ -1,8 +1,6 @@
-package com.limitedgoodsreservation.purchase.controller;
+package com.limitedgoodsreservation.purchase.adapter.in.web;
 
-import com.limitedgoodsreservation.purchase.dto.PurchaseRequest;
-import com.limitedgoodsreservation.purchase.dto.PurchaseResponse;
-import com.limitedgoodsreservation.purchase.service.PurchaseService;
+import com.limitedgoodsreservation.purchase.application.PurchaseService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;

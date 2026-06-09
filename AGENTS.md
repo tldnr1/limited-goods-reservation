@@ -9,15 +9,15 @@ This file is the **current work index**. It may change as the project version ch
 ## Current Status
 
 ```text
-current_version: v1
-current_goal: naive purchase baseline implemented and experiment recorded
-next_target: v2 stock strategy comparison
+current_version: v2
+current_goal: stock strategy comparison foundation
+next_target: v2 experiment branches for stock consistency strategies
 project_type: Spring Boot backend portfolio project
-architecture_now: feature-based N-tier baseline
+architecture_now: focused port/adapter around stock consistency
 official_verification_path: Docker Compose first
 ```
 
-Do not start v2 stock strategy work unless the user explicitly asks to start v2 work.
+Do not select the final v2 stock strategy until experiment branches produce measured results.
 
 ---
 
@@ -85,12 +85,13 @@ Records explain why decisions were made. Notes are local/private scratch and are
 
 ## Current Guardrails
 
-- v1 should be a simple feature-based N-tier baseline.
-- Do not introduce hexagonal architecture, ports, adapters, Redis, MQ, waiting room, payment worker, or reward allocation in v1.
+- v2 should keep focused port/adapter boundaries around stock consistency only.
+- Redis may be configured for v2 experiments, but Redis Lua should live in an experiment branch until selected by measured results.
+- Do not introduce MQ, waiting room, active token, payment worker, or reward allocation in v2.
 - v1/v2 core experiments use a single hot product and single product stock.
 - External requests use `productId`; `product_stock.id` is an internal DB identifier.
 - Use `X-USER-ID` as the simplified test identity.
-- Do not add a `users` table in v1.
+- Do not add a `users` table in v2.
 - Do not create future package placeholders without real classes.
 
 ---

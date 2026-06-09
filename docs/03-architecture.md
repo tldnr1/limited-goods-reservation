@@ -119,6 +119,14 @@ keep each strategy measurable with the same scenario shape
 do not rewrite the whole project into strict DDD
 ```
 
+Foundation default:
+
+```text
+feature/v2 starts with a naive-rdb stock deduction adapter.
+This adapter preserves the v1 read-check-write failure so later experiment branches can compare against the same baseline.
+Redis infrastructure may exist before Redis stock logic is selected.
+```
+
 Possible strategy adapters:
 
 ```text

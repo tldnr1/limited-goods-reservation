@@ -1,6 +1,6 @@
-package com.limitedgoodsreservation.order.entity;
+package com.limitedgoodsreservation.order.domain;
 
-import com.limitedgoodsreservation.product.entity.Product;
+import com.limitedgoodsreservation.stock.domain.Product;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

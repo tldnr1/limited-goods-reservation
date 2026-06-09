@@ -1,4 +1,4 @@
-package com.limitedgoodsreservation.product.entity;
+package com.limitedgoodsreservation.stock.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

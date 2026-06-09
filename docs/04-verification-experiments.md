@@ -105,6 +105,14 @@ same request pattern
 multiple stock consistency strategies
 ```
 
+Foundation baseline:
+
+```text
+feature/v2 starts with stock_strategy = naive-rdb
+the naive-rdb adapter must still reproduce oversell
+Redis infrastructure can be present, but the default purchase flow must not require Redis
+```
+
 Strategies:
 
 ```text
@@ -206,6 +214,15 @@ payment success/failure/timeout count
 retry count
 ```
 
+v2 foundation custom metrics:
+
+```text
+purchase.attempts{strategy}
+purchase.success{strategy}
+purchase.sold.out{strategy}
+purchase.unexpected.failure{strategy}
+```
+
 ---
 
 ## 5. Scenario Files
@@ -215,6 +232,7 @@ Suggested paths:
 ```text
 k6/v0/smoke.js
 k6/v1/oversell-baseline.js
+k6/v2/stock-strategy-baseline.js
 k6/v2/stock-strategy-comparison.js
 k6/v3-1/waiting-room.js
 k6/v3-2/payment-worker-delay.js
