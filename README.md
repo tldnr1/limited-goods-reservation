@@ -1,34 +1,58 @@
-# limited-goods-reservation docs package
+# limited-goods-reservation
 
-This package contains initial v0 documentation for Codex.
+Spring Boot backend portfolio project for limited goods sale failures.
 
 Core message:
 
 ```text
 This is not a full commerce project.
-This is a Spring Boot backend portfolio project that reproduces and improves limited-sale backend failures step by step.
+This project reproduces and improves limited-sale backend failures step by step.
 ```
 
-## Local Experiment Direction
+---
 
-The intended local workflow is Docker-first. Spring Boot API instances, PostgreSQL, Redis, RabbitMQ, Nginx, k6, and observability components should be introduced as Docker Compose services when their versions allow them.
+## Current Status
 
-Local Java can be used as a developer convenience, but the official project verification path should be reproducible through Docker Compose.
+The project is in **v0 documentation / project skeleton** stage.
 
-Recommended reading order:
+Business features start in v1.
+
+---
+
+## Quick Check
+
+Run the basic test suite:
 
 ```text
-1. AGENTS.md
-2. docs/00-project-charter.md
-3. docs/01-version-roadmap.md
-4. docs/02-domain-model.md
-5. docs/03-architecture.md
-6. docs/04-data-model.md
-7. docs/05-testing-strategy.md
-8. docs/06-load-test-and-observability.md
-9. docs/07-github-workflow.md
-10. docs/08-experiment-policy.md
-11. docs/09-future-scope.md
-12. docs/experiments/README.md
-13. .github/pull_request_template.md
+./gradlew test
 ```
+
+Run the v0 Docker Compose skeleton:
+
+```text
+docker compose up --build
+```
+
+Run the k6 smoke scenario through the Compose profile:
+
+```text
+docker compose --profile load-test up --build k6
+```
+
+---
+
+## Documents
+
+Start with `AGENTS.md`. It is the current Codex work index.
+
+Stable project rules live here:
+
+```text
+docs/01-roadmap.md
+docs/02-domain-data.md
+docs/03-architecture.md
+docs/04-verification-experiments.md
+docs/05-workflow-future-scope.md
+```
+
+Use README for quickstart. Use AGENTS/docs for implementation guidance.

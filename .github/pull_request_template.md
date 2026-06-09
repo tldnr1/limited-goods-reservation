@@ -2,10 +2,7 @@
 
 - [ ] v0
 - [ ] v1
-- [ ] v2.1
-- [ ] v2.2
-- [ ] v2.3
-- [ ] v2.4
+- [ ] v2
 - [ ] v3.1
 - [ ] v3.2
 - [ ] v4
@@ -28,6 +25,7 @@ Describe the problem this PR addresses.
 - [ ] Testcontainers
 - [ ] k6 load test
 - [ ] Manual test
+- [ ] Not needed
 
 ## Metrics / Result
 
@@ -51,23 +49,19 @@ List intentionally excluded work.
 
 ## Documentation Updated
 
-- [ ] AGENTS.md
-- [ ] docs/00-project-charter.md
-- [ ] docs/01-version-roadmap.md
-- [ ] docs/02-domain-model.md
-- [ ] docs/03-architecture.md
-- [ ] docs/04-data-model.md
-- [ ] docs/05-testing-strategy.md
-- [ ] docs/06-load-test-and-observability.md
-- [ ] docs/07-github-workflow.md
-- [ ] docs/08-experiment-policy.md
-- [ ] docs/09-future-scope.md
-- [ ] docs/experiments/*
+- [ ] Related docs updated
+- [ ] Experiment result added under records/experiments
 - [ ] Not needed
+
+If docs were updated, list the files:
+
+```text
+
+```
 
 ## Checklist
 
-- [ ] This PR does not implement later-version features early.
 - [ ] This PR respects the current version boundary.
+- [ ] This PR does not implement later-version features early.
 - [ ] Business logic is explicit and explainable.
 - [ ] Experiment work is documented if it affects architectural decisions.

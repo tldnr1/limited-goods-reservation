@@ -1,394 +1,206 @@
 # 03. Architecture
 
-This document defines the target architecture and package rules.
+This document is the Truth for package structure, dependency direction, and architecture evolution by version.
+
+Version scope belongs to `docs/01-roadmap.md`. ERD and identifiers belong to `docs/02-domain-data.md`.
 
 ---
 
-## 1. Architecture Style
+## 1. Architecture Principle
 
-Use a lightweight Hexagonal Architecture.
-
-The goal is not strict DDD. The goal is:
+Architecture should appear because the version objective needs it.
 
 ```text
-testable business logic
-clear dependency direction
-clear separation between domain and infrastructure
-portfolio-friendly explanation
+v0: runnable skeleton only
+v1: feature-based N-tier baseline
+v2: focused port/adapter around stock strategy comparison
+v3+: modular monolith with feature-based modules
 ```
 
-Core rule:
-
-```text
-domain does not know JPA, Redis, RabbitMQ, HTTP, or Spring Web DTOs
-```
+Do not introduce a pattern just because it is the final target.
 
 ---
 
-## 2. Base Package Structure
+## 2. v0 Skeleton
+
+Expected structure:
 
 ```text
 src/main/java/com/limitedgoodsreservation/
   LimitedGoodsReservationApplication.java
-  domain/
-  application/
-  adapter/
-    in/
-      web/
-    out/
-      persistence/
-      redis/
-      mq/
-      pg/
+```
+
+Rules:
+
+```text
+no business package placeholders
+no empty future package-info.java files
+no purchase/reservation/payment/reward code
+```
+
+---
+
+## 3. v1 Feature-Based N-Tier
+
+Purpose:
+
+```text
+make the naive purchase failure easy to see and explain
+```
+
+Package direction:
+
+```text
+src/main/java/com/limitedgoodsreservation/
+  purchase/
+    controller/
+    dto/
+    service/
+  product/
+    entity/
+    repository/
+  order/
+    entity/
+    repository/
   global/
 ```
 
-The base package may be renamed later if a personal domain or GitHub-based package naming rule is selected.
-
----
-
-## 3. Package Responsibilities
-
-### domain
-
-Contains pure business concepts and rules.
-
-Examples:
+Dependency direction:
 
 ```text
-Order
-Reservation
-Payment
-RewardAllocation
-StockPolicy
-ReservationStatus
-OrderStatus
-PaymentStatus
+controller -> service -> repository -> database
 ```
 
 Rules:
 
 ```text
-no JPA annotations if avoidable in core domain
-no Redis access
-no RabbitMQ access
-no Controller DTOs
-no HTTP concepts
+JPA entities may live directly in feature packages
+service may coordinate the naive purchase flow directly
+no port/adapter abstraction
+no stock strategy abstraction
 ```
 
 ---
 
-### application
+## 4. v2 Focused Port/Adapter
 
-Contains use cases, transaction boundaries, and ports.
-
-Examples:
+Purpose:
 
 ```text
-PurchaseNaiveUseCase
-ReserveProductUseCase
-ReleaseExpiredReservationUseCase
-IssueActiveTokenUseCase
-RequestPaymentUseCase
-ProcessPaymentResultUseCase
-AllocateRewardUseCase
+compare stock consistency strategies without rewriting every feature
 ```
 
-Application layer may define ports such as:
+Package direction:
 
 ```text
-ProductStockPort
-OrderPort
-ReservationPort
-StockReservationPort
-WaitingQueuePort
-ActiveTokenPort
-PaymentJobPort
-PaymentGatewayPort
-```
-
----
-
-### adapter.in.web
-
-Contains web adapters.
-
-Examples:
-
-```text
-OrderController
-ReservationController
-WaitingRoomController
-PaymentController
-RewardController
-Request DTOs
-Response DTOs
+src/main/java/com/limitedgoodsreservation/
+  purchase/
+    adapter/in/web/
+    application/
+  stock/
+    domain/
+    application/
+      port/
+    adapter/out/persistence/
+    adapter/out/redis/
+  order/
+    domain/
+    application/
+    adapter/out/persistence/
+  global/
 ```
 
 Rules:
 
 ```text
-Controller should call application use cases.
-Controller should not contain business rules.
+introduce ports around stock consistency only when comparison needs them
+keep strategy interfaces small
+keep each strategy measurable with the same scenario shape
+do not rewrite the whole project into strict DDD
 ```
 
----
-
-### adapter.out.persistence
-
-Contains PostgreSQL/JPA related code.
-
-Examples:
+Possible strategy adapters:
 
 ```text
-JpaOrderEntity
-JpaReservationEntity
-JpaPaymentEntity
-SpringDataOrderRepository
-OrderPersistenceAdapter
-```
-
-Rules:
-
-```text
-JPA entities should not leak into domain use cases if separated.
-Persistence adapter maps between JPA model and domain/application model.
-```
-
----
-
-### adapter.out.redis
-
-Contains Redis related code.
-
-Examples:
-
-```text
-RedisStockReservationAdapter
-RedisWaitingQueueAdapter
-RedisActiveTokenAdapter
-RedisIdempotencyAdapter
-Lua scripts
-```
-
-Responsibilities:
-
-```text
-stock reservation
-reservation TTL
-waiting queue
-active token
-short-term idempotency
-```
-
----
-
-### adapter.out.mq
-
-Contains RabbitMQ related code.
-
-Examples:
-
-```text
-RabbitPaymentJobPublisher
-PaymentJobConsumer
-PaymentRequestedMessage
-```
-
-Responsibilities:
-
-```text
-publish payment job
-consume payment job
-retry payment job when allowed
-```
-
----
-
-### adapter.out.pg
-
-Contains Mock PG integration.
-
-Examples:
-
-```text
-MockPgClient
-MockPgScenario
-MockPgPaymentResult
-```
-
-MVP scenarios:
-
-```text
-success
-fail
-delay
-timeout
-```
-
----
-
-### global
-
-Contains cross-cutting infrastructure.
-
-Examples:
-
-```text
-config
-exception
-common response
-logging
-metrics
-```
-
----
-
-## 4. Dependency Direction
-
-Preferred direction:
-
-```text
-adapter.in.web
-→ application
-→ domain
-
-adapter.out.*
-→ application ports
-```
-
-The application layer owns the use case. Infrastructure implements ports.
-
----
-
-## 5. Runtime Components by Version
-
-Runtime components should be reproducible through Docker Compose in local experiment environments.
-
-Local Java execution is allowed as a developer convenience, but version-level verification should use the Docker Compose topology so that API instances, infrastructure services, load testing, and later scale-out experiments run in the same explicit environment.
-
-### v1
-
-```text
-Spring API container
-PostgreSQL
-k6 container
-```
-
-### v2.2
-
-```text
-Spring API container
-PostgreSQL
-Redis
+RDB atomic update
+RDB pessimistic lock
+RDB optimistic lock
+Redis distributed lock
 Redis Lua
-k6 container
-```
-
-### v2.4
-
-```text
-Nginx
-Spring API container instance 1
-Spring API container instance 2
-PostgreSQL
-Redis
-k6 container
-```
-
-### v3.1
-
-```text
-Spring API container
-PostgreSQL
-Redis
-Admission Scheduler
-Waiting Queue
-Active Token
-k6 container
-```
-
-### v3.2
-
-```text
-Spring API container
-PostgreSQL
-Redis
-RabbitMQ
-Payment Worker
-Mock PG
-k6 container
 ```
 
 ---
 
-## 6. Redis / RDB / MQ Responsibility Split
+## 5. v3+ Modular Monolith
 
-### Redis
+Purpose:
 
 ```text
-real-time high-concurrency control
-stock reservation decision
-reservation TTL
-waiting queue
-active token
-short-term idempotency
+add feature modules for new limited-sale failure modes
 ```
 
-### PostgreSQL
+Target direction:
 
 ```text
-durable business records
-orders
-reservations
-payments
-reward allocations
-auditability
+src/main/java/com/limitedgoodsreservation/
+  purchase/
+  stock/
+  waitingroom/
+  payment/
+  reward/
+  global/
 ```
 
-### RabbitMQ
+Rules:
 
 ```text
-asynchronous payment job delivery
-payment delay isolation
-worker-based retry
+waitingroom appears when entry traffic control is implemented
+payment appears when PG delay isolation is implemented
+reward appears when reward allocation is implemented
+reconciliation stays future scope until explicitly introduced
+do not split into separately deployed services
 ```
 
 ---
 
-## 7. Transaction Boundary Notes
+## 6. Runtime Components
 
-General rule:
-
-```text
-RDB transaction protects durable state changes.
-Redis Lua protects real-time reservation atomicity.
-RabbitMQ separates payment work from request thread.
-```
-
-v2.2 partial failure rule:
+Runtime topology should remain reproducible through Docker Compose.
 
 ```text
-If Redis reservation succeeds but RDB save fails,
-try best-effort Redis reservation release.
-Full reconciliation is future scope.
+v0: Spring API container + PostgreSQL + k6 smoke container
+v1: Spring API container + PostgreSQL + k6 oversell scenario
+v2: Spring API container + PostgreSQL + Redis when Redis strategies are tested
+v3.1: Spring API container + PostgreSQL + Redis + waiting room / active token
+v3.2: Spring API container + PostgreSQL + Redis + RabbitMQ + Payment Worker + Mock PG
 ```
+
+Local Java execution is allowed for fast feedback, but version-level verification should use Docker Compose.
 
 ---
 
-## 8. Architecture Diagram
+## 7. Data Responsibility Split
 
-```mermaid
-flowchart LR
-    Client[Client / k6] --> API[Spring Boot API]
-    API --> PG[(PostgreSQL)]
-    API --> Redis[(Redis)]
+```text
+PostgreSQL:
+- durable business records
+- products
+- product_stock
+- orders
+- reservations/payments/reward_allocations when introduced
 
-    subgraph v3_2[From v3.2]
-        API --> MQ[(RabbitMQ)]
-        MQ --> Worker[Payment Worker]
-        Worker --> MockPG[Mock PG]
-        Worker --> PG
-        Worker --> Redis
-    end
+Redis:
+- real-time high-concurrency control
+- stock reservation decision when selected
+- reservation TTL
+- waiting queue
+- active token
+- short-term idempotency when introduced
+
+RabbitMQ:
+- asynchronous payment job delivery
+- payment delay isolation
+- worker-based retry
 ```
+
+Do not make Redis the only durable source of business truth.
