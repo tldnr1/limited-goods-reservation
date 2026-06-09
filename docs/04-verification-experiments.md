@@ -78,7 +78,20 @@ oversell_count > 0
 Result:
 
 ```text
-to be filled after v1 experiment
+Verified on 2026-06-09 through Docker Compose.
+
+Result:
+- successful purchase responses: 973
+- sold out responses: 27
+- unexpected responses: 0
+- initial stock: 100
+- product_stock.sold_quantity: 97
+- orders count: 973
+- oversell_count: 873
+- order_stock_gap: 876
+
+Detailed record:
+- records/experiments/v1-oversell-baseline.md
 ```
 
 ### v2 Stock Strategy Comparison

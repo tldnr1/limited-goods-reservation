@@ -13,9 +13,9 @@ This project reproduces and improves limited-sale backend failures step by step.
 
 ## Current Status
 
-The project is in **v0 documentation / project skeleton** stage.
+The project is in **v1 naive purchase baseline** stage.
 
-Business features start in v1.
+v1 reproduces oversell with a deliberately naive RDB read-check-write purchase flow.
 
 ---
 
@@ -27,16 +27,32 @@ Run the basic test suite:
 ./gradlew test
 ```
 
-Run the v0 Docker Compose skeleton:
+Run the Docker Compose API:
 
 ```text
 docker compose up --build
 ```
 
-Run the k6 smoke scenario through the Compose profile:
+Run the v1 k6 oversell baseline through the Compose profile:
 
 ```text
 docker compose --profile load-test up --build k6
+```
+
+Verify oversell after the k6 run:
+
+```sql
+SELECT p.id AS product_id,
+       ps.initial_quantity,
+       ps.sold_quantity,
+       COUNT(o.id) AS successful_order_count,
+       GREATEST(COUNT(o.id) - ps.initial_quantity, 0) AS oversell_count,
+       GREATEST(COUNT(o.id) - ps.sold_quantity, 0) AS order_stock_gap
+FROM products p
+JOIN product_stock ps ON ps.product_id = p.id
+LEFT JOIN orders o ON o.product_id = p.id
+WHERE p.id = 1
+GROUP BY p.id, ps.initial_quantity, ps.sold_quantity;
 ```
 
 ---

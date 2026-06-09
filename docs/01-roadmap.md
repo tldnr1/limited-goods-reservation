@@ -156,7 +156,32 @@ oversell_count > 0
 ### Result
 
 ```text
-to be filled after v1 experiment
+v1 feature-based N-tier baseline was implemented:
+- POST /api/v1/purchases
+- X-USER-ID request header as scalar test identity
+- productId-based external request
+- products, product_stock, orders tables
+- productId=1 seed data with initial_quantity=100
+- deliberately naive RDB read-check-write stock update
+
+Docker Compose verification passed:
+- docker compose build api
+- API health endpoint returned UP
+- docker compose --profile load-test up --force-recreate k6
+
+v1 oversell result:
+- concurrent users / iterations: 1000 / 1000
+- successful purchase responses: 973
+- sold out responses: 27
+- unexpected responses: 0
+- DB initial_quantity: 100
+- DB sold_quantity: 97
+- DB successful_order_count: 973
+- DB oversell_count: 873
+- DB order_stock_gap: 876
+
+Experiment record:
+- records/experiments/v1-oversell-baseline.md
 ```
 
 ---

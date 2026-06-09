@@ -6,6 +6,18 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:limited_goods}
     password: ${SPRING_DATASOURCE_PASSWORD:limited_goods}
     driver-class-name: org.postgresql.Driver
+  jpa:
+    defer-datasource-initialization: true
+    hibernate:
+      ddl-auto: create
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  sql:
+    init:
+      mode: always
 
 management:
   endpoints:

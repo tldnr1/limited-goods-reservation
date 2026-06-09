@@ -40,7 +40,7 @@ services:
       BASE_URL: http://api:8080
     volumes:
       - ./k6:/scripts:ro
-    command: ["run", "/scripts/v0/smoke.js"]
+    command: ["run", "/scripts/v1/oversell-baseline.js"]
     depends_on:
       - api
 
