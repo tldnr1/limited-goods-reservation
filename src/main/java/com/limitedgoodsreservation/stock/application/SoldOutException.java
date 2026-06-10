@@ -1,8 +1,8 @@
 package com.limitedgoodsreservation.stock.application;
 
-public class SoldOutException extends RuntimeException {
+public class SoldOutException extends StockDeductionException {
 
     public SoldOutException(Long productId) {
-        super("Sold out. productId=" + productId);
+        super(StockDeductionFailureReason.SOLD_OUT, "Sold out. productId=" + productId);
     }
 }

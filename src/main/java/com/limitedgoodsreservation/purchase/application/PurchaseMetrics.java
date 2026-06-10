@@ -1,5 +1,6 @@
 package com.limitedgoodsreservation.purchase.application;
 
+import com.limitedgoodsreservation.stock.application.StockDeductionFailureReason;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;
@@ -16,8 +17,9 @@ public class PurchaseMetrics {
     public void initialize(String strategyName) {
         counter("purchase.attempts", strategyName);
         counter("purchase.success", strategyName);
-        counter("purchase.sold.out", strategyName);
-        counter("purchase.unexpected.failure", strategyName);
+        for (StockDeductionFailureReason reason : StockDeductionFailureReason.values()) {
+            failureCounter(strategyName, reason);
+        }
     }
 
     public void incrementAttempt(String strategyName) {
@@ -28,12 +30,8 @@ public class PurchaseMetrics {
         increment("purchase.success", strategyName);
     }
 
-    public void incrementSoldOut(String strategyName) {
-        increment("purchase.sold.out", strategyName);
-    }
-
-    public void incrementUnexpectedFailure(String strategyName) {
-        increment("purchase.unexpected.failure", strategyName);
+    public void incrementFailure(String strategyName, StockDeductionFailureReason reason) {
+        failureCounter(strategyName, reason).increment();
     }
 
     private void increment(String name, String strategyName) {
@@ -42,5 +40,9 @@ public class PurchaseMetrics {
 
     private Counter counter(String name, String strategyName) {
         return meterRegistry.counter(name, "strategy", strategyName);
+    }
+
+    private Counter failureCounter(String strategyName, StockDeductionFailureReason reason) {
+        return meterRegistry.counter("purchase.failure", "strategy", strategyName, "reason", reason.name());
     }
 }

@@ -20,7 +20,6 @@
   "graphTooltip": 0,
   "id": null,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
       "datasource": {
@@ -29,9 +28,6 @@
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -46,8 +42,8 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 6,
+        "h": 6,
+        "w": 8,
         "x": 0,
         "y": 0
       },
@@ -67,39 +63,23 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.3.0",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
           "editorMode": "code",
           "expr": "sum by (strategy) (purchase_attempts_total)",
           "legendFormat": "{{strategy}} attempts",
-          "range": true,
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
           "editorMode": "code",
           "expr": "sum by (strategy) (purchase_success_total)",
           "legendFormat": "{{strategy}} success",
-          "range": true,
           "refId": "B"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
           "editorMode": "code",
-          "expr": "sum by (strategy) (purchase_sold_out_total)",
-          "legendFormat": "{{strategy}} sold out",
-          "range": true,
+          "expr": "sum by (strategy, reason) (purchase_failure_total)",
+          "legendFormat": "{{strategy}} {{reason}}",
           "refId": "C"
         }
       ],
@@ -113,41 +93,6 @@
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -162,41 +107,41 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 9,
-        "x": 6,
+        "h": 6,
+        "w": 8,
+        "x": 8,
         "y": 0
       },
       "id": 2,
       "options": {
+        "displayMode": "gradient",
         "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "displayMode": "table",
+          "calcs": [],
+          "displayMode": "list",
           "placement": "bottom",
           "showLegend": true
         },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
           "editorMode": "code",
-          "expr": "sum by (status) (rate(http_server_requests_seconds_count{uri=\"/api/v1/purchases\"}[1m]))",
-          "legendFormat": "status {{status}}",
-          "range": true,
+          "expr": "sum by (reason) (purchase_failure_total)",
+          "legendFormat": "{{reason}}",
           "refId": "A"
         }
       ],
-      "title": "Purchase Request Rate by Status",
-      "type": "timeseries"
+      "title": "Failure Reason Breakdown",
+      "type": "bargauge"
     },
     {
       "datasource": {
@@ -205,40 +150,15 @@
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
           "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "seconds",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
+            "axisLabel": "ms",
             "drawStyle": "line",
             "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
             "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "spanNulls": false
           },
           "mappings": [],
           "thresholds": {
@@ -254,9 +174,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 9,
-        "x": 15,
+        "h": 6,
+        "w": 8,
+        "x": 16,
         "y": 0
       },
       "id": 3,
@@ -276,29 +196,25 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
           "editorMode": "code",
-          "expr": "sum(rate(http_server_requests_seconds_sum{uri=\"/api/v1/purchases\"}[1m])) / sum(rate(http_server_requests_seconds_count{uri=\"/api/v1/purchases\"}[1m]))",
-          "legendFormat": "api avg",
-          "range": true,
+          "expr": "1000 * max(k6_http_req_duration_p50{name=\"http://api:8080/api/v1/purchases\"})",
+          "legendFormat": "k6 p50",
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
           "editorMode": "code",
-          "expr": "max(http_server_requests_seconds_max{uri=\"/api/v1/purchases\"})",
-          "legendFormat": "api max",
-          "range": true,
+          "expr": "1000 * max(k6_http_req_duration_p95{name=\"http://api:8080/api/v1/purchases\"})",
+          "legendFormat": "k6 p95",
           "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "1000 * max(k6_http_req_duration_p99{name=\"http://api:8080/api/v1/purchases\"})",
+          "legendFormat": "k6 p99",
+          "refId": "C"
         }
       ],
-      "title": "API Purchase Latency",
+      "title": "k6 Purchase Latency",
       "type": "timeseries"
     },
     {
@@ -308,40 +224,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
           "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
             "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "spanNulls": false
           },
           "mappings": [],
           "thresholds": {
@@ -357,10 +247,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 6,
         "w": 8,
         "x": 0,
-        "y": 8
+        "y": 6
       },
       "id": 4,
       "options": {
@@ -379,29 +269,13 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
           "editorMode": "code",
-          "expr": "hikaricp_connections_active",
-          "legendFormat": "active",
-          "range": true,
+          "expr": "sum by (status) (rate(k6_http_reqs_total{name=\"http://api:8080/api/v1/purchases\"}[1m]))",
+          "legendFormat": "k6 status {{status}}",
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
-          "editorMode": "code",
-          "expr": "hikaricp_connections_pending",
-          "legendFormat": "pending",
-          "range": true,
-          "refId": "B"
         }
       ],
-      "title": "DB Connection Pool",
+      "title": "k6 Request Rate by Status",
       "type": "timeseries"
     },
     {
@@ -411,40 +285,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
           "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
             "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "spanNulls": false
           },
           "mappings": [],
           "thresholds": {
@@ -460,10 +308,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 6,
         "w": 8,
         "x": 8,
-        "y": 8
+        "y": 6
       },
       "id": 5,
       "options": {
@@ -482,29 +330,13 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
           "editorMode": "code",
-          "expr": "jvm_threads_live_threads",
-          "legendFormat": "live threads",
-          "range": true,
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{uri=\"/api/v1/purchases\"}[1m]))",
+          "legendFormat": "api status {{status}}",
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
-          "editorMode": "code",
-          "expr": "process_cpu_usage",
-          "legendFormat": "process cpu",
-          "range": true,
-          "refId": "B"
         }
       ],
-      "title": "JVM / Process",
+      "title": "API Request Rate by Status",
       "type": "timeseries"
     },
     {
@@ -514,40 +346,14 @@
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
           "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
             "drawStyle": "line",
             "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
             "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
+            "spanNulls": false
           },
           "mappings": [],
           "thresholds": {
@@ -563,10 +369,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 6,
         "w": 8,
         "x": 16,
-        "y": 8
+        "y": 6
       },
       "id": 6,
       "options": {
@@ -585,29 +391,86 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
           "editorMode": "code",
-          "expr": "sum(rate(k6_http_reqs_total[1m]))",
-          "legendFormat": "k6 request rate",
-          "range": true,
+          "expr": "hikaricp_connections_active",
+          "legendFormat": "active",
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "Prometheus"
-          },
           "editorMode": "code",
-          "expr": "k6_vus",
-          "legendFormat": "k6 vus",
-          "range": true,
+          "expr": "hikaricp_connections_pending",
+          "legendFormat": "pending",
           "refId": "B"
         }
       ],
-      "title": "k6 Load",
+      "title": "DB Connection Pool",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "jvm_threads_live_threads",
+          "legendFormat": "live threads",
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "process_cpu_usage",
+          "legendFormat": "process cpu",
+          "refId": "B"
+        }
+      ],
+      "title": "JVM / Process",
       "type": "timeseries"
     }
   ],
@@ -628,6 +491,6 @@
   "timezone": "browser",
   "title": "v2 Stock Strategy Overview",
   "uid": "limited-goods-v2-stock",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

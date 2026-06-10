@@ -19,6 +19,9 @@ spring:
     init:
       mode: always
 
+stock:
+  strategy: ${STOCK_STRATEGY:naive-rdb}
+
 management:
   endpoints:
     web:

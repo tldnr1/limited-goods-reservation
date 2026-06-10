@@ -8,6 +8,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/limited_goods_reservation
       SPRING_DATASOURCE_USERNAME: limited_goods
       SPRING_DATASOURCE_PASSWORD: limited_goods
+      STOCK_STRATEGY: ${STOCK_STRATEGY:-naive-rdb}
     ports:
       - "8080:8080"
     depends_on:
@@ -90,7 +91,11 @@ services:
       - load-test
     environment:
       BASE_URL: http://api:8080
-      STOCK_STRATEGY: naive-rdb
+      STOCK_STRATEGY: ${STOCK_STRATEGY:-naive-rdb}
+      PRODUCT_ID: ${PRODUCT_ID:-1}
+      VUS: ${VUS:-1000}
+      ITERATIONS: ${ITERATIONS:-1000}
+      MAX_DURATION: ${MAX_DURATION:-2m}
       K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
       K6_PROMETHEUS_RW_TREND_STATS: p(50),p(95),p(99),min,max,avg
     volumes:

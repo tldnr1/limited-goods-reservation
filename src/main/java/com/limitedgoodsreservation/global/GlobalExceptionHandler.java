@@ -1,6 +1,6 @@
 package com.limitedgoodsreservation.global;
 
-import com.limitedgoodsreservation.stock.application.SoldOutException;
+import com.limitedgoodsreservation.stock.application.StockDeductionException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -9,10 +9,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(SoldOutException.class)
-    public ResponseEntity<ErrorResponse> handleSoldOut(SoldOutException exception) {
+    @ExceptionHandler(StockDeductionException.class)
+    public ResponseEntity<ErrorResponse> handleStockDeduction(StockDeductionException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponse("SOLD_OUT", exception.getMessage()));
+                .body(new ErrorResponse(exception.reason().name(), exception.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

@@ -3,7 +3,9 @@ package com.limitedgoodsreservation.purchase.application;
 import com.limitedgoodsreservation.order.adapter.out.persistence.OrderRepository;
 import com.limitedgoodsreservation.order.domain.Order;
 import com.limitedgoodsreservation.purchase.adapter.in.web.PurchaseResponse;
-import com.limitedgoodsreservation.stock.application.SoldOutException;
+import com.limitedgoodsreservation.stock.application.StockDeductionException;
+import com.limitedgoodsreservation.stock.application.StockDeductionFailureReason;
+import com.limitedgoodsreservation.stock.application.StockDeductionPortResolver;
 import com.limitedgoodsreservation.stock.application.port.StockDeductionPort;
 import com.limitedgoodsreservation.stock.application.port.StockDeductionResult;
 import org.springframework.stereotype.Service;
@@ -12,19 +14,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PurchaseService {
 
-    private final StockDeductionPort stockDeductionPort;
+    private final StockDeductionPortResolver stockDeductionPortResolver;
     private final OrderRepository orderRepository;
     private final PurchaseMetrics purchaseMetrics;
 
     public PurchaseService(
-            StockDeductionPort stockDeductionPort,
+            StockDeductionPortResolver stockDeductionPortResolver,
             OrderRepository orderRepository,
             PurchaseMetrics purchaseMetrics
     ) {
-        this.stockDeductionPort = stockDeductionPort;
+        this.stockDeductionPortResolver = stockDeductionPortResolver;
         this.orderRepository = orderRepository;
         this.purchaseMetrics = purchaseMetrics;
-        this.purchaseMetrics.initialize(stockDeductionPort.strategyName());
+        this.purchaseMetrics.initialize(stockDeductionPortResolver.selectedStrategyName());
     }
 
     @Transactional
@@ -36,6 +38,7 @@ public class PurchaseService {
             throw new IllegalArgumentException("productId is required.");
         }
 
+        StockDeductionPort stockDeductionPort = stockDeductionPortResolver.selectedPort();
         String strategyName = stockDeductionPort.strategyName();
         purchaseMetrics.incrementAttempt(strategyName);
 
@@ -45,11 +48,11 @@ public class PurchaseService {
             purchaseMetrics.incrementSuccess(strategyName);
 
             return PurchaseResponse.from(order);
-        } catch (SoldOutException exception) {
-            purchaseMetrics.incrementSoldOut(strategyName);
+        } catch (StockDeductionException exception) {
+            purchaseMetrics.incrementFailure(strategyName, exception.reason());
             throw exception;
         } catch (RuntimeException exception) {
-            purchaseMetrics.incrementUnexpectedFailure(strategyName);
+            purchaseMetrics.incrementFailure(strategyName, StockDeductionFailureReason.UNEXPECTED_FAILURE);
             throw exception;
         }
     }

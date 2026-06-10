@@ -44,6 +44,30 @@ Grafana provisions the v2 Stock Strategy Overview dashboard from monitoring/graf
 Screenshots for troubleshooting records should use the Grafana dashboard plus the DB verification query result.
 ```
 
+v2 common experiment runbook:
+
+```text
+1. docker compose build api
+2. docker compose up -d --force-recreate api redis prometheus grafana
+3. Check API health: http://localhost:8080/actuator/health
+4. Check Prometheus target: up{job="api"} == 1
+5. Check Grafana dashboard uid: limited-goods-v2-stock
+6. docker compose --profile load-test up --force-recreate k6
+7. Run the DB verification query for successful_order_count, oversell_count, and order_stock_gap.
+8. Query Prometheus for purchase_attempts_total, purchase_success_total, and purchase_failure_total.
+9. Capture the Grafana dashboard for troubleshooting records when a result is worth preserving.
+```
+
+v2 load steps:
+
+```text
+smoke:    VUS=10   ITERATIONS=10
+medium:   VUS=100  ITERATIONS=100
+baseline: VUS=1000 ITERATIONS=1000
+```
+
+Each strategy should record at least one baseline result.
+
 ---
 
 ## 3. Core Scenarios
@@ -120,6 +144,7 @@ Foundation baseline:
 feature/v2 starts with stock_strategy = naive-rdb
 the naive-rdb adapter must still reproduce oversell
 Redis infrastructure can be present, but the default purchase flow must not require Redis
+stock.strategy is selected from STOCK_STRATEGY and defaults to naive-rdb
 ```
 
 Strategies:
@@ -140,6 +165,18 @@ each strategy records success/failure counts
 each strategy records latency metrics where practical
 selected main path achieves oversell_count = 0
 ```
+
+Failure reasons:
+
+```text
+SOLD_OUT
+OPTIMISTIC_CONFLICT
+LOCK_BUSY
+LOCK_TIMEOUT
+UNEXPECTED_FAILURE
+```
+
+HTTP status is not the primary comparison key. Use the response body `code`, k6 counters, and Prometheus `reason` label.
 
 Result:
 
@@ -228,8 +265,16 @@ v2 foundation custom metrics:
 ```text
 purchase.attempts{strategy}
 purchase.success{strategy}
-purchase.sold.out{strategy}
-purchase.unexpected.failure{strategy}
+purchase.failure{strategy,reason}
+```
+
+v2 Redis experiment defaults:
+
+```text
+Redis stock key: stock:available:{productId}
+Redis Lua / Redis lock branches must initialize stock:available:1 to 100 before the baseline run.
+Redis stock deduction followed by DB order persistence is a dual-write flow; record this limitation.
+Do not inject DB failure in the default v2 comparison.
 ```
 
 ---

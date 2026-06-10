@@ -39,6 +39,21 @@ Run the v2 stock strategy baseline through the Compose profile:
 docker compose --profile load-test up --build k6
 ```
 
+Run smaller load steps by overriding k6 environment values:
+
+```text
+$env:VUS='10'; $env:ITERATIONS='10'; docker compose --profile load-test up --force-recreate k6
+$env:VUS='100'; $env:ITERATIONS='100'; docker compose --profile load-test up --force-recreate k6
+$env:VUS='1000'; $env:ITERATIONS='1000'; docker compose --profile load-test up --force-recreate k6
+```
+
+Select a v2 stock strategy with `STOCK_STRATEGY`:
+
+```text
+$env:STOCK_STRATEGY='naive-rdb'; docker compose up -d --force-recreate api
+$env:STOCK_STRATEGY='naive-rdb'; docker compose --profile load-test up --force-recreate k6
+```
+
 Open local monitoring:
 
 ```text
