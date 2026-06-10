@@ -39,6 +39,15 @@ Run the v2 stock strategy baseline through the Compose profile:
 docker compose --profile load-test up --build k6
 ```
 
+Open local monitoring:
+
+```text
+Prometheus: http://localhost:9090
+Grafana: http://localhost:3000
+Grafana login: admin / admin
+Dashboard: Limited Goods / v2 Stock Strategy Overview
+```
+
 Verify oversell after the k6 run:
 
 ```sql

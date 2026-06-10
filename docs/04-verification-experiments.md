@@ -35,6 +35,15 @@ Docker Compose
 
 Version-level verification should be runnable through Docker Compose. Local IDE or local Java execution may be used for fast feedback.
 
+v2 monitoring:
+
+```text
+Prometheus scrapes Spring Boot Actuator metrics from /actuator/prometheus.
+k6 writes load-test metrics to Prometheus remote write during Compose load-test runs.
+Grafana provisions the v2 Stock Strategy Overview dashboard from monitoring/grafana/dashboards/.
+Screenshots for troubleshooting records should use the Grafana dashboard plus the DB verification query result.
+```
+
 ---
 
 ## 3. Core Scenarios
