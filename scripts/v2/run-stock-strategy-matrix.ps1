@@ -7,6 +7,9 @@ param(
     [int] $Repeats = 5,
     [int] $InitialStock = 100,
     [int] $ProductId = 1,
+    [string] $ResultName = "v2-stock-strategy-comparison",
+    [int] $StabilizeSeconds = 0,
+    [int] $CooldownSeconds = 0,
     [switch] $Smoke,
     [switch] $SkipBuild
 )
@@ -25,7 +28,7 @@ $RawDir = Join-Path $Root "notes\v2-stock-strategy\raw"
 $CsvPath = if ($Smoke) {
     Join-Path $RawDir "v2-stock-strategy-smoke-$Strategy.csv"
 } else {
-    Join-Path $Root "records\experiments\v2-stock-strategy-comparison.csv"
+    Join-Path $Root "records\experiments\$ResultName.csv"
 }
 New-Item -ItemType Directory -Force -Path $RawDir | Out-Null
 if ($Smoke -and (Test-Path -LiteralPath $CsvPath)) {
@@ -54,6 +57,17 @@ function Wait-Api {
     }
 
     throw "API health endpoint did not become ready."
+}
+
+function Wait-IfNeeded {
+    param([int] $Seconds, [string] $Reason)
+
+    if ($Seconds -le 0) {
+        return
+    }
+
+    Write-Host "$Reason for $Seconds seconds."
+    Start-Sleep -Seconds $Seconds
 }
 
 function Reset-ExperimentState {
@@ -171,7 +185,10 @@ $startedAt = Get-Date -Format "yyyyMMdd-HHmmss"
 $warmupRunId = "$startedAt-$Strategy-warmup"
 Write-Host "Warm-up run: $warmupRunId"
 Reset-ExperimentState
+Wait-Api
+Wait-IfNeeded -Seconds $StabilizeSeconds -Reason "Stabilizing before warm-up"
 Invoke-K6Run -UserCount 10 -Repeat 0 -RunId $warmupRunId
+Wait-IfNeeded -Seconds $CooldownSeconds -Reason "Cooling down after warm-up"
 
 foreach ($userCount in $Users) {
     for ($repeat = 1; $repeat -le $Repeats; $repeat += 1) {
@@ -179,7 +196,10 @@ foreach ($userCount in $Users) {
         Write-Host "Measured run: $runId"
 
         Reset-ExperimentState
+        Wait-Api
+        Wait-IfNeeded -Seconds $StabilizeSeconds -Reason "Stabilizing before measured run"
         Invoke-K6Run -UserCount $userCount -Repeat $repeat -RunId $runId
+        Wait-IfNeeded -Seconds $CooldownSeconds -Reason "Cooling down after measured run"
 
         $summary = Read-K6Summary $runId
         $duration = $summary.metrics.http_req_duration.values
