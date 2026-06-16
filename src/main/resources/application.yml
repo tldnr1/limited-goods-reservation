@@ -26,6 +26,11 @@ spring:
 stock:
   strategy: ${STOCK_STRATEGY:naive-rdb}
 
+purchase:
+  failure:
+    mode: ${PURCHASE_FAILURE_MODE:off}
+    limit: ${PURCHASE_FAILURE_LIMIT:0}
+
 management:
   endpoints:
     web:

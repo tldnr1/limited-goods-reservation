@@ -288,5 +288,8 @@ Stabilized rerun record:
 - records/experiments/v2-stock-strategy-expansion-rerun.csv
 If another normal-load pass is needed, consider changing the k6 scenario shape before rerunning both strategies.
 Add separate failure-injection experiments for Redis Lua and RDB atomic.
+Failure-injection record:
+- records/experiments/v2-stock-failure-injection.md
+- records/experiments/v2-stock-failure-injection.csv
 For v3 planning, design compensation/reconciliation around Redis Lua's dual-write limitation.
 ```

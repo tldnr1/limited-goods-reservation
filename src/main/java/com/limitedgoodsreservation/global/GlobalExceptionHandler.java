@@ -1,5 +1,6 @@
 package com.limitedgoodsreservation.global;
 
+import com.limitedgoodsreservation.purchase.failure.InjectedPurchaseFailureException;
 import com.limitedgoodsreservation.stock.strategy.StockDeductionException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleStockDeduction(StockDeductionException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse(exception.reason().name(), exception.getMessage()));
+    }
+
+    @ExceptionHandler(InjectedPurchaseFailureException.class)
+    public ResponseEntity<ErrorResponse> handleInjectedPurchaseFailure(InjectedPurchaseFailureException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ErrorResponse("INJECTED_ORDER_SAVE_FAILURE", exception.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

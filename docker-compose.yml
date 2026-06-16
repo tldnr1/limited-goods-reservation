@@ -11,6 +11,8 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       STOCK_STRATEGY: ${STOCK_STRATEGY:-naive-rdb}
+      PURCHASE_FAILURE_MODE: ${PURCHASE_FAILURE_MODE:-off}
+      PURCHASE_FAILURE_LIMIT: ${PURCHASE_FAILURE_LIMIT:-0}
     ports:
       - "8080:8080"
     depends_on:
@@ -108,7 +110,7 @@ services:
     volumes:
       - ./k6:/scripts:ro
       - ./notes/v2-stock-strategy/raw:/results
-    command: ["run", "-o", "experimental-prometheus-rw", "/scripts/v2/stock-strategy-baseline.js"]
+    command: ["run", "-o", "experimental-prometheus-rw", "${K6_SCRIPT:-/scripts/v2/stock-strategy-baseline.js}"]
     depends_on:
       api:
         condition: service_started

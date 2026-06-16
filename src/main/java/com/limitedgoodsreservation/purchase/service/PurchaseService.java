@@ -5,6 +5,8 @@ import com.limitedgoodsreservation.order.repository.OrderRepository;
 import com.limitedgoodsreservation.product.entity.Product;
 import com.limitedgoodsreservation.product.repository.ProductRepository;
 import com.limitedgoodsreservation.purchase.dto.PurchaseResponse;
+import com.limitedgoodsreservation.purchase.failure.InjectedPurchaseFailureException;
+import com.limitedgoodsreservation.purchase.failure.PurchaseFailureInjector;
 import com.limitedgoodsreservation.purchase.metrics.PurchaseMetrics;
 import com.limitedgoodsreservation.stock.strategy.StockDeductionException;
 import com.limitedgoodsreservation.stock.strategy.StockDeductionFailureReason;
@@ -22,17 +24,20 @@ public class PurchaseService {
     private final ProductRepository productRepository;
     private final OrderRepository orderRepository;
     private final PurchaseMetrics purchaseMetrics;
+    private final PurchaseFailureInjector purchaseFailureInjector;
 
     public PurchaseService(
             StockDeductionStrategyResolver stockDeductionStrategyResolver,
             ProductRepository productRepository,
             OrderRepository orderRepository,
-            PurchaseMetrics purchaseMetrics
+            PurchaseMetrics purchaseMetrics,
+            PurchaseFailureInjector purchaseFailureInjector
     ) {
         this.stockDeductionStrategyResolver = stockDeductionStrategyResolver;
         this.productRepository = productRepository;
         this.orderRepository = orderRepository;
         this.purchaseMetrics = purchaseMetrics;
+        this.purchaseFailureInjector = purchaseFailureInjector;
     }
 
     @PostConstruct
@@ -42,6 +47,11 @@ public class PurchaseService {
 
     @Transactional
     public PurchaseResponse purchase(Long userId, Long productId) {
+        return purchase(userId, productId, null);
+    }
+
+    @Transactional
+    public PurchaseResponse purchase(Long userId, Long productId, String runId) {
         if (userId == null) {
             throw new IllegalArgumentException("X-USER-ID is required.");
         }
@@ -58,6 +68,7 @@ public class PurchaseService {
                     strategyName,
                     () -> stockDeductionStrategy.deduct(productId)
             );
+            purchaseFailureInjector.maybeFailAfterStockDecisionBeforeOrderSave(runId, strategyName);
             Product product = productRepository.getReferenceById(deductionResult.productId());
             Order order = purchaseMetrics.recordOrderSave(
                     strategyName,
@@ -68,6 +79,9 @@ public class PurchaseService {
             return PurchaseResponse.from(order);
         } catch (StockDeductionException exception) {
             purchaseMetrics.incrementFailure(strategyName, exception.reason());
+            throw exception;
+        } catch (InjectedPurchaseFailureException exception) {
+            purchaseMetrics.incrementFailure(strategyName, StockDeductionFailureReason.INJECTED_ORDER_SAVE_FAILURE);
             throw exception;
         } catch (RuntimeException exception) {
             purchaseMetrics.incrementFailure(strategyName, StockDeductionFailureReason.UNEXPECTED_FAILURE);
