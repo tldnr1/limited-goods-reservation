@@ -137,6 +137,8 @@ The HTTP failed rate includes 409 SOLD_OUT responses from k6's built-in HTTP sta
 
 Run strategy branches with the same baseline shape:
 
+Historical note: these branches were used before the v2 comparison code was folded back into `feature/v2`. After that consolidation, they can be deleted once the useful code and records are preserved.
+
 ```text
 experiment/v2-rdb-atomic
 experiment/v2-rdb-pessimistic

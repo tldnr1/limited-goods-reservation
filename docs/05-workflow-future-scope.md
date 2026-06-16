@@ -11,7 +11,7 @@ Default flow:
 ```text
 main <- dev <- feature/*
 main <- hotfix/*
-experiment/* may be kept for comparison records
+experiment/* may be used temporarily for comparison spikes
 ```
 
 Branch meaning:
@@ -21,7 +21,7 @@ main          stable documented baseline
 dev           integration branch before main
 feature/*     main-path implementation
 hotfix/*      urgent correction from main
-experiment/*  optional comparison implementation
+experiment/*  short-lived comparison implementation
 docs/*        documentation-only work
 ```
 
@@ -36,9 +36,9 @@ Examples:
 ```text
 docs/v0-documentation-cleanup
 feature/v1-naive-purchase-baseline
-experiment/v2-rdb-atomic-update
-experiment/v2-redis-lua
 feature/v2-selected-stock-strategy
+experiment/v3-1-token-policy-spike
+experiment/v3-2-payment-timeout-spike
 feature/v3-1-waiting-room-active-token
 feature/v3-2-payment-worker
 feature/v4-reward-allocation
@@ -79,6 +79,7 @@ comparison question is clear
 result is documented
 decision is stated
 limitations are stated
+temporary branch can be deleted after useful code or records are folded into the main path
 ```
 
 ---

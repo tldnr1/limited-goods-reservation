@@ -6,6 +6,10 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:limited_goods}
     password: ${SPRING_DATASOURCE_PASSWORD:limited_goods}
     driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      repositories:
+        enabled: false
   jpa:
     defer-datasource-initialization: true
     hibernate:
