@@ -110,7 +110,7 @@ Prometheus checks:
 
 The v2 naive-rdb control baseline reproduced oversell under the shared v2 experiment harness.
 
-The API returned 969 successful purchases for an initial stock of 100, so the DB-level `oversell_count` was 869. The stock row ended at `sold_quantity = 100`, while `orders` contained 969 rows for `productId = 1`, which preserves the v1 failure mode under the v2 port/adapter structure.
+The API returned 969 successful purchases for an initial stock of 100, so the DB-level `oversell_count` was 869. The stock row ended at `sold_quantity = 100`, while `orders` contained 969 rows for `productId = 1`, which preserves the v1 failure mode under the earlier v2 foundation structure.
 
 Latency was high at the tail for the local Docker Compose run:
 

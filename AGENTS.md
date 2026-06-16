@@ -95,7 +95,7 @@ Records explain why decisions were made. Notes are local/private scratch and are
 - Use `X-USER-ID` as the simplified test identity.
 - Do not add a `users` table in v2.
 - Do not create future package placeholders without real classes.
-- Run the v2 benchmark matrix as 100, 500, and 1000 users, each 5 times per official strategy, before recording the selected v2 path.
+- Run one official strategy per benchmark command. Each strategy uses 100, 500, and 1000 users, each 5 times, before recording the selected v2 path.
 
 ---
 

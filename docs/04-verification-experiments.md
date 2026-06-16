@@ -52,8 +52,8 @@ v2 common experiment runbook:
 3. Check API health: http://localhost:8080/actuator/health
 4. Check Prometheus target: up{job="api"} == 1
 5. Check Grafana dashboard uid: limited-goods-v2-stock
-6. Run scripts/v2/run-stock-strategy-matrix.ps1 -Smoke for a quick matrix check.
-7. Run scripts/v2/run-stock-strategy-matrix.ps1 for the official 60-run matrix.
+6. Run scripts/v2/run-stock-strategy-matrix.ps1 -Strategy {strategy} -Smoke for a quick strategy check.
+7. Run scripts/v2/run-stock-strategy-matrix.ps1 -Strategy {strategy} for each official strategy.
 8. Summarize records/experiments/v2-stock-strategy-comparison.csv.
 9. Query Prometheus for purchase counters and stock/order timer histograms.
 10. Capture the Grafana dashboard for troubleshooting records when a result is worth preserving.
@@ -69,6 +69,7 @@ stock:      initial_quantity = 100
 ```
 
 Each measured run resets DB order/stock state and Redis state before k6 starts. Each strategy gets one warm-up run that is excluded from official results.
+Run one strategy per command so failures and machine variance are easier to isolate.
 
 ---
 

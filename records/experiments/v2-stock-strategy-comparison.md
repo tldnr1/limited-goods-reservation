@@ -40,16 +40,22 @@ repeats = 5 per strategy/load
 official runtime = Windows Docker Compose
 ```
 
-Run command:
+Run commands:
 
 ```powershell
-.\scripts\v2\run-stock-strategy-matrix.ps1
+.\scripts\v2\run-stock-strategy-matrix.ps1 -Strategy naive-rdb
+.\scripts\v2\run-stock-strategy-matrix.ps1 -Strategy rdb-atomic
+.\scripts\v2\run-stock-strategy-matrix.ps1 -Strategy rdb-pessimistic
+.\scripts\v2\run-stock-strategy-matrix.ps1 -Strategy redis-lua
 ```
 
-Smoke command:
+Smoke commands:
 
 ```powershell
-.\scripts\v2\run-stock-strategy-matrix.ps1 -Smoke
+.\scripts\v2\run-stock-strategy-matrix.ps1 -Strategy naive-rdb -Smoke
+.\scripts\v2\run-stock-strategy-matrix.ps1 -Strategy rdb-atomic -Smoke
+.\scripts\v2\run-stock-strategy-matrix.ps1 -Strategy rdb-pessimistic -Smoke
+.\scripts\v2\run-stock-strategy-matrix.ps1 -Strategy redis-lua -Smoke
 ```
 
 ## Metrics
