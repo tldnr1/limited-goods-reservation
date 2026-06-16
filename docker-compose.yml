@@ -8,11 +8,15 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/limited_goods_reservation
       SPRING_DATASOURCE_USERNAME: limited_goods
       SPRING_DATASOURCE_PASSWORD: limited_goods
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
       STOCK_STRATEGY: ${STOCK_STRATEGY:-naive-rdb}
     ports:
       - "8080:8080"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   postgres:
@@ -96,10 +100,14 @@ services:
       VUS: ${VUS:-1000}
       ITERATIONS: ${ITERATIONS:-1000}
       MAX_DURATION: ${MAX_DURATION:-2m}
+      RUN_ID: ${RUN_ID:-local}
+      REPEAT: ${REPEAT:-1}
+      INITIAL_STOCK: ${INITIAL_STOCK:-100}
       K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
       K6_PROMETHEUS_RW_TREND_STATS: p(50),p(95),p(99),min,max,avg
     volumes:
       - ./k6:/scripts:ro
+      - ./notes/v2-stock-strategy/raw:/results
     command: ["run", "-o", "experimental-prometheus-rw", "/scripts/v2/stock-strategy-baseline.js"]
     depends_on:
       api:

@@ -1,5 +1,7 @@
 # v2 Naive RDB Baseline
 
+> Historical note: this result was recorded before v2 was simplified to a v1-like layered + stock strategy structure. Keep it as the first v2 harness baseline. The official strategy comparison should use `records/experiments/v2-stock-strategy-comparison.md`.
+
 ## Version
 
 v2 stock strategy comparison

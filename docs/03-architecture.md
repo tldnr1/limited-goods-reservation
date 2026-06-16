@@ -13,7 +13,7 @@ Architecture should appear because the version objective needs it.
 ```text
 v0: runnable skeleton only
 v1: feature-based N-tier baseline
-v2: focused port/adapter around stock strategy comparison
+v2: v1-like layered structure with stock strategy comparison
 v3+: modular monolith with feature-based modules
 ```
 
@@ -82,12 +82,12 @@ no stock strategy abstraction
 
 ---
 
-## 4. v2 Focused Port/Adapter
+## 4. v2 Layered Stock Strategy
 
 Purpose:
 
 ```text
-compare stock consistency strategies without rewriting every feature
+compare stock consistency strategies while keeping the v1 code shape easy to explain
 ```
 
 Package direction:
@@ -95,46 +95,53 @@ Package direction:
 ```text
 src/main/java/com/limitedgoodsreservation/
   purchase/
-    adapter/in/web/
-    application/
-  stock/
-    domain/
-    application/
-      port/
-    adapter/out/persistence/
-    adapter/out/redis/
+    controller/
+    dto/
+    service/
+    metrics/
+  product/
+    entity/
+    repository/
   order/
-    domain/
-    application/
-    adapter/out/persistence/
+    entity/
+    repository/
+  stock/
+    strategy/
   global/
 ```
 
 Rules:
 
 ```text
-introduce ports around stock consistency only when comparison needs them
-keep strategy interfaces small
+keep controller -> service -> repository readable like v1
+isolate only stock deduction behind a small strategy interface
 keep each strategy measurable with the same scenario shape
-do not rewrite the whole project into strict DDD
+do not use full hexagonal/strict DDD in v2
+reconsider port/adapter in v3 when waiting room, active token, payment, and worker boundaries appear
 ```
 
 Foundation default:
 
 ```text
-feature/v2 starts with a naive-rdb stock deduction adapter.
-This adapter preserves the v1 read-check-write failure so later experiment branches can compare against the same baseline.
-Redis infrastructure may exist before Redis stock logic is selected.
+feature/v2 starts with a naive-rdb stock strategy.
+This strategy preserves the v1 read-check-write failure so later strategies can compare against the same baseline.
 ```
 
-Possible strategy adapters:
+Official comparison strategies:
 
 ```text
+naive-rdb
 RDB atomic update
 RDB pessimistic lock
-RDB optimistic lock
-Redis distributed lock
 Redis Lua
+```
+
+Redis Lua rule:
+
+```text
+Redis stock key stock:available:{productId} is the stock decision source of truth for redis-lua.
+The v2 API still saves the order synchronously, so measure stock decision latency separately from HTTP latency.
+DB failure compensation after Redis deduction is future scope.
 ```
 
 ---

@@ -1,0 +1,1 @@
+run_id,strategy,users,repeat,initial_stock,http_reqs,http_failed_rate,http_p50_ms,http_p95_ms,http_p99_ms,successful_purchases,sold_out_responses,lock_timeout_responses,unexpected_responses,db_initial_quantity,db_sold_quantity,db_order_count,redis_available,stock_decision_count,oversell_count,decision_order_gap

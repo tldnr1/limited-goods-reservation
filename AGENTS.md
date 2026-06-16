@@ -10,14 +10,14 @@ This file is the **current work index**. It may change as the project version ch
 
 ```text
 current_version: v2
-current_goal: stock strategy comparison foundation
-next_target: v2 experiment branches for stock consistency strategies
+current_goal: layered stock strategy comparison
+next_target: v2 60-run stock strategy benchmark matrix
 project_type: Spring Boot backend portfolio project
-architecture_now: focused port/adapter around stock consistency
+architecture_now: v1-like layered + stock strategy
 official_verification_path: Docker Compose first
 ```
 
-Do not select the final v2 stock strategy until experiment branches produce measured results.
+Do not select the final v2 stock strategy until the 4-strategy benchmark matrix produces measured results.
 
 ---
 
@@ -85,14 +85,17 @@ Records explain why decisions were made. Notes are local/private scratch and are
 
 ## Current Guardrails
 
-- v2 should keep focused port/adapter boundaries around stock consistency only.
-- Redis may be configured for v2 experiments, but Redis Lua should live in an experiment branch until selected by measured results.
+- v2 should keep a v1-like layered structure and isolate only stock deduction behind a small strategy interface.
+- v2 official comparison strategies are `naive-rdb`, `rdb-atomic`, `rdb-pessimistic`, and `redis-lua`.
+- Redis Lua is an official v2 comparison strategy. Treat Redis `stock:available:{productId}` as the stock decision source of truth for that strategy.
+- For Redis Lua, separate stock decision latency from full HTTP latency because the v2 API still saves a DB order synchronously before responding.
 - Do not introduce MQ, waiting room, active token, payment worker, or reward allocation in v2.
 - v1/v2 core experiments use a single hot product and single product stock.
 - External requests use `productId`; `product_stock.id` is an internal DB identifier.
 - Use `X-USER-ID` as the simplified test identity.
 - Do not add a `users` table in v2.
 - Do not create future package placeholders without real classes.
+- Run the v2 benchmark matrix as 100, 500, and 1000 users, each 5 times per official strategy, before recording the selected v2 path.
 
 ---
 

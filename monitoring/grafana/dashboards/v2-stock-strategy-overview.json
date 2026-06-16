@@ -197,20 +197,20 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "1000 * max(k6_http_req_duration_p50{name=\"http://api:8080/api/v1/purchases\"})",
-          "legendFormat": "k6 p50",
+          "expr": "1000 * max by (strategy, users) (k6_http_req_duration_p50{name=\"http://api:8080/api/v1/purchases\"})",
+          "legendFormat": "{{strategy}} u{{users}} p50",
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "1000 * max(k6_http_req_duration_p95{name=\"http://api:8080/api/v1/purchases\"})",
-          "legendFormat": "k6 p95",
+          "expr": "1000 * max by (strategy, users) (k6_http_req_duration_p95{name=\"http://api:8080/api/v1/purchases\"})",
+          "legendFormat": "{{strategy}} u{{users}} p95",
           "refId": "B"
         },
         {
           "editorMode": "code",
-          "expr": "1000 * max(k6_http_req_duration_p99{name=\"http://api:8080/api/v1/purchases\"})",
-          "legendFormat": "k6 p99",
+          "expr": "1000 * max by (strategy, users) (k6_http_req_duration_p99{name=\"http://api:8080/api/v1/purchases\"})",
+          "legendFormat": "{{strategy}} u{{users}} p99",
           "refId": "C"
         }
       ],
@@ -270,8 +270,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (status) (rate(k6_http_reqs_total{name=\"http://api:8080/api/v1/purchases\"}[1m]))",
-          "legendFormat": "k6 status {{status}}",
+          "expr": "sum by (strategy, status) (rate(k6_http_reqs_total{name=\"http://api:8080/api/v1/purchases\"}[1m]))",
+          "legendFormat": "{{strategy}} status {{status}}",
           "refId": "A"
         }
       ],
@@ -472,6 +472,142 @@
       ],
       "title": "JVM / Process",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisLabel": "seconds",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 12
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (le, strategy) (rate(stock_decision_duration_seconds_bucket[1m])))",
+          "legendFormat": "{{strategy}} decision p95",
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum by (le, strategy) (rate(stock_decision_duration_seconds_bucket[1m])))",
+          "legendFormat": "{{strategy}} decision p99",
+          "refId": "B"
+        }
+      ],
+      "title": "Stock Decision Duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisLabel": "seconds",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (le, strategy) (rate(order_save_duration_seconds_bucket[1m])))",
+          "legendFormat": "{{strategy}} order p95",
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum by (le, strategy) (rate(order_save_duration_seconds_bucket[1m])))",
+          "legendFormat": "{{strategy}} order p99",
+          "refId": "B"
+        }
+      ],
+      "title": "Order Save Duration",
+      "type": "timeseries"
     }
   ],
   "refresh": "5s",
@@ -491,6 +627,6 @@
   "timezone": "browser",
   "title": "v2 Stock Strategy Overview",
   "uid": "limited-goods-v2-stock",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }

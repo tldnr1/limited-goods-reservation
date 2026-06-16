@@ -52,21 +52,23 @@ v2 common experiment runbook:
 3. Check API health: http://localhost:8080/actuator/health
 4. Check Prometheus target: up{job="api"} == 1
 5. Check Grafana dashboard uid: limited-goods-v2-stock
-6. docker compose --profile load-test up --force-recreate k6
-7. Run the DB verification query for successful_order_count, oversell_count, and order_stock_gap.
-8. Query Prometheus for purchase_attempts_total, purchase_success_total, and purchase_failure_total.
-9. Capture the Grafana dashboard for troubleshooting records when a result is worth preserving.
+6. Run scripts/v2/run-stock-strategy-matrix.ps1 -Smoke for a quick matrix check.
+7. Run scripts/v2/run-stock-strategy-matrix.ps1 for the official 60-run matrix.
+8. Summarize records/experiments/v2-stock-strategy-comparison.csv.
+9. Query Prometheus for purchase counters and stock/order timer histograms.
+10. Capture the Grafana dashboard for troubleshooting records when a result is worth preserving.
 ```
 
-v2 load steps:
+v2 official load matrix:
 
 ```text
-smoke:    VUS=10   ITERATIONS=10
-medium:   VUS=100  ITERATIONS=100
-baseline: VUS=1000 ITERATIONS=1000
+strategies: naive-rdb, rdb-atomic, rdb-pessimistic, redis-lua
+loads:      100, 500, 1000 users
+repeats:    5 per strategy/load
+stock:      initial_quantity = 100
 ```
 
-Each strategy should record at least one baseline result.
+Each measured run resets DB order/stock state and Redis state before k6 starts. Each strategy gets one warm-up run that is excluded from official results.
 
 ---
 
@@ -141,28 +143,29 @@ multiple stock consistency strategies
 Foundation baseline:
 
 ```text
-feature/v2 starts with stock_strategy = naive-rdb
-the naive-rdb adapter must still reproduce oversell
-Redis infrastructure can be present, but the default purchase flow must not require Redis
+feature/v2 starts with stock.strategy = naive-rdb
+the naive-rdb strategy must still reproduce stock/order inconsistency
+Redis infrastructure is used by the redis-lua official strategy
 stock.strategy is selected from STOCK_STRATEGY and defaults to naive-rdb
 ```
 
 Strategies:
 
 ```text
-RDB atomic update
-RDB pessimistic lock
-RDB optimistic lock
-Redis distributed lock
-Redis Lua
+naive-rdb
+rdb-atomic
+rdb-pessimistic
+redis-lua
 ```
 
 Expected:
 
 ```text
 each strategy records oversell_count
+each strategy records decision_order_gap
 each strategy records success/failure counts
-each strategy records latency metrics where practical
+each strategy records HTTP p50/p95/p99 through k6
+each strategy records stock decision and order save timers through Micrometer
 selected main path achieves oversell_count = 0
 ```
 
@@ -170,8 +173,6 @@ Failure reasons:
 
 ```text
 SOLD_OUT
-OPTIMISTIC_CONFLICT
-LOCK_BUSY
 LOCK_TIMEOUT
 UNEXPECTED_FAILURE
 ```
@@ -266,15 +267,20 @@ v2 foundation custom metrics:
 purchase.attempts{strategy}
 purchase.success{strategy}
 purchase.failure{strategy,reason}
+stock.decision.duration{strategy}
+order.save.duration{strategy}
 ```
 
-v2 Redis experiment defaults:
+v2 Redis Lua defaults:
 
 ```text
 Redis stock key: stock:available:{productId}
-Redis Lua / Redis lock branches must initialize stock:available:1 to 100 before the baseline run.
-Redis stock deduction followed by DB order persistence is a dual-write flow; record this limitation.
+The benchmark runner must initialize stock:available:1 to 100 before each redis-lua run.
+Redis stock deduction followed by synchronous DB order persistence is a dual-write flow; record this limitation.
 Do not inject DB failure in the default v2 comparison.
+For redis-lua, stock_decision_count = initial_stock - redis_available.
+For RDB strategies, stock_decision_count = product_stock.sold_quantity.
+For every official strategy, decision_order_gap = order_count - stock_decision_count.
 ```
 
 ---
@@ -287,7 +293,6 @@ Suggested paths:
 k6/v0/smoke.js
 k6/v1/oversell-baseline.js
 k6/v2/stock-strategy-baseline.js
-k6/v2/stock-strategy-comparison.js
 k6/v3-1/waiting-room.js
 k6/v3-2/payment-worker-delay.js
 ```

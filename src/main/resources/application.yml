@@ -34,3 +34,10 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        stock.decision.duration: true
+        order.save.duration: true
+      percentiles:
+        stock.decision.duration: 0.5,0.95,0.99
+        order.save.duration: 0.5,0.95,0.99

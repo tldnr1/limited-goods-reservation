@@ -1,6 +1,6 @@
 package com.limitedgoodsreservation;
 
-import com.limitedgoodsreservation.stock.application.StockStrategyProperties;
+import com.limitedgoodsreservation.stock.strategy.StockStrategyProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
