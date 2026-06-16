@@ -283,6 +283,9 @@ The v2 comparison does not inject DB write failures after Redis deduction. Compe
 
 ```text
 Normal-load expansion for redis-lua and rdb-atomic is complete for users = 3000, 5000, 10000.
+Stabilized rerun record:
+- records/experiments/v2-stock-strategy-expansion-rerun.md
+- records/experiments/v2-stock-strategy-expansion-rerun.csv
 If another normal-load pass is needed, consider changing the k6 scenario shape before rerunning both strategies.
 Add separate failure-injection experiments for Redis Lua and RDB atomic.
 For v3 planning, design compensation/reconciliation around Redis Lua's dual-write limitation.
