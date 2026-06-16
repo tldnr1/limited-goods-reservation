@@ -182,12 +182,83 @@ Overall 60-run comparison:
 | redis-lua | 500 | 5 | 100.0 | 400.0 | 100.0 | 100.0 | 0.0 | 0.0 | 361.52 | 385.59 |
 | redis-lua | 1000 | 5 | 100.0 | 900.0 | 100.0 | 100.0 | 0.0 | 0.0 | 340.32 | 366.94 |
 
+Normal-load expansion started with `redis-lua`.
+
+| strategy | users | runs | avg success | avg sold out | avg stock decision | avg orders | avg oversell | avg gap | avg HTTP p50 ms | avg HTTP p95 ms | avg HTTP p99 ms |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| redis-lua | 3000 | 5 | 100.0 | 2900.0 | 100.0 | 100.0 | 0.0 | 0.0 | 606.62 | 909.13 | 1028.84 |
+| redis-lua | 5000 | 5 | 100.0 | 4900.0 | 100.0 | 100.0 | 0.0 | 0.0 | 384.03 | 548.99 | 621.55 |
+| redis-lua | 10000 | 5 | 100.0 | 9900.0 | 100.0 | 100.0 | 0.0 | 0.0 | 471.51 | 649.45 | 740.96 |
+
+Redis Lua expansion result:
+
+```text
+measured rows = 15
+3000 / 5000 / 10000 users = 5 runs each
+unexpected_responses = 0
+stock_decision_count = 100 in all measured runs
+order_count = 100 in all measured runs
+oversell_count = 0 in all 15 runs
+decision_order_gap = 0 in all 15 runs
+```
+
+Prometheus timer snapshot after the redis-lua expansion:
+
+```text
+stock.decision.duration p95 ~= 6.92 ms
+stock.decision.duration p99 ~= 14.02 ms
+order.save.duration p95 ~= 11.10 ms
+order.save.duration p99 ~= 37.61 ms
+```
+
+The HTTP p95/p99 values are not strictly monotonic by user count. The 3000-user runs had higher tail latency than the later 5000/10000-user runs, so compare the expansion against `rdb-atomic` before making a final scaling claim. The correctness result is stable, but latency interpretation should account for k6 VU initialization and local Docker scheduling variance.
+
+The same normal-load expansion was then run for `rdb-atomic`.
+
+| strategy | users | runs | avg success | avg sold out | avg unexpected | avg stock decision | avg orders | avg oversell | avg gap | avg HTTP p50 ms | avg HTTP p95 ms | avg HTTP p99 ms |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| rdb-atomic | 3000 | 5 | 100.0 | 2900.0 | 0.0 | 100.0 | 100.0 | 0.0 | 0.0 | 1029.33 | 1501.12 | 1602.27 |
+| rdb-atomic | 5000 | 5 | 100.0 | 4900.0 | 0.0 | 100.0 | 100.0 | 0.0 | 0.0 | 921.85 | 1298.23 | 1430.84 |
+| rdb-atomic | 10000 | 5 | 100.0 | 9861.4 | 38.6 | 100.0 | 100.0 | 0.0 | 0.0 | 733.07 | 1206.63 | 12968.30 |
+
+RDB atomic expansion result:
+
+```text
+measured rows = 15
+3000 / 5000 / 10000 users = 5 runs each
+stock_decision_count = 100 in all measured runs
+order_count = 100 in all measured runs
+oversell_count = 0 in all 15 runs
+decision_order_gap = 0 in all 15 runs
+unexpected_responses = 0 for 3000 and 5000 users
+unexpected_responses = 193 total at 10000 users
+```
+
+Prometheus timer snapshot after the rdb-atomic expansion:
+
+```text
+stock.decision.duration p95 ~= 10.12 ms
+stock.decision.duration p99 ~= 41.63 ms
+order.save.duration p95 ~= 6.45 ms
+order.save.duration p99 ~= 12.22 ms
+```
+
+Expansion comparison:
+
+| users | redis-lua HTTP p95 ms | redis-lua HTTP p99 ms | rdb-atomic HTTP p95 ms | rdb-atomic HTTP p99 ms | rdb-atomic unexpected avg |
+|---:|---:|---:|---:|---:|---:|
+| 3000 | 909.13 | 1028.84 | 1501.12 | 1602.27 | 0.0 |
+| 5000 | 548.99 | 621.55 | 1298.23 | 1430.84 | 0.0 |
+| 10000 | 649.45 | 740.96 | 1206.63 | 12968.30 | 38.6 |
+
+In this expansion, both strategies preserved stock/order correctness. Redis Lua had lower HTTP tail latency at every expanded load and produced no unexpected responses. RDB atomic remained correct but showed request timeouts at 10000 users, especially one run with a very large p99. This suggests Redis Lua is the better next candidate for normal-load scaling experiments, while RDB atomic remains the control baseline for simplicity and failure-mode comparison.
+
 ## Decision
 
 Interim decision for the next expansion:
 
 ```text
-Expand redis-lua first.
+Expand redis-lua first for v3-oriented normal-load scaling.
 Keep rdb-atomic as the control baseline.
 Do not expand naive-rdb or rdb-pessimistic unless a later question needs them.
 ```
@@ -200,7 +271,7 @@ Do not expand naive-rdb or rdb-pessimistic unless a later question needs them.
 
 `rdb-pessimistic` is correct but has worse tail latency than `rdb-atomic` in this matrix. It does not currently offer a portfolio advantage over atomic update for the single hot-product stock deduction case.
 
-`redis-lua` is correct and shows the best HTTP p95/p99 in the 100-stock matrix. More importantly, it moves the hot stock decision into Redis, which is the shape needed for later v3 concerns such as active token, reservation TTL, compensation, and reconciliation.
+`redis-lua` is correct and shows the best HTTP p95/p99 in the 100-stock matrix and in the first 3000/5000/10000 normal-load expansion. More importantly, it moves the hot stock decision into Redis, which is the shape needed for later v3 concerns such as active token, reservation TTL, compensation, and reconciliation.
 
 ## Limitations
 
@@ -211,8 +282,8 @@ The v2 comparison does not inject DB write failures after Redis deduction. Compe
 ## Follow-up
 
 ```text
-Run redis-lua expansion with initial stock = 100 and users = 3000, 5000, 10000.
-Run rdb-atomic expansion as the control baseline for the same loads if time allows.
-Keep measuring Redis stock decision latency separately from HTTP latency.
+Normal-load expansion for redis-lua and rdb-atomic is complete for users = 3000, 5000, 10000.
+If another normal-load pass is needed, consider changing the k6 scenario shape before rerunning both strategies.
+Add separate failure-injection experiments for Redis Lua and RDB atomic.
 For v3 planning, design compensation/reconciliation around Redis Lua's dual-write limitation.
 ```
