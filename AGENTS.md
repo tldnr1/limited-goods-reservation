@@ -9,15 +9,15 @@ This file is the **current work index**. It may change as the project version ch
 ## Current Status
 
 ```text
-current_version: v0
-current_goal: documentation and runnable skeleton cleanup
-next_target: v1 naive purchase baseline
+current_version: v1
+current_goal: naive purchase baseline implemented and experiment recorded
+next_target: v2 stock strategy comparison
 project_type: Spring Boot backend portfolio project
-architecture_now: runnable skeleton only
+architecture_now: feature-based N-tier baseline
 official_verification_path: Docker Compose first
 ```
 
-Do not implement business features in v0 unless the user explicitly asks to start v1 work.
+Do not start v2 stock strategy work unless the user explicitly asks to start v2 work.
 
 ---
 

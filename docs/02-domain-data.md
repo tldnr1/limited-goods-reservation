@@ -105,6 +105,12 @@ orders:
 - updated_at
 ```
 
+v1 order status:
+
+```text
+CREATED: successful naive purchase order, without payment semantics
+```
+
 v1 ERD:
 
 ```mermaid
