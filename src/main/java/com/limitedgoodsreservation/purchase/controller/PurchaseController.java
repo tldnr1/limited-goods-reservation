@@ -24,9 +24,10 @@ public class PurchaseController {
     @PostMapping
     public ResponseEntity<PurchaseResponse> purchase(
             @RequestHeader("X-USER-ID") Long userId,
+            @RequestHeader(value = "X-RUN-ID", required = false) String runId,
             @RequestBody PurchaseRequest request
     ) {
-        PurchaseResponse response = purchaseService.purchase(userId, request.productId());
+        PurchaseResponse response = purchaseService.purchase(userId, request.productId(), runId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

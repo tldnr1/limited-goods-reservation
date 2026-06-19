@@ -7,6 +7,7 @@ import com.limitedgoodsreservation.order.repository.OrderRepository;
 import com.limitedgoodsreservation.product.entity.ProductStock;
 import com.limitedgoodsreservation.product.repository.ProductStockRepository;
 import com.limitedgoodsreservation.purchase.dto.PurchaseResponse;
+import com.limitedgoodsreservation.stock.strategy.SoldOutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

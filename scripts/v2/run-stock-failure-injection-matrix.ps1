@@ -1,0 +1,265 @@
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet("rdb-atomic", "redis-lua")]
+    [string] $Strategy,
+    [string[]] $Users = @("500", "1000"),
+    [int] $Repeats = 5,
+    [int] $InitialStock = 100,
+    [int] $FailureLimit = 10,
+    [int] $ProductId = 1,
+    [string] $ResultName = "v2-stock-failure-injection",
+    [int] $StabilizeSeconds = 2,
+    [int] $CooldownSeconds = 2,
+    [switch] $SkipBuild
+)
+
+$ErrorActionPreference = "Stop"
+
+$Root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+Set-Location $Root
+
+$RawDir = Join-Path $Root "notes\v2-stock-strategy\raw"
+$CsvPath = Join-Path $Root "records\experiments\$ResultName.csv"
+New-Item -ItemType Directory -Force -Path $RawDir | Out-Null
+
+function Convert-UserCounts {
+    param([string[]] $RawUsers)
+
+    $counts = @()
+    foreach ($rawUser in $RawUsers) {
+        foreach ($part in $rawUser.Split(",")) {
+            $value = $part.Trim()
+            if (-not $value) {
+                continue
+            }
+
+            $counts += [int] $value
+        }
+    }
+
+    if ($counts.Count -eq 0) {
+        throw "At least one user count is required."
+    }
+
+    return $counts
+}
+
+$UserCounts = Convert-UserCounts -RawUsers $Users
+
+function Invoke-Compose {
+    param([string[]] $Arguments)
+
+    & docker compose @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "docker compose $($Arguments -join ' ') failed with exit code $LASTEXITCODE"
+    }
+}
+
+function Wait-Api {
+    for ($i = 0; $i -lt 60; $i += 1) {
+        try {
+            $response = Invoke-RestMethod -Uri "http://localhost:8080/actuator/health" -TimeoutSec 2
+            if ($response.status -eq "UP") {
+                return
+            }
+        } catch {
+            Start-Sleep -Seconds 1
+        }
+    }
+
+    throw "API health endpoint did not become ready."
+}
+
+function Wait-IfNeeded {
+    param([int] $Seconds, [string] $Reason)
+
+    if ($Seconds -le 0) {
+        return
+    }
+
+    Write-Host "$Reason for $Seconds seconds."
+    Start-Sleep -Seconds $Seconds
+}
+
+function Reset-ExperimentState {
+    $resetSql = "TRUNCATE TABLE orders RESTART IDENTITY; UPDATE product_stock SET initial_quantity = $InitialStock, sold_quantity = 0, updated_at = now() WHERE product_id = $ProductId;"
+    & docker compose exec -T postgres psql -U limited_goods -d limited_goods_reservation -v ON_ERROR_STOP=1 -c $resetSql | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to reset PostgreSQL state."
+    }
+
+    & docker compose exec -T redis redis-cli FLUSHDB | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to flush Redis."
+    }
+
+    if ($Strategy -eq "redis-lua") {
+        & docker compose exec -T redis redis-cli SET "stock:available:$ProductId" "$InitialStock" | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to initialize Redis stock key."
+        }
+    }
+}
+
+function Read-DbMetrics {
+    $query = "select ps.initial_quantity, ps.sold_quantity, count(o.id), greatest(count(o.id) - ps.initial_quantity, 0), count(o.id) - ps.sold_quantity from product_stock ps left join orders o on o.product_id = ps.product_id where ps.product_id = $ProductId group by ps.initial_quantity, ps.sold_quantity;"
+    $output = & docker compose exec -T postgres psql -U limited_goods -d limited_goods_reservation -q -t -A -F "," -c $query
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to read PostgreSQL verification metrics."
+    }
+
+    $line = $output | Where-Object { $_ -and $_.Trim() } | Select-Object -Last 1
+    $parts = $line.Split(",")
+    return [pscustomobject]@{
+        InitialQuantity = [int] $parts[0]
+        SoldQuantity = [int] $parts[1]
+        OrderCount = [int] $parts[2]
+        OversellCount = [int] $parts[3]
+        RdbOrderStockGap = [int] $parts[4]
+    }
+}
+
+function Read-RedisAvailable {
+    if ($Strategy -ne "redis-lua") {
+        return $null
+    }
+
+    $value = & docker compose exec -T redis redis-cli GET "stock:available:$ProductId"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to read Redis stock key."
+    }
+    if (-not $value) {
+        return $null
+    }
+
+    return [int] (($value | Select-Object -First 1).Trim())
+}
+
+function Invoke-K6Run {
+    param(
+        [int] $UserCount,
+        [int] $Repeat,
+        [string] $RunId
+    )
+
+    & docker compose --profile load-test run -T --rm `
+        -e STOCK_STRATEGY=$Strategy `
+        -e PRODUCT_ID=$ProductId `
+        -e VUS=$UserCount `
+        -e ITERATIONS=$UserCount `
+        -e RUN_ID=$RunId `
+        -e REPEAT=$Repeat `
+        -e INITIAL_STOCK=$InitialStock `
+        -e PURCHASE_FAILURE_MODE=$env:PURCHASE_FAILURE_MODE `
+        -e PURCHASE_FAILURE_LIMIT=$FailureLimit `
+        k6
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "k6 failure run failed for $RunId with exit code $LASTEXITCODE"
+    }
+}
+
+function Read-K6Summary {
+    param([string] $RunId)
+
+    $summaryPath = Join-Path $RawDir "$RunId.failure.summary.json"
+    if (-not (Test-Path $summaryPath)) {
+        throw "Missing k6 summary file: $summaryPath"
+    }
+
+    return Get-Content -Raw -Path $summaryPath | ConvertFrom-Json
+}
+
+function Get-MetricValue {
+    param($MetricValues, [string] $Name)
+
+    if ($null -eq $MetricValues) {
+        return 0
+    }
+
+    $property = $MetricValues.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        return 0
+    }
+
+    return [double] $property.Value
+}
+
+if (-not $SkipBuild) {
+    Invoke-Compose -Arguments @("build", "api")
+}
+
+Invoke-Compose -Arguments @("down", "-v")
+$env:STOCK_STRATEGY = $Strategy
+$env:PURCHASE_FAILURE_MODE = "AFTER_STOCK_DECISION_BEFORE_ORDER_SAVE"
+$env:PURCHASE_FAILURE_LIMIT = "$FailureLimit"
+$env:K6_SCRIPT = "/scripts/v2/stock-strategy-failure.js"
+Invoke-Compose -Arguments @("up", "-d", "--force-recreate", "api", "prometheus")
+Wait-Api
+
+$startedAt = Get-Date -Format "yyyyMMdd-HHmmss"
+$warmupRunId = "$startedAt-$Strategy-failure-warmup"
+Write-Host "Warm-up run: $warmupRunId"
+Reset-ExperimentState
+Wait-Api
+Wait-IfNeeded -Seconds $StabilizeSeconds -Reason "Stabilizing before warm-up"
+Invoke-K6Run -UserCount 10 -Repeat 0 -RunId $warmupRunId
+Wait-IfNeeded -Seconds $CooldownSeconds -Reason "Cooling down after warm-up"
+
+foreach ($userCount in $UserCounts) {
+    for ($repeat = 1; $repeat -le $Repeats; $repeat += 1) {
+        $runId = "$startedAt-$Strategy-failure-u$userCount-r$repeat"
+        Write-Host "Measured failure run: $runId"
+
+        Reset-ExperimentState
+        Wait-Api
+        Wait-IfNeeded -Seconds $StabilizeSeconds -Reason "Stabilizing before measured run"
+        Invoke-K6Run -UserCount $userCount -Repeat $repeat -RunId $runId
+        Wait-IfNeeded -Seconds $CooldownSeconds -Reason "Cooling down after measured run"
+
+        $summary = Read-K6Summary $runId
+        $duration = $summary.metrics.http_req_duration.values
+        $db = Read-DbMetrics
+        $redisAvailable = Read-RedisAvailable
+
+        if ($Strategy -eq "redis-lua") {
+            $stockDecisionCount = $InitialStock - $redisAvailable
+        } else {
+            $stockDecisionCount = $db.SoldQuantity
+        }
+
+        $row = [pscustomobject]@{
+            run_id = $runId
+            strategy = $Strategy
+            users = $userCount
+            repeat = $repeat
+            initial_stock = $InitialStock
+            failure_mode = $env:PURCHASE_FAILURE_MODE
+            failure_limit = $FailureLimit
+            http_reqs = Get-MetricValue $summary.metrics.http_reqs.values "count"
+            http_failed_rate = Get-MetricValue $summary.metrics.http_req_failed.values "rate"
+            http_p50_ms = Get-MetricValue $duration "p(50)"
+            http_p95_ms = Get-MetricValue $duration "p(95)"
+            http_p99_ms = Get-MetricValue $duration "p(99)"
+            successful_purchases = Get-MetricValue $summary.metrics.successful_purchases.values "count"
+            sold_out_responses = Get-MetricValue $summary.metrics.sold_out_responses.values "count"
+            injected_failure_responses = Get-MetricValue $summary.metrics.injected_failure_responses.values "count"
+            unexpected_responses = Get-MetricValue $summary.metrics.unexpected_responses.values "count"
+            db_initial_quantity = $db.InitialQuantity
+            db_sold_quantity = $db.SoldQuantity
+            db_order_count = $db.OrderCount
+            redis_available = $redisAvailable
+            stock_decision_count = $stockDecisionCount
+            oversell_count = $db.OversellCount
+            decision_order_gap = $db.OrderCount - $stockDecisionCount
+        }
+
+        $row | Export-Csv -Path $CsvPath -NoTypeInformation -Append
+    }
+}
+
+Write-Host "v2 stock failure injection run finished."
+Write-Host "Strategy: $Strategy"
+Write-Host "Raw files: $RawDir"
+Write-Host "CSV: $CsvPath"

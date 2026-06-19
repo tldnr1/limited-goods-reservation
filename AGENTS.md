@@ -9,15 +9,15 @@ This file is the **current work index**. It may change as the project version ch
 ## Current Status
 
 ```text
-current_version: v1
-current_goal: naive purchase baseline implemented and experiment recorded
-next_target: v2 stock strategy comparison
+current_version: v3.1
+current_goal: waiting room and active token entry control
+next_target: v3.1 entry-control baseline and admission policy design
 project_type: Spring Boot backend portfolio project
-architecture_now: feature-based N-tier baseline
+architecture_now: v2 layered stock strategy complete; v3.1 modular monolith transition
 official_verification_path: Docker Compose first
 ```
 
-Do not start v2 stock strategy work unless the user explicitly asks to start v2 work.
+v2 is complete. Redis Lua is the v3-oriented main path, and RDB atomic remains the control baseline.
 
 ---
 
@@ -85,12 +85,15 @@ Records explain why decisions were made. Notes are local/private scratch and are
 
 ## Current Guardrails
 
-- v1 should be a simple feature-based N-tier baseline.
-- Do not introduce hexagonal architecture, ports, adapters, Redis, MQ, waiting room, payment worker, or reward allocation in v1.
-- v1/v2 core experiments use a single hot product and single product stock.
+- The v2 result is recorded under `records/experiments/`; do not reinterpret measured results without a new experiment.
+- Keep Redis Lua as the v3-oriented main path and RDB atomic as the control baseline.
+- v3.1 controls entry traffic before the existing purchase and stock path.
+- Add waiting room and active token boundaries only when real v3.1 classes are implemented.
+- Do not introduce RabbitMQ, payment worker, reward allocation, or reconciliation worker in v3.1.
+- Core experiments continue to use a single hot product and single product stock unless the scenario explicitly changes.
 - External requests use `productId`; `product_stock.id` is an internal DB identifier.
 - Use `X-USER-ID` as the simplified test identity.
-- Do not add a `users` table in v1.
+- Do not add a `users` table in v3.1.
 - Do not create future package placeholders without real classes.
 
 ---

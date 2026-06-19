@@ -2,28 +2,56 @@ package com.limitedgoodsreservation.purchase.service;
 
 import com.limitedgoodsreservation.order.entity.Order;
 import com.limitedgoodsreservation.order.repository.OrderRepository;
-import com.limitedgoodsreservation.product.entity.ProductStock;
-import com.limitedgoodsreservation.product.repository.ProductStockRepository;
+import com.limitedgoodsreservation.product.entity.Product;
+import com.limitedgoodsreservation.product.repository.ProductRepository;
 import com.limitedgoodsreservation.purchase.dto.PurchaseResponse;
+import com.limitedgoodsreservation.purchase.failure.InjectedPurchaseFailureException;
+import com.limitedgoodsreservation.purchase.failure.PurchaseFailureInjector;
+import com.limitedgoodsreservation.purchase.metrics.PurchaseMetrics;
+import com.limitedgoodsreservation.stock.strategy.StockDeductionException;
+import com.limitedgoodsreservation.stock.strategy.StockDeductionFailureReason;
+import com.limitedgoodsreservation.stock.strategy.StockDeductionResult;
+import com.limitedgoodsreservation.stock.strategy.StockDeductionStrategy;
+import com.limitedgoodsreservation.stock.strategy.StockDeductionStrategyResolver;
+import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PurchaseService {
 
-    private final ProductStockRepository productStockRepository;
+    private final StockDeductionStrategyResolver stockDeductionStrategyResolver;
+    private final ProductRepository productRepository;
     private final OrderRepository orderRepository;
+    private final PurchaseMetrics purchaseMetrics;
+    private final PurchaseFailureInjector purchaseFailureInjector;
 
     public PurchaseService(
-            ProductStockRepository productStockRepository,
-            OrderRepository orderRepository
+            StockDeductionStrategyResolver stockDeductionStrategyResolver,
+            ProductRepository productRepository,
+            OrderRepository orderRepository,
+            PurchaseMetrics purchaseMetrics,
+            PurchaseFailureInjector purchaseFailureInjector
     ) {
-        this.productStockRepository = productStockRepository;
+        this.stockDeductionStrategyResolver = stockDeductionStrategyResolver;
+        this.productRepository = productRepository;
         this.orderRepository = orderRepository;
+        this.purchaseMetrics = purchaseMetrics;
+        this.purchaseFailureInjector = purchaseFailureInjector;
+    }
+
+    @PostConstruct
+    void initializeMetrics() {
+        purchaseMetrics.initialize(stockDeductionStrategyResolver.selectedStrategyName());
     }
 
     @Transactional
     public PurchaseResponse purchase(Long userId, Long productId) {
+        return purchase(userId, productId, null);
+    }
+
+    @Transactional
+    public PurchaseResponse purchase(Long userId, Long productId, String runId) {
         if (userId == null) {
             throw new IllegalArgumentException("X-USER-ID is required.");
         }
@@ -31,16 +59,33 @@ public class PurchaseService {
             throw new IllegalArgumentException("productId is required.");
         }
 
-        ProductStock stock = productStockRepository.findByProduct_Id(productId)
-                .orElseThrow(() -> new IllegalArgumentException("Product not found. productId=" + productId));
+        StockDeductionStrategy stockDeductionStrategy = stockDeductionStrategyResolver.selectedStrategy();
+        String strategyName = stockDeductionStrategy.strategyName();
+        purchaseMetrics.incrementAttempt(strategyName);
 
-        if (!stock.hasAvailableQuantity()) {
-            throw new SoldOutException(productId);
+        try {
+            StockDeductionResult deductionResult = purchaseMetrics.recordStockDecision(
+                    strategyName,
+                    () -> stockDeductionStrategy.deduct(productId)
+            );
+            purchaseFailureInjector.maybeFailAfterStockDecisionBeforeOrderSave(runId, strategyName);
+            Product product = productRepository.getReferenceById(deductionResult.productId());
+            Order order = purchaseMetrics.recordOrderSave(
+                    strategyName,
+                    () -> orderRepository.save(Order.created(userId, product))
+            );
+            purchaseMetrics.incrementSuccess(strategyName);
+
+            return PurchaseResponse.from(order);
+        } catch (StockDeductionException exception) {
+            purchaseMetrics.incrementFailure(strategyName, exception.reason());
+            throw exception;
+        } catch (InjectedPurchaseFailureException exception) {
+            purchaseMetrics.incrementFailure(strategyName, StockDeductionFailureReason.INJECTED_ORDER_SAVE_FAILURE);
+            throw exception;
+        } catch (RuntimeException exception) {
+            purchaseMetrics.incrementFailure(strategyName, StockDeductionFailureReason.UNEXPECTED_FAILURE);
+            throw exception;
         }
-
-        Order order = orderRepository.save(Order.created(userId, stock.getProduct()));
-        stock.increaseSoldQuantity();
-
-        return PurchaseResponse.from(order);
     }
 }

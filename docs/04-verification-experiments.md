@@ -35,6 +35,42 @@ Docker Compose
 
 Version-level verification should be runnable through Docker Compose. Local IDE or local Java execution may be used for fast feedback.
 
+v2 monitoring:
+
+```text
+Prometheus scrapes Spring Boot Actuator metrics from /actuator/prometheus.
+k6 writes load-test metrics to Prometheus remote write during Compose load-test runs.
+Grafana provisions the v2 Stock Strategy Overview dashboard from monitoring/grafana/dashboards/.
+Screenshots for troubleshooting records should use the Grafana dashboard plus the DB verification query result.
+```
+
+v2 common experiment runbook:
+
+```text
+1. docker compose build api
+2. docker compose up -d --force-recreate api redis prometheus grafana
+3. Check API health: http://localhost:8080/actuator/health
+4. Check Prometheus target: up{job="api"} == 1
+5. Check Grafana dashboard uid: limited-goods-v2-stock
+6. Run scripts/v2/run-stock-strategy-matrix.ps1 -Strategy {strategy} -Smoke for a quick strategy check.
+7. Run scripts/v2/run-stock-strategy-matrix.ps1 -Strategy {strategy} for each official strategy.
+8. Summarize records/experiments/v2-stock-strategy-comparison.csv.
+9. Query Prometheus for purchase counters and stock/order timer histograms.
+10. Capture the Grafana dashboard for troubleshooting records when a result is worth preserving.
+```
+
+v2 official load matrix:
+
+```text
+strategies: naive-rdb, rdb-atomic, rdb-pessimistic, redis-lua
+loads:      100, 500, 1000 users
+repeats:    5 per strategy/load
+stock:      initial_quantity = 100
+```
+
+Each measured run resets DB order/stock state and Redis state before k6 starts. Each strategy gets one warm-up run that is excluded from official results.
+Run one strategy per command so failures and machine variance are easier to isolate.
+
 ---
 
 ## 3. Core Scenarios
@@ -105,29 +141,75 @@ same request pattern
 multiple stock consistency strategies
 ```
 
+Foundation baseline:
+
+```text
+feature/v2 starts with stock.strategy = naive-rdb
+the naive-rdb strategy must still reproduce stock/order inconsistency
+Redis infrastructure is used by the redis-lua official strategy
+stock.strategy is selected from STOCK_STRATEGY and defaults to naive-rdb
+```
+
 Strategies:
 
 ```text
-RDB atomic update
-RDB pessimistic lock
-RDB optimistic lock
-Redis distributed lock
-Redis Lua
+naive-rdb
+rdb-atomic
+rdb-pessimistic
+redis-lua
 ```
 
 Expected:
 
 ```text
 each strategy records oversell_count
+each strategy records decision_order_gap
 each strategy records success/failure counts
-each strategy records latency metrics where practical
+each strategy records HTTP p50/p95/p99 through k6
+each strategy records stock decision and order save timers through Micrometer
 selected main path achieves oversell_count = 0
 ```
+
+Failure reasons:
+
+```text
+SOLD_OUT
+LOCK_TIMEOUT
+INJECTED_ORDER_SAVE_FAILURE
+UNEXPECTED_FAILURE
+```
+
+HTTP status is not the primary comparison key. Use the response body `code`, k6 counters, and Prometheus `reason` label.
 
 Result:
 
 ```text
-to be filled after v2 comparison
+The official matrix completed 60 measured runs:
+- four strategies
+- 100, 500, and 1000 users
+- five repeats per strategy/load
+
+Normal-load correctness:
+- naive-rdb reproduced stock/order inconsistency
+- rdb-atomic, rdb-pessimistic, and redis-lua recorded oversell_count = 0
+- selected redis-lua recorded decision_order_gap = 0 in all official matrix runs
+
+Expansion:
+- redis-lua and rdb-atomic each ran at 3000, 5000, and 10000 users, five times
+- redis-lua had lower HTTP tail latency at every expanded load and no unexpected responses
+
+Failure injection:
+- rdb-atomic: stock_decision_count = 100, order_count = 100, gap = 0
+- redis-lua: stock_decision_count = 100, order_count = 90, gap = -10
+
+Decision:
+- redis-lua is the v3-oriented main path
+- rdb-atomic remains the control baseline
+
+Records:
+- records/experiments/v2-stock-strategy-comparison.md
+- records/experiments/v2-stock-strategy-expansion-rerun.md
+- records/experiments/v2-stock-failure-injection.md
 ```
 
 ### v3.1 Entry Control
@@ -206,6 +288,28 @@ payment success/failure/timeout count
 retry count
 ```
 
+v2 foundation custom metrics:
+
+```text
+purchase.attempts{strategy}
+purchase.success{strategy}
+purchase.failure{strategy,reason}
+stock.decision.duration{strategy}
+order.save.duration{strategy}
+```
+
+v2 Redis Lua defaults:
+
+```text
+Redis stock key: stock:available:{productId}
+The benchmark runner must initialize stock:available:1 to 100 before each redis-lua run.
+Redis stock deduction followed by synchronous DB order persistence is a dual-write flow; record this limitation.
+Do not inject DB failure in the default v2 comparison.
+For redis-lua, stock_decision_count = initial_stock - redis_available.
+For RDB strategies, stock_decision_count = product_stock.sold_quantity.
+For every official strategy, decision_order_gap = order_count - stock_decision_count.
+```
+
 ---
 
 ## 5. Scenario Files
@@ -215,7 +319,7 @@ Suggested paths:
 ```text
 k6/v0/smoke.js
 k6/v1/oversell-baseline.js
-k6/v2/stock-strategy-comparison.js
+k6/v2/stock-strategy-baseline.js
 k6/v3-1/waiting-room.js
 k6/v3-2/payment-worker-delay.js
 ```

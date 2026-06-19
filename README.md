@@ -13,9 +13,17 @@ This project reproduces and improves limited-sale backend failures step by step.
 
 ## Current Status
 
-The project is in **v1 naive purchase baseline** stage.
+The project has completed the **v2 stock strategy comparison** and is ready for the v3.1 entry-control stage.
 
-v1 reproduces oversell with a deliberately naive RDB read-check-write purchase flow.
+Redis Lua is the v3-oriented main path, while RDB atomic remains the control baseline. The runtime configuration still defaults to `naive-rdb`, so select a strategy explicitly when reproducing v2 results.
+
+Measured v2 results are recorded in:
+
+```text
+records/experiments/v2-stock-strategy-comparison.md
+records/experiments/v2-stock-strategy-expansion-rerun.md
+records/experiments/v2-stock-failure-injection.md
+```
 
 ---
 
@@ -33,10 +41,34 @@ Run the Docker Compose API:
 docker compose up --build
 ```
 
-Run the v1 k6 oversell baseline through the Compose profile:
+Run the v2 stock strategy baseline through the Compose profile:
 
 ```text
 docker compose --profile load-test up --build k6
+```
+
+Run smaller load steps by overriding k6 environment values:
+
+```text
+$env:VUS='10'; $env:ITERATIONS='10'; docker compose --profile load-test up --force-recreate k6
+$env:VUS='100'; $env:ITERATIONS='100'; docker compose --profile load-test up --force-recreate k6
+$env:VUS='1000'; $env:ITERATIONS='1000'; docker compose --profile load-test up --force-recreate k6
+```
+
+Select a v2 stock strategy with `STOCK_STRATEGY`:
+
+```text
+$env:STOCK_STRATEGY='naive-rdb'; docker compose up -d --force-recreate api
+$env:STOCK_STRATEGY='naive-rdb'; docker compose --profile load-test up --force-recreate k6
+```
+
+Open local monitoring:
+
+```text
+Prometheus: http://localhost:9090
+Grafana: http://localhost:3000
+Grafana login: admin / admin
+Dashboard: Limited Goods / v2 Stock Strategy Overview
 ```
 
 Verify oversell after the k6 run:
