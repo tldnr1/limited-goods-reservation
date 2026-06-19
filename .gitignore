@@ -1,1 +1,25 @@
 notes/
+
+# Local agent and IDE state
+.agents/
+.codex/
+.idea/
+.vscode/
+*.iml
+
+# Build output
+.gradle/
+build/
+out/
+
+# Local environment and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Python study branches
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]

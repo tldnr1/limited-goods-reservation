@@ -238,7 +238,29 @@ decision_order_gap = 0 for selected non-naive strategy
 ### Result
 
 ```text
-to be filled after v2 comparison
+v2 kept the v1-like layered purchase flow and isolated stock deduction behind StockDeductionStrategy.
+
+The official 60-run matrix completed:
+- strategies: naive-rdb, rdb-atomic, rdb-pessimistic, redis-lua
+- users: 100, 500, 1000
+- repeats: 5 per strategy/load
+
+naive-rdb reproduced lost update and stock/order inconsistency.
+rdb-atomic and rdb-pessimistic preserved oversell_count = 0 and decision_order_gap = 0.
+redis-lua also preserved oversell_count = 0 and decision_order_gap = 0 under normal load.
+
+The 3000/5000/10000-user expansion favored redis-lua for HTTP tail latency and response stability.
+Failure injection after stock decision showed rdb-atomic gap = 0 and redis-lua gap = -10.
+
+Decision:
+- use redis-lua as the v3-oriented main path
+- keep rdb-atomic as the control baseline
+- design v3 compensation/reservation/reconciliation around the Redis-to-DB dual-write gap
+
+Evidence:
+- records/experiments/v2-stock-strategy-comparison.md
+- records/experiments/v2-stock-strategy-expansion-rerun.md
+- records/experiments/v2-stock-failure-injection.md
 ```
 
 ---

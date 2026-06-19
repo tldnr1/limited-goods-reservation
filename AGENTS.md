@@ -9,15 +9,15 @@ This file is the **current work index**. It may change as the project version ch
 ## Current Status
 
 ```text
-current_version: v2
-current_goal: layered stock strategy comparison
-next_target: v2 60-run stock strategy benchmark matrix
+current_version: v3.1
+current_goal: waiting room and active token entry control
+next_target: v3.1 entry-control baseline and admission policy design
 project_type: Spring Boot backend portfolio project
-architecture_now: v1-like layered + stock strategy
+architecture_now: v2 layered stock strategy complete; v3.1 modular monolith transition
 official_verification_path: Docker Compose first
 ```
 
-Do not select the final v2 stock strategy until the 4-strategy benchmark matrix produces measured results.
+v2 is complete. Redis Lua is the v3-oriented main path, and RDB atomic remains the control baseline.
 
 ---
 
@@ -85,17 +85,16 @@ Records explain why decisions were made. Notes are local/private scratch and are
 
 ## Current Guardrails
 
-- v2 should keep a v1-like layered structure and isolate only stock deduction behind a small strategy interface.
-- v2 official comparison strategies are `naive-rdb`, `rdb-atomic`, `rdb-pessimistic`, and `redis-lua`.
-- Redis Lua is an official v2 comparison strategy. Treat Redis `stock:available:{productId}` as the stock decision source of truth for that strategy.
-- For Redis Lua, separate stock decision latency from full HTTP latency because the v2 API still saves a DB order synchronously before responding.
-- Do not introduce MQ, waiting room, active token, payment worker, or reward allocation in v2.
-- v1/v2 core experiments use a single hot product and single product stock.
+- The v2 result is recorded under `records/experiments/`; do not reinterpret measured results without a new experiment.
+- Keep Redis Lua as the v3-oriented main path and RDB atomic as the control baseline.
+- v3.1 controls entry traffic before the existing purchase and stock path.
+- Add waiting room and active token boundaries only when real v3.1 classes are implemented.
+- Do not introduce RabbitMQ, payment worker, reward allocation, or reconciliation worker in v3.1.
+- Core experiments continue to use a single hot product and single product stock unless the scenario explicitly changes.
 - External requests use `productId`; `product_stock.id` is an internal DB identifier.
 - Use `X-USER-ID` as the simplified test identity.
-- Do not add a `users` table in v2.
+- Do not add a `users` table in v3.1.
 - Do not create future package placeholders without real classes.
-- Run one official strategy per benchmark command. Each strategy uses 100, 500, and 1000 users, each 5 times, before recording the selected v2 path.
 
 ---
 

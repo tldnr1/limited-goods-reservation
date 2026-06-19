@@ -8,6 +8,20 @@
 - [ ] v4
 - [ ] v5+
 
+## Base / Release
+
+Target branch:
+
+```text
+main
+```
+
+Tag after merge (`N/A` when this PR does not complete a version):
+
+```text
+N/A
+```
+
 ## Purpose
 
 Describe the problem this PR addresses.
@@ -65,3 +79,4 @@ If docs were updated, list the files:
 - [ ] This PR does not implement later-version features early.
 - [ ] Business logic is explicit and explainable.
 - [ ] Experiment work is documented if it affects architectural decisions.
+- [ ] The completed-version tag is created from the merged `main` commit, or marked `N/A`.

@@ -255,10 +255,10 @@ In this expansion, both strategies preserved stock/order correctness. Redis Lua 
 
 ## Decision
 
-Interim decision for the next expansion:
+Final v2 decision:
 
 ```text
-Expand redis-lua first for v3-oriented normal-load scaling.
+Use redis-lua as the v3-oriented main path.
 Keep rdb-atomic as the control baseline.
 Do not expand naive-rdb or rdb-pessimistic unless a later question needs them.
 ```
@@ -277,7 +277,7 @@ Do not expand naive-rdb or rdb-pessimistic unless a later question needs them.
 
 Redis Lua uses `stock:available:{productId}` as the stock decision source of truth in v2. The API still persists a DB order synchronously before responding, so HTTP latency includes both Redis stock decision time and DB order save time.
 
-The v2 comparison does not inject DB write failures after Redis deduction. Compensation, reservation state, payment delay, and reconciliation remain v3+ scope.
+The default comparison does not inject DB write failures after Redis deduction. The separate failure-injection experiment recorded `decision_order_gap = -10` for Redis Lua, confirming that compensation, reservation state, or reconciliation is required in v3+.
 
 ## Follow-up
 
@@ -287,8 +287,7 @@ Stabilized rerun record:
 - records/experiments/v2-stock-strategy-expansion-rerun.md
 - records/experiments/v2-stock-strategy-expansion-rerun.csv
 If another normal-load pass is needed, consider changing the k6 scenario shape before rerunning both strategies.
-Add separate failure-injection experiments for Redis Lua and RDB atomic.
-Failure-injection record:
+Failure injection for Redis Lua and RDB atomic is complete:
 - records/experiments/v2-stock-failure-injection.md
 - records/experiments/v2-stock-failure-injection.csv
 For v3 planning, design compensation/reconciliation around Redis Lua's dual-write limitation.

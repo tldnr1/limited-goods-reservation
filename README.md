@@ -13,9 +13,17 @@ This project reproduces and improves limited-sale backend failures step by step.
 
 ## Current Status
 
-The project is in **v2 stock strategy comparison foundation** stage.
+The project has completed the **v2 stock strategy comparison** and is ready for the v3.1 entry-control stage.
 
-The default v2 adapter still uses the v1 naive RDB read-check-write flow so strategy experiments can compare against the same failure baseline.
+Redis Lua is the v3-oriented main path, while RDB atomic remains the control baseline. The runtime configuration still defaults to `naive-rdb`, so select a strategy explicitly when reproducing v2 results.
+
+Measured v2 results are recorded in:
+
+```text
+records/experiments/v2-stock-strategy-comparison.md
+records/experiments/v2-stock-strategy-expansion-rerun.md
+records/experiments/v2-stock-failure-injection.md
+```
 
 ---
 

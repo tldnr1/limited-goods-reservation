@@ -175,6 +175,7 @@ Failure reasons:
 ```text
 SOLD_OUT
 LOCK_TIMEOUT
+INJECTED_ORDER_SAVE_FAILURE
 UNEXPECTED_FAILURE
 ```
 
@@ -183,7 +184,32 @@ HTTP status is not the primary comparison key. Use the response body `code`, k6 
 Result:
 
 ```text
-to be filled after v2 comparison
+The official matrix completed 60 measured runs:
+- four strategies
+- 100, 500, and 1000 users
+- five repeats per strategy/load
+
+Normal-load correctness:
+- naive-rdb reproduced stock/order inconsistency
+- rdb-atomic, rdb-pessimistic, and redis-lua recorded oversell_count = 0
+- selected redis-lua recorded decision_order_gap = 0 in all official matrix runs
+
+Expansion:
+- redis-lua and rdb-atomic each ran at 3000, 5000, and 10000 users, five times
+- redis-lua had lower HTTP tail latency at every expanded load and no unexpected responses
+
+Failure injection:
+- rdb-atomic: stock_decision_count = 100, order_count = 100, gap = 0
+- redis-lua: stock_decision_count = 100, order_count = 90, gap = -10
+
+Decision:
+- redis-lua is the v3-oriented main path
+- rdb-atomic remains the control baseline
+
+Records:
+- records/experiments/v2-stock-strategy-comparison.md
+- records/experiments/v2-stock-strategy-expansion-rerun.md
+- records/experiments/v2-stock-failure-injection.md
 ```
 
 ### v3.1 Entry Control
