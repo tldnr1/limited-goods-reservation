@@ -214,13 +214,31 @@ Records:
 
 ### v3.1 Entry Control
 
+Question:
+
+```text
+Does a waiting room with active tokens reduce burst pressure on the purchase path?
+```
+
+Alternatives:
+
+```text
+direct access
+fixed batch admission
+hybrid admission
+```
+
 Expected:
 
 ```text
 request without active token is rejected
-entry traffic is controlled before stock reservation
+duplicate enter does not create duplicate queue entries
+entry traffic is controlled before stock decision
 waiting queue size is observable
 active token issued count is observable
+active token rejected count is observable
+purchase path attempt count is lower than direct access under the same burst shape
+HTTP p95/p99 and unexpected responses are compared across alternatives
 ```
 
 Result:
@@ -229,7 +247,39 @@ Result:
 to be filled after v3.1 experiment
 ```
 
-### v3.2 Payment Delay Isolation
+### v3.2 Reservation / Idempotency / Compensation
+
+Question:
+
+```text
+Can the Redis Lua stock decision path recover from DB reservation persistence failure?
+```
+
+Alternatives:
+
+```text
+v2 redis-lua without compensation
+redis-lua with synchronous reservation and immediate compensation
+rdb-atomic control baseline
+```
+
+Expected:
+
+```text
+Redis stock decision count and DB reservation count stay aligned under normal load
+failure injection after Redis deduction is compensated or recorded as recoverable
+duplicate request retry does not create duplicate active reservations
+idempotency hit count is observable
+compensation success/failure count is observable
+```
+
+Result:
+
+```text
+to be filled after v3.2 experiment
+```
+
+### v3.3 Payment Delay Isolation
 
 Expected:
 
@@ -243,7 +293,7 @@ PG timeout becomes UNKNOWN or retry target
 Result:
 
 ```text
-to be filled after v3.2 experiment
+to be filled after v3.3 experiment
 ```
 
 ---
@@ -282,6 +332,12 @@ v3+ metrics:
 waiting queue size
 active token issued count
 active token rejected count
+active token current count
+duplicate waiting enter count
+purchase guard rejection count
+reservation count
+idempotency hit count
+compensation success/failure count
 payment queue backlog
 worker throughput
 payment success/failure/timeout count
@@ -321,7 +377,9 @@ k6/v0/smoke.js
 k6/v1/oversell-baseline.js
 k6/v2/stock-strategy-baseline.js
 k6/v3-1/waiting-room.js
-k6/v3-2/payment-worker-delay.js
+k6/v3-1/waiting-room-bypass.js
+k6/v3-2/reservation-compensation.js
+k6/v3-3/payment-worker-delay.js
 ```
 
 Each scenario should record:

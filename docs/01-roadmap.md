@@ -24,7 +24,8 @@ v0: documentation and runnable skeleton
 v1: naive purchase baseline with feature-based N-tier
 v2: stock strategy comparison with v1-like layered strategy
 v3.1: waiting room + active token
-v3.2: RabbitMQ + payment worker
+v3.2: reservation + idempotency + compensation
+v3.3: RabbitMQ + payment worker
 v4: reward allocation policy
 v5+: advanced scope
 ```
@@ -269,7 +270,7 @@ Evidence:
 
 ### Goal
 
-Control entry traffic before users reach the reservation attempt.
+Control entry traffic before users reach the purchase and stock decision path.
 
 ### Architecture Level
 
@@ -281,18 +282,27 @@ shared PostgreSQL / Redis topology
 ### Allowed
 
 ```text
-waiting queue
-active token
+Redis ZSET waiting queue
+active token with TTL
+active token purchase guard
 admission scheduler
+fixed batch admission comparison
+hybrid admission comparison
 direct access comparison
-rate limit comparison
 waiting room metrics
+waiting status API
 ```
 
 ### Forbidden
 
 ```text
+reservation table
+reservation TTL
+idempotency key
+Redis stock compensation
+payment queue
 payment worker
+RabbitMQ
 reward allocation
 duplicate webhook handling
 DLQ
@@ -305,9 +315,14 @@ MSA-style service split
 
 ```text
 request without active token is rejected
-entry traffic is controlled before stock reservation
+duplicate waiting room entry does not create duplicate queue members
+entry traffic is controlled before stock decision
 waiting queue size is observable
 active token issued count is observable
+active token rejected count is observable
+direct access, fixed batch admission, and hybrid admission are compared
+purchase path attempt count is lower than direct access under the same burst shape
+oversell_count remains 0 for the selected stock strategy
 ```
 
 ### Result
@@ -318,7 +333,69 @@ to be filled after v3.1 experiment
 
 ---
 
-## v3.2. RabbitMQ + Payment Worker
+## v3.2. Reservation + Idempotency + Compensation
+
+### Goal
+
+Make the Redis Lua stock decision path recoverable when DB reservation persistence fails after Redis deduction.
+
+### Architecture Level
+
+```text
+modular monolith feature module: reservation
+Redis Lua stock decision remains the main path
+PostgreSQL remains the durable business truth
+```
+
+### Allowed
+
+```text
+reservation table
+reservation status
+short-term idempotency key
+one active reservation per user/product
+reservation TTL marker in Redis
+immediate Redis stock compensation after DB reservation save failure
+failure injection after Redis stock decision
+duplicate request comparison
+reservation and compensation metrics
+```
+
+### Forbidden
+
+```text
+duplicate webhook handling
+delayed webhook handling
+RabbitMQ
+payment worker
+Mock PG
+DLQ
+outbox pattern
+reconciliation worker
+Kafka
+MSA-style service split
+```
+
+### Success Metrics
+
+```text
+Redis stock decision count and DB reservation count stay aligned under normal load
+failure injection after Redis deduction is compensated or recorded as a recoverable gap
+duplicate purchase retry does not create duplicate active reservations
+idempotency hit count is observable
+compensation success/failure count is observable
+rdb-atomic remains available as the control baseline
+```
+
+### Result
+
+```text
+to be filled after v3.2 experiment
+```
+
+---
+
+## v3.3. RabbitMQ + Payment Worker
 
 ### Goal
 
@@ -365,12 +442,13 @@ API response time is not directly tied to Mock PG delay
 payment queue backlog is observable
 worker throughput is observable
 payment success/failure/timeout count is observable
+PG timeout becomes UNKNOWN or retry target
 ```
 
 ### Result
 
 ```text
-to be filled after v3.2 experiment
+to be filled after v3.3 experiment
 ```
 
 ---

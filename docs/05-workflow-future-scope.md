@@ -38,9 +38,11 @@ docs/v0-documentation-cleanup
 feature/v1-naive-purchase-baseline
 feature/v2-selected-stock-strategy
 experiment/v3-1-token-policy-spike
-experiment/v3-2-payment-timeout-spike
+experiment/v3-2-compensation-spike
+experiment/v3-3-payment-timeout-spike
 feature/v3-1-waiting-room-active-token
-feature/v3-2-payment-worker
+feature/v3-2-reservation-compensation
+feature/v3-3-payment-worker
 feature/v4-reward-allocation
 ```
 
@@ -53,7 +55,8 @@ PR title examples:
 [v2] Compare stock consistency strategies
 [v2] Add selected stock strategy
 [v3.1] Add waiting room and active token
-[v3.2] Add RabbitMQ payment worker
+[v3.2] Add reservation compensation
+[v3.3] Add RabbitMQ payment worker
 [v4] Add reward allocation MVP
 ```
 

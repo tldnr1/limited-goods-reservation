@@ -171,11 +171,23 @@ idempotency keys if idempotency becomes part of the version objective
 ### v3.1
 
 ```text
-waiting queue Redis keys
-active token Redis keys
+waiting sequence Redis key
+waiting queue Redis ZSET
+waiting user marker Redis key
+active token Redis key
 ```
 
 ### v3.2
+
+```text
+reservations
+reservation TTL keys
+user reservation guard keys
+idempotency keys
+compensation metrics
+```
+
+### v3.3
 
 ```text
 payments
@@ -226,22 +238,35 @@ Keep Redis keys productId-based until the domain expands.
 
 ```text
 stock:available:{productId}
+waiting:sequence:{productId}
+waiting:queue:{productId}
+waiting:user:{productId}:{userId}
+active-token:{productId}:{userId}
 reservation:{reservationId}
 user:reservation:{productId}:{userId}
 idempotency:{key}
-waiting:queue:{productId}
-active-token:{productId}:{userId}
 ```
 
 Key ownership:
 
 ```text
-stock:available:{productId}          v2 Redis stock strategy
-reservation:{reservationId}          reservation TTL marker
-user:reservation:{productId}:{userId} one active reservation rule
-idempotency:{key}                    duplicated request result
-waiting:queue:{productId}            v3.1 waiting room
-active-token:{productId}:{userId}    v3.1 active token
+stock:available:{productId}           v2+ Redis stock strategy
+waiting:sequence:{productId}          v3.1 monotonic queue order source
+waiting:queue:{productId}             v3.1 ZSET, member=userId, score=sequence
+waiting:user:{productId}:{userId}     v3.1 duplicate enter marker
+active-token:{productId}:{userId}     v3.1 temporary right to attempt purchase
+reservation:{reservationId}           v3.2 reservation TTL marker
+user:reservation:{productId}:{userId} v3.2 one active reservation rule
+idempotency:{key}                     v3.2 duplicated request result
+```
+
+v3.1 waiting room rule:
+
+```text
+The waiting queue stores order, not permission.
+The active-token key stores temporary permission.
+An active token is consumed before entering the purchase path and defaults to a 60-second TTL.
+Requests without an active token return conflict instead of reaching stock deduction.
 ```
 
 ---
