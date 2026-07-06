@@ -31,6 +31,17 @@ purchase:
     mode: ${PURCHASE_FAILURE_MODE:off}
     limit: ${PURCHASE_FAILURE_LIMIT:0}
 
+waiting-room:
+  enabled: ${WAITING_ROOM_ENABLED:true}
+  product-id: ${WAITING_ROOM_PRODUCT_ID:1}
+  admission:
+    scheduler-enabled: ${WAITING_ROOM_ADMISSION_SCHEDULER_ENABLED:true}
+    batch-size: ${WAITING_ROOM_ADMISSION_BATCH_SIZE:20}
+    active-capacity: ${WAITING_ROOM_ADMISSION_ACTIVE_CAPACITY:100}
+    token-ttl-seconds: ${WAITING_ROOM_ACTIVE_TOKEN_TTL_SECONDS:60}
+    interval-ms: ${WAITING_ROOM_ADMISSION_INTERVAL_MS:1000}
+    retry-after-seconds: ${WAITING_ROOM_RETRY_AFTER_SECONDS:2}
+
 management:
   endpoints:
     web:

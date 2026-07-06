@@ -9,7 +9,8 @@ import org.springframework.boot.test.context.SpringBootTest;
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create",
-        "spring.sql.init.mode=never"
+        "spring.sql.init.mode=never",
+        "waiting-room.admission.scheduler-enabled=false"
 })
 class LimitedGoodsReservationApplicationTests {
 

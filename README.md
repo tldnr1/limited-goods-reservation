@@ -13,9 +13,10 @@ This project reproduces and improves limited-sale backend failures step by step.
 
 ## Current Status
 
-The project has completed the **v2 stock strategy comparison** and is ready for the v3.1 entry-control stage.
+The project has completed the **v2 stock strategy comparison** and is in the v3.1 entry-control stage.
 
 Redis Lua is the v3-oriented main path, while RDB atomic remains the control baseline. The runtime configuration still defaults to `naive-rdb`, so select a strategy explicitly when reproducing v2 results.
+When reproducing v2 direct purchase scenarios after v3.1, disable the waiting-room guard with `WAITING_ROOM_ENABLED=false`.
 
 Measured v2 results are recorded in:
 
@@ -58,8 +59,16 @@ $env:VUS='1000'; $env:ITERATIONS='1000'; docker compose --profile load-test up -
 Select a v2 stock strategy with `STOCK_STRATEGY`:
 
 ```text
-$env:STOCK_STRATEGY='naive-rdb'; docker compose up -d --force-recreate api
+$env:STOCK_STRATEGY='naive-rdb'; $env:WAITING_ROOM_ENABLED='false'; docker compose up -d --force-recreate api
 $env:STOCK_STRATEGY='naive-rdb'; docker compose --profile load-test up --force-recreate k6
+```
+
+Run a small v3.1 waiting-room smoke scenario:
+
+```text
+$env:STOCK_STRATEGY='redis-lua'; docker compose up -d --force-recreate api
+docker compose exec -T redis redis-cli SET stock:available:1 100
+$env:K6_SCRIPT='/scripts/v3-1/waiting-room.js'; docker compose --profile load-test run -T --rm -e VUS=10 -e ITERATIONS=10 -e RUN_ID=v3-1-smoke k6
 ```
 
 Open local monitoring:
