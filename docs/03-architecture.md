@@ -183,6 +183,9 @@ queue score: Redis INCR sequence
 active token TTL: 60 seconds
 active token missing response: 409 conflict
 admission policy: hybrid batch/capacity
+admission interval: 1 second
+batchSize: 20
+activeCapacity: 100
 ```
 
 ---

@@ -89,7 +89,7 @@ Records explain why decisions were made. Notes are local/private scratch and are
 - Keep Redis Lua as the v3-oriented main path and RDB atomic as the control baseline.
 - v3.1 controls entry traffic before the existing purchase and stock path.
 - v3.1 uses Redis ZSET for the waiting queue, active-token keys with TTL, and explicit purchase guard rejection.
-- v3.1 default admission policy is hybrid: issue at most `batchSize` tokens per interval without exceeding `activeCapacity`.
+- v3.1 default admission policy is hybrid: issue at most `batchSize=20` tokens every 1 second without exceeding `activeCapacity=100`.
 - Add waiting room and active token boundaries only when real v3.1 classes are implemented.
 - Do not introduce reservation TTL, purchase idempotency, Redis stock compensation, RabbitMQ, payment worker, reward allocation, outbox, or reconciliation worker in v3.1.
 - v3.2 handles reservation, idempotency, and simple compensation for the Redis-to-DB dual-write gap.
