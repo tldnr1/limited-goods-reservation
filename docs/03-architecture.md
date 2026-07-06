@@ -146,7 +146,51 @@ DB failure compensation after Redis deduction is future scope.
 
 ---
 
-## 5. v3+ Modular Monolith
+## 5. v3.1 Entry Control Module
+
+Purpose:
+
+```text
+limit how many users can enter the existing purchase and stock decision path
+```
+
+Package direction:
+
+```text
+src/main/java/com/limitedgoodsreservation/
+  waitingroom/
+    controller/
+    dto/
+    service/
+    scheduler/
+    metrics/
+```
+
+Rules:
+
+```text
+keep the existing purchase flow readable
+place waiting queue, active token, and admission policy in waitingroom
+validate active token explicitly before stock deduction
+do not introduce reservation, payment, or worker abstractions in v3.1
+```
+
+Default policy:
+
+```text
+queue structure: Redis ZSET
+queue score: Redis INCR sequence
+active token TTL: 60 seconds
+active token missing response: 409 conflict
+admission policy: hybrid batch/capacity
+admission interval: 1 second
+batchSize: 20
+activeCapacity: 100
+```
+
+---
+
+## 6. v3+ Modular Monolith
 
 Purpose:
 
@@ -161,6 +205,7 @@ src/main/java/com/limitedgoodsreservation/
   purchase/
   stock/
   waitingroom/
+  reservation/
   payment/
   reward/
   global/
@@ -170,15 +215,16 @@ Rules:
 
 ```text
 waitingroom appears when entry traffic control is implemented
+reservation appears when Redis stock decisions become durable reservations
 payment appears when PG delay isolation is implemented
 reward appears when reward allocation is implemented
-reconciliation stays future scope until explicitly introduced
+outbox and reconciliation workers stay future scope until explicitly introduced
 do not split into separately deployed services
 ```
 
 ---
 
-## 6. Runtime Components
+## 7. Runtime Components
 
 Runtime topology should remain reproducible through Docker Compose.
 
@@ -187,14 +233,15 @@ v0: Spring API container + PostgreSQL + k6 smoke container
 v1: Spring API container + PostgreSQL + k6 oversell scenario
 v2: Spring API container + PostgreSQL + Redis when Redis strategies are tested
 v3.1: Spring API container + PostgreSQL + Redis + waiting room / active token
-v3.2: Spring API container + PostgreSQL + Redis + RabbitMQ + Payment Worker + Mock PG
+v3.2: Spring API container + PostgreSQL + Redis + reservation / idempotency / compensation
+v3.3: Spring API container + PostgreSQL + Redis + RabbitMQ + Payment Worker + Mock PG
 ```
 
 Local Java execution is allowed for fast feedback, but version-level verification should use Docker Compose.
 
 ---
 
-## 7. Data Responsibility Split
+## 8. Data Responsibility Split
 
 ```text
 PostgreSQL:
@@ -207,9 +254,9 @@ PostgreSQL:
 Redis:
 - real-time high-concurrency control
 - stock reservation decision when selected
-- reservation TTL
 - waiting queue
 - active token
+- reservation TTL when introduced
 - short-term idempotency when introduced
 
 RabbitMQ:
