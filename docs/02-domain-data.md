@@ -242,6 +242,7 @@ waiting:sequence:{productId}
 waiting:queue:{productId}
 waiting:user:{productId}:{userId}
 active-token:{productId}:{userId}
+active-token:index:{productId}
 reservation:{reservationId}
 user:reservation:{productId}:{userId}
 idempotency:{key}
@@ -255,6 +256,7 @@ waiting:sequence:{productId}          v3.1 monotonic queue order source
 waiting:queue:{productId}             v3.1 ZSET, member=userId, score=sequence
 waiting:user:{productId}:{userId}     v3.1 duplicate enter marker
 active-token:{productId}:{userId}     v3.1 temporary right to attempt purchase
+active-token:index:{productId}        v3.1 ZSET index for active token capacity accounting
 reservation:{reservationId}           v3.2 reservation TTL marker
 user:reservation:{productId}:{userId} v3.2 one active reservation rule
 idempotency:{key}                     v3.2 duplicated request result

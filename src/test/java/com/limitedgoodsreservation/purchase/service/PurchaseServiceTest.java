@@ -19,7 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create",
-        "spring.sql.init.mode=always"
+        "spring.sql.init.mode=always",
+        "waiting-room.admission.scheduler-enabled=false"
 })
 @Transactional
 class PurchaseServiceTest {

@@ -2,6 +2,7 @@ package com.limitedgoodsreservation.global;
 
 import com.limitedgoodsreservation.purchase.failure.InjectedPurchaseFailureException;
 import com.limitedgoodsreservation.stock.strategy.StockDeductionException;
+import com.limitedgoodsreservation.waitingroom.service.ActiveTokenRequiredException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -20,6 +21,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleInjectedPurchaseFailure(InjectedPurchaseFailureException exception) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(new ErrorResponse("INJECTED_ORDER_SAVE_FAILURE", exception.getMessage()));
+    }
+
+    @ExceptionHandler(ActiveTokenRequiredException.class)
+    public ResponseEntity<ErrorResponse> handleActiveTokenRequired(ActiveTokenRequiredException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("ACTIVE_TOKEN_REQUIRED", exception.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
