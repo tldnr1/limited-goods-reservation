@@ -133,12 +133,10 @@ The test uses immediate purchase after ACTIVE. A real UI may have more user thin
 
 ## Follow-up
 
-Before tagging v3.1:
+Completed in the final v3.1 entry-control record:
 
 ```text
-run repeats >= 3
-try users 500, 1000, and 3000 if local Docker remains stable
-compare batchSize 10, 20, and 50
-compare activeCapacity 10, 50, and 100
-decide whether to add user think time after ACTIVE for a more visible hybrid-policy comparison
+records/experiments/v3-1-entry-control.md
 ```
+
+The final record adds think-time scenarios and closes v3.1 as the entry-control baseline.

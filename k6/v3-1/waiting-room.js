@@ -174,6 +174,7 @@ export function handleSummary(data) {
       `users=${vus}`,
       `iterations=${iterations}`,
       `max_polls=${maxPolls}`,
+      `pre_purchase_sleep_seconds=${prePurchaseSleepSeconds}`,
       `http_req_duration_p50_ms=${duration['p(50)'] || duration.med || 0}`,
       `http_req_duration_p95_ms=${duration['p(95)'] || 0}`,
       `http_req_duration_p99_ms=${duration['p(99)'] || 0}`,

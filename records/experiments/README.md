@@ -12,6 +12,7 @@ Suggested file name:
 v1-oversell-baseline.md
 v2-stock-strategy-comparison.md
 v3-1-entry-control.md
+v3-1-entry-control-initial.md
 v3-2-payment-delay-isolation.md
 v4-reward-policy-comparison.md
 ```

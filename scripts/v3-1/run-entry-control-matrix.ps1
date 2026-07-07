@@ -13,10 +13,12 @@ param(
     [int] $AdmissionIntervalMs = 1000,
     [int] $TokenTtlSeconds = 60,
     [int] $MaxPolls = 10,
+    [string] $ThinkTimes = "0",
     [string] $MaxDuration = "2m",
     [string] $ResultName = "v3-1-entry-control-initial",
     [switch] $Smoke,
-    [switch] $SkipBuild
+    [switch] $SkipBuild,
+    [switch] $AppendResult
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,6 +30,11 @@ if ($Smoke) {
     $ResultName = "v3-1-entry-control-smoke"
 }
 
+$ThinkTimeValues = $ThinkTimes.Split(",") |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ -ne "" } |
+        ForEach-Object { [int] $_ }
+
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $Root
 
@@ -35,7 +42,7 @@ $RawDir = Join-Path $Root "notes\v3-1-entry-control\raw"
 $CsvPath = Join-Path $Root "records\experiments\$ResultName.csv"
 New-Item -ItemType Directory -Force -Path $RawDir | Out-Null
 New-Item -ItemType Directory -Force -Path (Split-Path $CsvPath) | Out-Null
-if (Test-Path -LiteralPath $CsvPath) {
+if ((-not $AppendResult) -and (Test-Path -LiteralPath $CsvPath)) {
     Remove-Item -LiteralPath $CsvPath -Force
 }
 
@@ -139,6 +146,7 @@ function Invoke-K6Run {
         [string] $Policy,
         [int] $BatchSize,
         [int] $ActiveCapacity,
+        [int] $ThinkTimeSeconds,
         [int] $UserCount,
         [int] $Repeat,
         [string] $RunId
@@ -161,6 +169,7 @@ function Invoke-K6Run {
         -e INITIAL_STOCK=$InitialStock `
         -e MAX_POLLS=$MaxPolls `
         -e MAX_DURATION=$MaxDuration `
+        -e PRE_PURCHASE_SLEEP_SECONDS=$ThinkTimeSeconds `
         -e WAITING_ROOM_ADMISSION_BATCH_SIZE=$BatchSize `
         -e WAITING_ROOM_ADMISSION_ACTIVE_CAPACITY=$ActiveCapacity `
         k6
@@ -232,66 +241,70 @@ foreach ($policy in $Policies) {
     Start-ApiForPolicy -Policy $policy -BatchSize $config.BatchSize -ActiveCapacity $config.ActiveCapacity
 
     foreach ($userCount in $Users) {
-        for ($repeat = 1; $repeat -le $Repeats; $repeat += 1) {
-            $runId = "$startedAt-$policy-u$userCount-r$repeat"
-            Write-Host "Measured run: $runId"
+        foreach ($thinkTime in $ThinkTimeValues) {
+            for ($repeat = 1; $repeat -le $Repeats; $repeat += 1) {
+                $runId = "$startedAt-$policy-u$userCount-t$thinkTime-r$repeat"
+                Write-Host "Measured run: $runId"
 
-            Reset-ExperimentState
-            Wait-Api
-            Invoke-K6Run `
-                -Policy $policy `
-                -BatchSize $config.BatchSize `
-                -ActiveCapacity $config.ActiveCapacity `
-                -UserCount $userCount `
-                -Repeat $repeat `
-                -RunId $runId
+                Reset-ExperimentState
+                Wait-Api
+                Invoke-K6Run `
+                    -Policy $policy `
+                    -BatchSize $config.BatchSize `
+                    -ActiveCapacity $config.ActiveCapacity `
+                    -ThinkTimeSeconds $thinkTime `
+                    -UserCount $userCount `
+                    -Repeat $repeat `
+                    -RunId $runId
 
-            $summary = Read-K6Summary $runId
-            $duration = $summary.metrics.http_req_duration.values
-            $purchaseDuration = $summary.metrics.purchase_req_duration.values
-            $db = Read-DbMetrics
-            $redisAvailable = Read-RedisInteger -Arguments @("GET", "stock:available:$ProductId")
-            $waitingQueueSize = Read-RedisInteger -Arguments @("ZCARD", "waiting:queue:$ProductId")
-            $activeTokenCurrent = Read-RedisInteger -Arguments @("ZCARD", "active-token:index:$ProductId")
-            $stockDecisionCount = $InitialStock - $redisAvailable
+                $summary = Read-K6Summary $runId
+                $duration = $summary.metrics.http_req_duration.values
+                $purchaseDuration = $summary.metrics.purchase_req_duration.values
+                $db = Read-DbMetrics
+                $redisAvailable = Read-RedisInteger -Arguments @("GET", "stock:available:$ProductId")
+                $waitingQueueSize = Read-RedisInteger -Arguments @("ZCARD", "waiting:queue:$ProductId")
+                $activeTokenCurrent = Read-RedisInteger -Arguments @("ZCARD", "active-token:index:$ProductId")
+                $stockDecisionCount = $InitialStock - $redisAvailable
 
-            $row = [pscustomobject]@{
-                run_id = $runId
-                policy = $policy
-                users = $userCount
-                repeat = $repeat
-                initial_stock = $InitialStock
-                batch_size = $config.BatchSize
-                active_capacity = $config.ActiveCapacity
-                max_polls = $MaxPolls
-                http_reqs = Get-MetricValue $summary.metrics.http_reqs.values "count"
-                http_failed_rate = Get-MetricValue $summary.metrics.http_req_failed.values "rate"
-                http_p50_ms = Get-MetricValue $duration "p(50)"
-                http_p95_ms = Get-MetricValue $duration "p(95)"
-                http_p99_ms = Get-MetricValue $duration "p(99)"
-                purchase_p50_ms = Get-MetricValue $purchaseDuration "p(50)"
-                purchase_p95_ms = Get-MetricValue $purchaseDuration "p(95)"
-                purchase_p99_ms = Get-MetricValue $purchaseDuration "p(99)"
-                waiting_entries = Get-MetricValue $summary.metrics.waiting_entries.values "count"
-                active_statuses = Get-MetricValue $summary.metrics.active_statuses.values "count"
-                not_admitted_within_window = Get-MetricValue $summary.metrics.not_admitted_within_window.values "count"
-                purchase_attempts = Get-MetricValue $summary.metrics.purchase_attempts.values "count"
-                successful_purchases = Get-MetricValue $summary.metrics.successful_purchases.values "count"
-                sold_out_responses = Get-MetricValue $summary.metrics.sold_out_responses.values "count"
-                active_token_required_responses = Get-MetricValue $summary.metrics.active_token_required_responses.values "count"
-                unexpected_responses = Get-MetricValue $summary.metrics.unexpected_responses.values "count"
-                db_initial_quantity = $db.InitialQuantity
-                db_sold_quantity = $db.SoldQuantity
-                db_order_count = $db.OrderCount
-                redis_available = $redisAvailable
-                stock_decision_count = $stockDecisionCount
-                oversell_count = $db.OversellCount
-                decision_order_gap = $db.OrderCount - $stockDecisionCount
-                waiting_queue_size_after = $waitingQueueSize
-                active_token_current_after = $activeTokenCurrent
+                $row = [pscustomobject]@{
+                    run_id = $runId
+                    policy = $policy
+                    users = $userCount
+                    repeat = $repeat
+                    initial_stock = $InitialStock
+                    batch_size = $config.BatchSize
+                    active_capacity = $config.ActiveCapacity
+                    max_polls = $MaxPolls
+                    think_time_seconds = $thinkTime
+                    http_reqs = Get-MetricValue $summary.metrics.http_reqs.values "count"
+                    http_failed_rate = Get-MetricValue $summary.metrics.http_req_failed.values "rate"
+                    http_p50_ms = Get-MetricValue $duration "p(50)"
+                    http_p95_ms = Get-MetricValue $duration "p(95)"
+                    http_p99_ms = Get-MetricValue $duration "p(99)"
+                    purchase_p50_ms = Get-MetricValue $purchaseDuration "p(50)"
+                    purchase_p95_ms = Get-MetricValue $purchaseDuration "p(95)"
+                    purchase_p99_ms = Get-MetricValue $purchaseDuration "p(99)"
+                    waiting_entries = Get-MetricValue $summary.metrics.waiting_entries.values "count"
+                    active_statuses = Get-MetricValue $summary.metrics.active_statuses.values "count"
+                    not_admitted_within_window = Get-MetricValue $summary.metrics.not_admitted_within_window.values "count"
+                    purchase_attempts = Get-MetricValue $summary.metrics.purchase_attempts.values "count"
+                    successful_purchases = Get-MetricValue $summary.metrics.successful_purchases.values "count"
+                    sold_out_responses = Get-MetricValue $summary.metrics.sold_out_responses.values "count"
+                    active_token_required_responses = Get-MetricValue $summary.metrics.active_token_required_responses.values "count"
+                    unexpected_responses = Get-MetricValue $summary.metrics.unexpected_responses.values "count"
+                    db_initial_quantity = $db.InitialQuantity
+                    db_sold_quantity = $db.SoldQuantity
+                    db_order_count = $db.OrderCount
+                    redis_available = $redisAvailable
+                    stock_decision_count = $stockDecisionCount
+                    oversell_count = $db.OversellCount
+                    decision_order_gap = $db.OrderCount - $stockDecisionCount
+                    waiting_queue_size_after = $waitingQueueSize
+                    active_token_current_after = $activeTokenCurrent
+                }
+
+                $row | Export-Csv -Path $CsvPath -NoTypeInformation -Append
             }
-
-            $row | Export-Csv -Path $CsvPath -NoTypeInformation -Append
         }
     }
 }
