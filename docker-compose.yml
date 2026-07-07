@@ -113,11 +113,14 @@ services:
       RUN_ID: ${RUN_ID:-local}
       REPEAT: ${REPEAT:-1}
       INITIAL_STOCK: ${INITIAL_STOCK:-100}
+      ADMISSION_POLICY: ${ADMISSION_POLICY:-unknown}
+      MAX_POLLS: ${MAX_POLLS:-30}
+      PRE_PURCHASE_SLEEP_SECONDS: ${PRE_PURCHASE_SLEEP_SECONDS:-0}
       K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
       K6_PROMETHEUS_RW_TREND_STATS: p(50),p(95),p(99),min,max,avg
     volumes:
       - ./k6:/scripts:ro
-      - ./notes/v2-stock-strategy/raw:/results
+      - ${K6_RESULTS_DIR:-./notes/v2-stock-strategy/raw}:/results
     command: ["run", "-o", "experimental-prometheus-rw", "${K6_SCRIPT:-/scripts/v2/stock-strategy-baseline.js}"]
     depends_on:
       api:

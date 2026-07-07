@@ -378,8 +378,17 @@ k6/v1/oversell-baseline.js
 k6/v2/stock-strategy-baseline.js
 k6/v3-1/waiting-room.js
 k6/v3-1/waiting-room-bypass.js
+k6/v3-1/direct-purchase.js
 k6/v3-2/reservation-compensation.js
 k6/v3-3/payment-worker-delay.js
+```
+
+Version runners:
+
+```text
+scripts/v2/run-stock-strategy-matrix.ps1
+scripts/v2/run-stock-failure-injection-matrix.ps1
+scripts/v3-1/run-entry-control-matrix.ps1
 ```
 
 Each scenario should record:

@@ -7,10 +7,8 @@ const baseUrl = __ENV.BASE_URL || 'http://localhost:8080';
 const productId = Number(__ENV.PRODUCT_ID || 1);
 const vus = Number(__ENV.VUS || 100);
 const iterations = Number(__ENV.ITERATIONS || vus);
-const runId = __ENV.RUN_ID || 'v3-1-waiting-room-local';
-const maxPolls = Number(__ENV.MAX_POLLS || 30);
-const admissionPolicy = __ENV.ADMISSION_POLICY || 'waiting-room';
-const prePurchaseSleepSeconds = Number(__ENV.PRE_PURCHASE_SLEEP_SECONDS || 0);
+const runId = __ENV.RUN_ID || 'v3-1-direct-local';
+const admissionPolicy = __ENV.ADMISSION_POLICY || 'direct';
 
 export const options = {
   summaryTrendStats: ['min', 'avg', 'med', 'p(50)', 'p(95)', 'p(99)', 'max'],
@@ -21,18 +19,15 @@ export const options = {
     users: String(vus),
   },
   scenarios: {
-    waiting_room: {
+    direct_purchase: {
       executor: 'shared-iterations',
       vus,
       iterations,
-      maxDuration: __ENV.MAX_DURATION || '3m',
+      maxDuration: __ENV.MAX_DURATION || '2m',
     },
   },
 };
 
-const waitingEntries = new Counter('waiting_entries');
-const activeStatuses = new Counter('active_statuses');
-const notAdmittedWithinWindow = new Counter('not_admitted_within_window');
 const purchaseAttempts = new Counter('purchase_attempts');
 const successfulPurchases = new Counter('successful_purchases');
 const soldOutResponses = new Counter('sold_out_responses');
@@ -54,67 +49,8 @@ export function setup() {
 
 export default function () {
   const userId = exec.scenario.iterationInTest + 1;
-  let status = enterWaitingRoom(userId);
-
-  for (let poll = 0; status !== 'ACTIVE' && poll < maxPolls; poll += 1) {
-    sleep(1);
-    status = readWaitingStatus(userId);
-  }
-
-  if (status !== 'ACTIVE') {
-    notAdmittedWithinWindow.add(1);
-    return;
-  }
-
-  activeStatuses.add(1);
-  if (prePurchaseSleepSeconds > 0) {
-    sleep(prePurchaseSleepSeconds);
-  }
-  purchase(userId);
-}
-
-function enterWaitingRoom(userId) {
-  const response = http.post(
-    `${baseUrl}/api/v3/waiting-room/enter`,
-    JSON.stringify({ productId }),
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-USER-ID': String(userId),
-      },
-    },
-  );
-
-  check(response, {
-    'enter response is OK': (res) => res.status === 200,
-  });
-
-  const status = responseStatus(response);
-  if (status === 'WAITING') {
-    waitingEntries.add(1);
-  }
-  return status;
-}
-
-function readWaitingStatus(userId) {
-  const response = http.get(
-    `${baseUrl}/api/v3/waiting-room/status?productId=${productId}`,
-    {
-      headers: {
-        'X-USER-ID': String(userId),
-      },
-    },
-  );
-
-  check(response, {
-    'status response is OK': (res) => res.status === 200,
-  });
-
-  return responseStatus(response);
-}
-
-function purchase(userId) {
   purchaseAttempts.add(1);
+
   const response = http.post(
     `${baseUrl}/api/v1/purchases`,
     JSON.stringify({ productId }),
@@ -126,6 +62,12 @@ function purchase(userId) {
     },
   );
   purchaseReqDuration.add(response.timings.duration);
+
+  check(response, {
+    'purchase response is created or expected failure': (res) => (
+      res.status === 201 || responseCode(res) === 'SOLD_OUT'
+    ),
+  });
 
   if (response.status === 201) {
     successfulPurchases.add(1);
@@ -145,14 +87,6 @@ function purchase(userId) {
   unexpectedResponses.add(1);
 }
 
-function responseStatus(response) {
-  try {
-    return response.json('status') || '';
-  } catch (error) {
-    return '';
-  }
-}
-
 function responseCode(response) {
   try {
     return response.json('code') || '';
@@ -167,22 +101,18 @@ export function handleSummary(data) {
 
   return {
     stdout: [
-      'v3.1 waiting room',
+      'v3.1 direct purchase',
       `run_id=${runId}`,
       `admission_policy=${admissionPolicy}`,
       `product_id=${productId}`,
       `users=${vus}`,
       `iterations=${iterations}`,
-      `max_polls=${maxPolls}`,
       `http_req_duration_p50_ms=${duration['p(50)'] || duration.med || 0}`,
       `http_req_duration_p95_ms=${duration['p(95)'] || 0}`,
       `http_req_duration_p99_ms=${duration['p(99)'] || 0}`,
       `purchase_req_duration_p50_ms=${purchaseDuration['p(50)'] || purchaseDuration.med || 0}`,
       `purchase_req_duration_p95_ms=${purchaseDuration['p(95)'] || 0}`,
       `purchase_req_duration_p99_ms=${purchaseDuration['p(99)'] || 0}`,
-      `waiting_entries=${data.metrics.waiting_entries?.values.count || 0}`,
-      `active_statuses=${data.metrics.active_statuses?.values.count || 0}`,
-      `not_admitted_within_window=${data.metrics.not_admitted_within_window?.values.count || 0}`,
       `purchase_attempts=${data.metrics.purchase_attempts?.values.count || 0}`,
       `successful_purchases=${data.metrics.successful_purchases?.values.count || 0}`,
       `sold_out_responses=${data.metrics.sold_out_responses?.values.count || 0}`,
