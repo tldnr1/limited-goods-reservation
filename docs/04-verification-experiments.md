@@ -244,7 +244,21 @@ HTTP p95/p99 and unexpected responses are compared across alternatives
 Result:
 
 ```text
-to be filled after v3.1 experiment
+Completed on 2026-07-07.
+
+The measured v3.1 matrix confirmed:
+- direct access reaches the purchase path with all burst users
+- fixed batch admission reduces purchase path attempts by admitting users in controlled batches
+- hybrid admission behaves like fixed batch when activeCapacity is above expected active holders
+- hybrid admission becomes stricter when activeCapacity is below expected active holders
+- not_admitted_within_window is a controlled waiting-room outcome, not an unexpected failure
+- unexpected_responses = 0 in all measured rows
+- oversell_count = 0 in all measured rows
+- decision_order_gap = 0 in all measured rows
+
+Primary records:
+- records/experiments/v3-1-entry-control.md
+- records/experiments/v3-1-entry-control-initial.md
 ```
 
 ### v3.2 Reservation / Idempotency / Compensation
@@ -378,8 +392,17 @@ k6/v1/oversell-baseline.js
 k6/v2/stock-strategy-baseline.js
 k6/v3-1/waiting-room.js
 k6/v3-1/waiting-room-bypass.js
+k6/v3-1/direct-purchase.js
 k6/v3-2/reservation-compensation.js
 k6/v3-3/payment-worker-delay.js
+```
+
+Version runners:
+
+```text
+scripts/v2/run-stock-strategy-matrix.ps1
+scripts/v2/run-stock-failure-injection-matrix.ps1
+scripts/v3-1/run-entry-control-matrix.ps1
 ```
 
 Each scenario should record:

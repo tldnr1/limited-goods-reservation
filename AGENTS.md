@@ -9,15 +9,15 @@ This file is the **current work index**. It may change as the project version ch
 ## Current Status
 
 ```text
-current_version: v3.1
-current_goal: waiting room and active token entry control
-next_target: v3.1 Redis ZSET waiting room and hybrid admission baseline
+current_version: v3.2
+current_goal: Redis stock decision to PostgreSQL truth consistency
+next_target: reservation, idempotency, and compensation design
 project_type: Spring Boot backend portfolio project
-architecture_now: v2 layered stock strategy complete; v3.1 modular monolith transition
+architecture_now: v3.1 waiting room complete; v3.2 modular monolith transition
 official_verification_path: Docker Compose first
 ```
 
-v2 is complete. Redis Lua is the v3-oriented main path, and RDB atomic remains the control baseline.
+v3.1 is complete. Redis Lua is the v3-oriented main path, and RDB atomic remains the control baseline.
 
 ---
 

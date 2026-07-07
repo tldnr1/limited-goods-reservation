@@ -13,17 +13,18 @@ This project reproduces and improves limited-sale backend failures step by step.
 
 ## Current Status
 
-The project has completed the **v2 stock strategy comparison** and is in the v3.1 entry-control stage.
+The project has completed the **v3.1 waiting-room entry-control experiment** and is ready for v3.2 consistency work.
 
 Redis Lua is the v3-oriented main path, while RDB atomic remains the control baseline. The runtime configuration still defaults to `naive-rdb`, so select a strategy explicitly when reproducing v2 results.
 When reproducing v2 direct purchase scenarios after v3.1, disable the waiting-room guard with `WAITING_ROOM_ENABLED=false`.
 
-Measured v2 results are recorded in:
+Measured results are recorded in:
 
 ```text
 records/experiments/v2-stock-strategy-comparison.md
 records/experiments/v2-stock-strategy-expansion-rerun.md
 records/experiments/v2-stock-failure-injection.md
+records/experiments/v3-1-entry-control.md
 ```
 
 ---

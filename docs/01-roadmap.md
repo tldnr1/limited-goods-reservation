@@ -328,7 +328,38 @@ oversell_count remains 0 for the selected stock strategy
 ### Result
 
 ```text
-to be filled after v3.1 experiment
+Completed on 2026-07-07 through Docker Compose.
+
+Implementation:
+- Redis ZSET waiting queue
+- active token with TTL
+- scheduled hybrid admission
+- explicit purchase guard returning 409 when active token is missing
+
+Verification:
+- request without active token is rejected
+- duplicate waiting-room enter does not create duplicate queue members
+- direct, fixed batch, and hybrid admission were compared
+- think-time matrix confirmed that activeCapacity becomes meaningful when users hold active tokens before purchase
+
+Result:
+- direct access sent 1000 of 1000 users into the purchase path
+- fixed/hybrid waiting-room policies reduced purchase_attempts before stock deduction
+- selected stock strategy remained redis-lua
+- all measured v3.1 rows recorded unexpected_responses = 0
+- all measured v3.1 rows recorded oversell_count = 0
+- all measured v3.1 rows recorded decision_order_gap = 0
+
+Decision:
+- v3.1 is complete as the entry-control baseline
+- batchSize controls admission rate
+- activeCapacity caps concurrent active-token holders
+- useful sizing heuristic: expected_active_users ~= batchSize * thinkTimeSeconds / admissionIntervalSeconds
+- v3.2 should focus on Redis stock decision to PostgreSQL truth consistency
+
+Evidence:
+- records/experiments/v3-1-entry-control.md
+- records/experiments/v3-1-entry-control-initial.md
 ```
 
 ---
