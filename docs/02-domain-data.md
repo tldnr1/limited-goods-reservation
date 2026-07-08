@@ -187,6 +187,34 @@ idempotency keys
 compensation metrics
 ```
 
+v3.2 implemented reservation fields:
+
+```text
+reservations:
+- id
+- user_id
+- product_id
+- idempotency_key
+- status
+- created_at
+- updated_at
+```
+
+v3.2 reservation constraints:
+
+```text
+unique(product_id, user_id)
+unique(idempotency_key)
+```
+
+v3.2 policy:
+
+```text
+one user can hold one reservation for one product in the core experiment.
+same idempotency key returns the already-created reservation result.
+same user/product with a different idempotency key is rejected.
+```
+
 ### v3.3
 
 ```text

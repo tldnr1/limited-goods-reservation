@@ -13,7 +13,9 @@ This project reproduces and improves limited-sale backend failures step by step.
 
 ## Current Status
 
-The project has completed the **v3.1 waiting-room entry-control experiment** and is ready for v3.2 consistency work.
+The project has completed the **v3.1 waiting-room entry-control experiment**.
+The **v3.2 reservation consistency path** now has implementation and Docker Compose smoke verification.
+The remaining v3.2 work is a load-test comparison between Redis Lua v3.2 and the RDB atomic control baseline.
 
 Redis Lua is the v3-oriented main path, while RDB atomic remains the control baseline. The runtime configuration still defaults to `naive-rdb`, so select a strategy explicitly when reproducing v2 results.
 When reproducing v2 direct purchase scenarios after v3.1, disable the waiting-room guard with `WAITING_ROOM_ENABLED=false`.
@@ -70,6 +72,12 @@ Run a small v3.1 waiting-room smoke scenario:
 $env:STOCK_STRATEGY='redis-lua'; docker compose up -d --force-recreate api
 docker compose exec -T redis redis-cli SET stock:available:1 100
 $env:K6_SCRIPT='/scripts/v3-1/waiting-room.js'; docker compose --profile load-test run -T --rm -e VUS=10 -e ITERATIONS=10 -e RUN_ID=v3-1-smoke k6
+```
+
+Run the v3.2 reservation consistency smoke scenario:
+
+```text
+powershell -ExecutionPolicy Bypass -File .\scripts\v3-2\run-reservation-consistency-smoke.ps1
 ```
 
 Open local monitoring:

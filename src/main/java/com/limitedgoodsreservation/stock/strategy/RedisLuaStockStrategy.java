@@ -23,6 +23,9 @@ public class RedisLuaStockStrategy implements StockDeductionStrategy {
             end
             return redis.call('DECR', KEYS[1])
             """, Long.class);
+    private static final DefaultRedisScript<Long> COMPENSATE_SCRIPT = new DefaultRedisScript<>("""
+            return redis.call('INCR', KEYS[1])
+            """, Long.class);
 
     private final StringRedisTemplate redisTemplate;
 
@@ -49,6 +52,16 @@ public class RedisLuaStockStrategy implements StockDeductionStrategy {
         }
 
         return new StockDeductionResult(productId);
+    }
+
+    public void compensate(Long productId) {
+        Long result = redisTemplate.execute(COMPENSATE_SCRIPT, List.of(stockKey(productId)));
+        if (result == null) {
+            throw new StockDeductionException(
+                    StockDeductionFailureReason.UNEXPECTED_FAILURE,
+                    "Redis stock compensation failed. productId=" + productId
+            );
+        }
     }
 
     public static String stockKey(Long productId) {

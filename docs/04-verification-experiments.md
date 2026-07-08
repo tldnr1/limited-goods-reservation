@@ -287,6 +287,26 @@ idempotency hit count is observable
 compensation success/failure count is observable
 ```
 
+Smoke verification:
+
+```text
+scripts/v3-2/run-reservation-consistency-smoke.ps1
+```
+
+Smoke checks:
+
+```text
+normal reservation creates one RESERVED row
+same idempotency key reuses the existing reservation
+same user/product with a different idempotency key is rejected
+request without active token is rejected before stock decision
+injected failure after Redis stock decision returns RESERVATION_FAILED_RETRYABLE
+Redis stock compensation restores stock after injected persistence failure
+active token is restored after successful compensation
+retry after restored token creates the reservation
+gap = DB RESERVED count - Redis stock decision count remains 0
+```
+
 Result:
 
 ```text
@@ -403,6 +423,7 @@ Version runners:
 scripts/v2/run-stock-strategy-matrix.ps1
 scripts/v2/run-stock-failure-injection-matrix.ps1
 scripts/v3-1/run-entry-control-matrix.ps1
+scripts/v3-2/run-reservation-consistency-smoke.ps1
 ```
 
 Each scenario should record:

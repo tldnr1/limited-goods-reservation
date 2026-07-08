@@ -98,6 +98,13 @@ public class RedisWaitingRoomStore implements WaitingRoomStore {
         return Boolean.TRUE.equals(deleted);
     }
 
+    @Override
+    public void restoreActiveToken(Long productId, Long userId, Duration tokenTtl) {
+        long expiresAtMillis = System.currentTimeMillis() + tokenTtl.toMillis();
+        redisTemplate.opsForValue().set(activeTokenKey(productId, userId), ACTIVE_TOKEN_VALUE, tokenTtl);
+        redisTemplate.opsForZSet().add(activeTokenIndexKey(productId), member(userId), expiresAtMillis);
+    }
+
     private WaitingRoomEntry waitingEntry(Long productId, Long userId, boolean duplicate) {
         String queueKey = waitingQueueKey(productId);
         Long rank = redisTemplate.opsForZSet().rank(queueKey, member(userId));
