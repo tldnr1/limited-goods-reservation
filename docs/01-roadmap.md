@@ -421,7 +421,25 @@ rdb-atomic remains available as the control baseline
 ### Result
 
 ```text
-to be filled after v3.2 experiment
+Implemented:
+- reservation table and RESERVED status
+- idempotency key reuse
+- one active reservation per user/product
+- Redis Lua stock compensation after DB reservation persistence failure
+- active-token restore after successful compensation
+- Docker Compose smoke verification
+
+Baseline load result:
+- record: records/experiments/v3-2-reservation-load-baseline.md
+- normal redis-lua 1000 users: created 100, sold out 900, gap 0, oversell 0, unexpected 0, p95 2487.89 ms, p99 2745.12 ms
+- normal rdb-atomic 1000 users: created 100, sold out 900, gap 0, oversell 0, unexpected 0, p95 1659.16 ms, p99 1803.32 ms
+- redis-lua failure injection 100 users: retryable failures 10, compensation successes 10, gap 0
+- duplicate redis-lua 100 users x 2 requests: created 100, idempotency hits 100, duplicate reservations 0
+
+Observation:
+- current v3.2 consistency checks passed
+- current Redis Lua normal path was not faster than RDB atomic in the baseline run
+- follow-up ADR should decide whether Redis remains a stock-decision component or moves forward as a minimal front gate
 ```
 
 ---
