@@ -122,6 +122,26 @@ class RedisWaitingRoomStoreTest {
     }
 
     @Test
+    void restoresActiveTokenAndCapacityIndex() {
+        RedisFixture fixture = new RedisFixture();
+        RedisWaitingRoomStore store = new RedisWaitingRoomStore(fixture.redisTemplate);
+
+        store.restoreActiveToken(1L, 1001L, Duration.ofSeconds(60));
+
+        verify(fixture.valueOperations).set(
+                RedisWaitingRoomStore.activeTokenKey(1L, 1001L),
+                "ACTIVE",
+                Duration.ofSeconds(60)
+        );
+        verify(fixture.zSetOperations).add(
+                eq(RedisWaitingRoomStore.activeTokenIndexKey(1L)),
+                eq("1001"),
+                anyDouble()
+        );
+    }
+
+
+    @Test
     void duplicateEnterDoesNotCreateAnotherQueueMember() {
         RedisFixture fixture = new RedisFixture();
         RedisWaitingRoomStore store = new RedisWaitingRoomStore(fixture.redisTemplate);

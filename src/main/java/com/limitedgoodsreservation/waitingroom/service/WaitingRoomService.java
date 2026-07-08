@@ -73,6 +73,19 @@ public class WaitingRoomService {
         }
     }
 
+    public void restoreActiveToken(Long userId, Long productId) {
+        validate(userId, productId);
+        if (!properties.isEnabled()) {
+            return;
+        }
+
+        waitingRoomStore.restoreActiveToken(
+                productId,
+                userId,
+                Duration.ofSeconds(properties.getAdmission().getTokenTtlSeconds())
+        );
+    }
+
     public int retryAfterSeconds() {
         return properties.getAdmission().getRetryAfterSeconds();
     }

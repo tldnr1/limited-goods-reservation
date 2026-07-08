@@ -88,6 +88,24 @@ class WaitingRoomServiceTest {
         assertThat(store.consumeCalled).isFalse();
     }
 
+    @Test
+    void restoresActiveTokenWithConfiguredTtl() {
+        CapturingStore store = new CapturingStore(false);
+        WaitingRoomProperties properties = new WaitingRoomProperties();
+        properties.getAdmission().setTokenTtlSeconds(45);
+        WaitingRoomService service = new WaitingRoomService(
+                store,
+                properties,
+                new WaitingRoomMetrics(new SimpleMeterRegistry())
+        );
+
+        service.restoreActiveToken(1001L, 1L);
+
+        assertThat(store.restoredProductId).isEqualTo(1L);
+        assertThat(store.restoredUserId).isEqualTo(1001L);
+        assertThat(store.restoredTokenTtl).isEqualTo(Duration.ofSeconds(45));
+    }
+
     private static class CapturingStore implements WaitingRoomStore {
 
         private final WaitingRoomEntry entry;
@@ -97,6 +115,9 @@ class WaitingRoomServiceTest {
         private int activeCapacity;
         private Duration tokenTtl;
         private boolean consumeCalled;
+        private Long restoredProductId;
+        private Long restoredUserId;
+        private Duration restoredTokenTtl;
 
         private CapturingStore(WaitingRoomEntry entry) {
             this.entry = entry;
@@ -138,6 +159,13 @@ class WaitingRoomServiceTest {
         public boolean consumeActiveToken(Long productId, Long userId) {
             consumeCalled = true;
             return consumeResult;
+        }
+
+        @Override
+        public void restoreActiveToken(Long productId, Long userId, Duration tokenTtl) {
+            restoredProductId = productId;
+            restoredUserId = userId;
+            restoredTokenTtl = tokenTtl;
         }
     }
 }

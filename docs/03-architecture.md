@@ -266,3 +266,44 @@ RabbitMQ:
 ```
 
 Do not make Redis the only durable source of business truth.
+
+---
+
+## 9. v3.2 Reservation Consistency Module
+
+Purpose:
+
+```text
+make the Redis Lua stock decision recoverable when PostgreSQL reservation persistence fails
+```
+
+Package direction:
+
+```text
+src/main/java/com/limitedgoodsreservation/
+  reservation/
+    entity/
+    exception/
+    metrics/
+    repository/
+```
+
+Request order:
+
+```text
+idempotency check
+-> existing user/product reservation check
+-> active token consume
+-> stock decision
+-> reservation insert
+-> compensation and active-token restore on persistence failure
+```
+
+Rules:
+
+```text
+PostgreSQL reservations are the v3.2 durable truth.
+Redis stock remains the fast decision source for redis-lua.
+Redis stock compensation runs only after a successful Redis decision followed by reservation persistence failure.
+Active token restore runs only when the persistence failure was handled as retryable.
+```

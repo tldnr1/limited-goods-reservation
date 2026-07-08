@@ -38,6 +38,16 @@ class RedisLuaStockStrategyTest {
                 .hasMessageContaining("Redis stock key missing");
     }
 
+    @Test
+    void compensatesRedisStockByProductKey() {
+        StubRedisTemplate redisTemplate = new StubRedisTemplate(100L);
+        RedisLuaStockStrategy strategy = new RedisLuaStockStrategy(redisTemplate);
+
+        strategy.compensate(1L);
+
+        assertThat(redisTemplate.lastKey).isEqualTo("stock:available:1");
+    }
+
     private static class StubRedisTemplate extends StringRedisTemplate {
 
         private final Long result;
