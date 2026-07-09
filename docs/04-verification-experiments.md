@@ -349,6 +349,7 @@ Follow-up:
 - final load-test design is tracked in docs/experiments/v3-2-load-test-design.md
 - primary VU runner: scripts/v3-2/run-architecture-vu-matrix.ps1
 - DB pool sweep runner: scripts/v3-2/run-architecture-pool-sweep.ps1
+- measured final comparison record: records/experiments/v3-2-architecture-load-comparison.md
 ```
 
 ### v3.3 Payment Delay Isolation
