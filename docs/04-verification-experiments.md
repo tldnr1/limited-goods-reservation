@@ -346,6 +346,9 @@ Follow-up:
 - ADR 0002 accepted a minimal Redis front gate for the next pass
 - final v3.2 comparison should use redis-frontgate vs rdb-atomic
 - final comparison should separate direct burst, waiting-room-admitted flow, active-token bypass flow, duplicate/idempotency flow, and persistence failure flow
+- final load-test design is tracked in docs/experiments/v3-2-load-test-design.md
+- primary VU runner: scripts/v3-2/run-architecture-vu-matrix.ps1
+- DB pool sweep runner: scripts/v3-2/run-architecture-pool-sweep.ps1
 ```
 
 ### v3.3 Payment Delay Isolation
@@ -450,6 +453,7 @@ k6/v3-1/waiting-room-bypass.js
 k6/v3-1/direct-purchase.js
 k6/v3-2/reservation-compensation.js
 k6/v3-2/reservation-consistency.js
+k6/v3-2/architecture-vu-baseline.js
 k6/v3-3/payment-worker-delay.js
 ```
 
@@ -461,6 +465,8 @@ scripts/v2/run-stock-failure-injection-matrix.ps1
 scripts/v3-1/run-entry-control-matrix.ps1
 scripts/v3-2/run-reservation-consistency-smoke.ps1
 scripts/v3-2/run-reservation-load-matrix.ps1
+scripts/v3-2/run-architecture-vu-matrix.ps1
+scripts/v3-2/run-architecture-pool-sweep.ps1
 ```
 
 Each scenario should record:
