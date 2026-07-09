@@ -148,7 +148,7 @@ Domain distinction:
 
 ```text
 Active token: temporary right to attempt reservation; not a purchase guarantee.
-Reservation: temporary stock hold created after selected stock strategy succeeds.
+Reservation: temporary stock hold created after the selected reservation path accepts the request.
 Payment: confirms or releases the reservation.
 Reward: limited benefit allocated after payment success; separate from product stock.
 ```
@@ -181,9 +181,8 @@ active token Redis key
 
 ```text
 reservations
-reservation TTL keys
-user reservation guard keys
-idempotency keys
+Redis reservation guard markers when redis-frontgate is selected
+Redis idempotency markers when redis-frontgate is selected
 compensation metrics
 ```
 
@@ -213,6 +212,7 @@ v3.2 policy:
 one user can hold one reservation for one product in the core experiment.
 same idempotency key returns the already-created reservation result.
 same user/product with a different idempotency key is rejected.
+PostgreSQL reservations remain the durable truth even when Redis front-gate markers are used.
 ```
 
 ### v3.3
@@ -271,9 +271,8 @@ waiting:queue:{productId}
 waiting:user:{productId}:{userId}
 active-token:{productId}:{userId}
 active-token:index:{productId}
-reservation:{reservationId}
-user:reservation:{productId}:{userId}
-idempotency:{key}
+reservation:idem:{idempotencyKey}
+reservation:user:{productId}:{userId}
 ```
 
 Key ownership:
@@ -285,9 +284,8 @@ waiting:queue:{productId}             v3.1 ZSET, member=userId, score=sequence
 waiting:user:{productId}:{userId}     v3.1 duplicate enter marker
 active-token:{productId}:{userId}     v3.1 temporary right to attempt purchase
 active-token:index:{productId}        v3.1 ZSET index for active token capacity accounting
-reservation:{reservationId}           v3.2 reservation TTL marker
-user:reservation:{productId}:{userId} v3.2 one active reservation rule
-idempotency:{key}                     v3.2 duplicated request result
+reservation:idem:{idempotencyKey}     v3.2 redis-frontgate idempotency marker
+reservation:user:{productId}:{userId} v3.2 redis-frontgate one active reservation marker
 ```
 
 v3.1 waiting room rule:
@@ -297,6 +295,14 @@ The waiting queue stores order, not permission.
 The active-token key stores temporary permission.
 An active token is consumed before entering the purchase path and defaults to a 60-second TTL.
 Requests without an active token return conflict instead of reaching stock deduction.
+```
+
+v3.2 redis-frontgate marker rule:
+
+```text
+PROCESSING markers are short-lived Redis guards for accepted candidates before DB save.
+RESERVED markers are Redis hints after DB save, not the durable source of truth.
+PostgreSQL unique(product_id, user_id) and unique(idempotency_key) remain the final safety net.
 ```
 
 ---

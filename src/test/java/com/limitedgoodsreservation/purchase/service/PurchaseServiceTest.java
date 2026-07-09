@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create",
         "spring.sql.init.mode=always",
+        "purchase.architecture=rdb-atomic",
         "waiting-room.enabled=false",
         "waiting-room.admission.scheduler-enabled=false"
 })

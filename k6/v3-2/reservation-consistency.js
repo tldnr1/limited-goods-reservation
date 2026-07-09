@@ -5,7 +5,7 @@ import { Counter, Trend } from 'k6/metrics';
 
 const baseUrl = __ENV.BASE_URL || 'http://localhost:8080';
 const productId = Number(__ENV.PRODUCT_ID || 1);
-const stockStrategy = __ENV.STOCK_STRATEGY || 'redis-lua';
+const purchaseArchitecture = __ENV.PURCHASE_ARCHITECTURE || __ENV.STOCK_STRATEGY || 'redis-frontgate';
 const vus = Number(__ENV.VUS || 100);
 const iterations = Number(__ENV.ITERATIONS || vus);
 const runId = __ENV.RUN_ID || 'v3-2-local';
@@ -16,7 +16,8 @@ export const options = {
   summaryTrendStats: ['min', 'avg', 'med', 'p(50)', 'p(95)', 'p(99)', 'max'],
   tags: {
     version: 'v3.2',
-    strategy: stockStrategy,
+    strategy: purchaseArchitecture,
+    architecture: purchaseArchitecture,
     scenario: scenarioMode,
     run_id: runId,
     users: String(vus),
@@ -44,6 +45,8 @@ const reservationReqDuration = new Trend('reservation_req_duration');
 const expectedCodes = new Set([
   'SOLD_OUT',
   'ALREADY_RESERVED',
+  'ACTIVE_TOKEN_REQUIRED',
+  'IDEMPOTENCY_PROCESSING',
   'RESERVATION_FAILED_RETRYABLE',
 ]);
 
@@ -141,7 +144,7 @@ export function handleSummary(data) {
     stdout: [
       'v3.2 reservation consistency',
       `run_id=${runId}`,
-      `stock_strategy=${stockStrategy}`,
+      `purchase_architecture=${purchaseArchitecture}`,
       `scenario_mode=${scenarioMode}`,
       `product_id=${productId}`,
       `users=${vus}`,

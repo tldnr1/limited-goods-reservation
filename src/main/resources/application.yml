@@ -27,6 +27,7 @@ stock:
   strategy: ${STOCK_STRATEGY:naive-rdb}
 
 purchase:
+  architecture: ${PURCHASE_ARCHITECTURE:}
   failure:
     mode: ${PURCHASE_FAILURE_MODE:off}
     limit: ${PURCHASE_FAILURE_LIMIT:0}
