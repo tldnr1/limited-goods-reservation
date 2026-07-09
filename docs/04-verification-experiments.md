@@ -347,6 +347,7 @@ Follow-up:
 - final v3.2 comparison should use redis-frontgate vs rdb-atomic
 - final comparison should separate direct burst, waiting-room-admitted flow, active-token bypass flow, duplicate/idempotency flow, and persistence failure flow
 - final load-test design is tracked in docs/experiments/v3-2-load-test-design.md
+- portfolio explanation is tracked in docs/experiments/v3-2-frontgate-comparison-summary.md
 - primary VU runner: scripts/v3-2/run-architecture-vu-matrix.ps1
 - DB pool sweep runner: scripts/v3-2/run-architecture-pool-sweep.ps1
 - measured final comparison record: records/experiments/v3-2-architecture-load-comparison.md

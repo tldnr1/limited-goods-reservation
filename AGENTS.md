@@ -10,8 +10,8 @@ This file is the **current work index**. It may change as the project version ch
 
 ```text
 current_version: v3.2
-current_goal: Redis front gate vs RDB atomic v3.2 comparison
-next_target: implement redis-frontgate unit/smoke verification, then run load comparison
+current_goal: Redis front gate vs RDB atomic v3.2 comparison documented
+next_target: review final v3.2 portfolio narrative, then plan v3.3 payment delay isolation
 project_type: Spring Boot backend portfolio project
 architecture_now: v3.1 waiting room complete; v3.2 modular monolith transition
 official_verification_path: Docker Compose first
@@ -19,7 +19,7 @@ official_verification_path: Docker Compose first
 
 v3.1 is complete. v3.2 reservation, idempotency, compensation smoke verification, and the first reservation load baseline are implemented.
 The first Redis Lua reservation baseline is recorded as evidence that stock-decision-only Redis is not enough after idempotency and reservation truth are added.
-The next v3.2 comparison is Redis front gate vs RDB atomic.
+The v3.2 Redis front gate vs RDB atomic comparison is implemented, load-tested, and documented.
 
 ---
 
@@ -97,7 +97,7 @@ Records explain why decisions were made. Notes are local/private scratch and are
 - Do not introduce reservation TTL, purchase idempotency, Redis stock compensation, RabbitMQ, payment worker, reward allocation, outbox, or reconciliation worker in v3.1.
 - v3.2 handles reservation, idempotency, and simple compensation for the Redis-to-DB dual-write gap.
 - v3.2 baseline load results show the current Redis Lua reservation path is not automatically faster than RDB atomic after DB idempotency, duplicate checks, and reservation persistence are added.
-- Next v3.2 work should implement Redis as a minimal front gate and compare it with the simpler RDB atomic control path.
+- v3.2 Redis front gate is implemented as a minimal front gate and compared with the simpler RDB atomic control path.
 - Do not force redis-frontgate into the existing `StockDeductionStrategy.deduct(productId)` abstraction; it needs userId, productId, idempotency key, and active-token state.
 - v3.3 handles RabbitMQ payment worker and Mock PG delay isolation.
 - Core experiments continue to use a single hot product and single product stock unless the scenario explicitly changes.

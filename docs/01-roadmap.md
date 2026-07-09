@@ -443,8 +443,18 @@ Observation:
 - current v3.2 consistency checks passed
 - current Redis Lua normal path was not faster than RDB atomic in the baseline run
 - ADR 0002 accepted moving Redis forward as a minimal front gate for the next implementation pass
-- final v3.2 comparison should use redis-frontgate vs rdb-atomic
+- final v3.2 comparison used redis-frontgate vs rdb-atomic
 - redis-frontgate should not be forced into StockDeductionStrategy because it needs userId, productId, idempotency key, and active-token state
+
+Final redis-frontgate vs rdb-atomic comparison:
+- implementation record: docs/experiments/v3-2-frontgate-comparison-summary.md
+- load design: docs/experiments/v3-2-load-test-design.md
+- measured result: records/experiments/v3-2-architecture-load-comparison.md
+- primary matrix: 24 runs across normal, sold-out, duplicate, and failure scenarios at 1000/3000/5000 VU
+- correctness gate passed in all primary runs: http_req_failed_rate 0, unexpected_responses 0, oversell_count 0, decision_reservation_gap 0
+- redis-frontgate reduced p95 latency by about 43.5% to 69.5% across the primary matrix
+- rdb-atomic remained a correct and simpler baseline, but paid higher tail latency when rejected traffic reached the DB path
+- DB pool sweep showed rdb-atomic latency is pool-sensitive; pool 20 was best in the 3000 VU normal sweep, while pool 40 regressed
 ```
 
 ---
