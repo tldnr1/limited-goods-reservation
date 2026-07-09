@@ -11,13 +11,13 @@ This file is the **current work index**. It may change as the project version ch
 ```text
 current_version: v3.2
 current_goal: Redis stock decision to PostgreSQL truth consistency validation
-next_target: v3.2 load-test comparison and result analysis
+next_target: Redis front-gate ADR and revised v3.2 comparison
 project_type: Spring Boot backend portfolio project
 architecture_now: v3.1 waiting room complete; v3.2 modular monolith transition
 official_verification_path: Docker Compose first
 ```
 
-v3.1 is complete. v3.2 reservation, idempotency, and compensation smoke verification is implemented.
+v3.1 is complete. v3.2 reservation, idempotency, compensation smoke verification, and the first reservation load baseline are implemented.
 Redis Lua is the v3-oriented main path, and RDB atomic remains the control baseline.
 
 ---
@@ -94,7 +94,8 @@ Records explain why decisions were made. Notes are local/private scratch and are
 - Add waiting room and active token boundaries only when real v3.1 classes are implemented.
 - Do not introduce reservation TTL, purchase idempotency, Redis stock compensation, RabbitMQ, payment worker, reward allocation, outbox, or reconciliation worker in v3.1.
 - v3.2 handles reservation, idempotency, and simple compensation for the Redis-to-DB dual-write gap.
-- v3.2 load-test results are not complete until Redis Lua v3.2 and RDB atomic control are compared.
+- v3.2 baseline load results show the current Redis Lua reservation path is not automatically faster than RDB atomic after DB idempotency, duplicate checks, and reservation persistence are added.
+- Next v3.2 work should decide whether Redis Lua remains stock-decision-only or moves forward as a minimal front gate.
 - v3.3 handles RabbitMQ payment worker and Mock PG delay isolation.
 - Core experiments continue to use a single hot product and single product stock unless the scenario explicitly changes.
 - External requests use `productId`; `product_stock.id` is an internal DB identifier.

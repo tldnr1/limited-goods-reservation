@@ -15,7 +15,7 @@ This project reproduces and improves limited-sale backend failures step by step.
 
 The project has completed the **v3.1 waiting-room entry-control experiment**.
 The **v3.2 reservation consistency path** now has implementation and Docker Compose smoke verification.
-The remaining v3.2 work is a load-test comparison between Redis Lua v3.2 and the RDB atomic control baseline.
+The first **v3.2 reservation load baseline** is recorded. The next v3.2 work is a Redis front-gate ADR and a revised comparison against the RDB atomic control baseline.
 
 Redis Lua is the v3-oriented main path, while RDB atomic remains the control baseline. The runtime configuration still defaults to `naive-rdb`, so select a strategy explicitly when reproducing v2 results.
 When reproducing v2 direct purchase scenarios after v3.1, disable the waiting-room guard with `WAITING_ROOM_ENABLED=false`.
@@ -27,6 +27,7 @@ records/experiments/v2-stock-strategy-comparison.md
 records/experiments/v2-stock-strategy-expansion-rerun.md
 records/experiments/v2-stock-failure-injection.md
 records/experiments/v3-1-entry-control.md
+records/experiments/v3-2-reservation-load-baseline.md
 ```
 
 ---

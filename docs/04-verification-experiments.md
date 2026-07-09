@@ -310,7 +310,23 @@ gap = DB RESERVED count - Redis stock decision count remains 0
 Result:
 
 ```text
-to be filled after v3.2 experiment
+Smoke verification:
+- scripts/v3-2/run-reservation-consistency-smoke.ps1 passed
+
+Baseline load record:
+- records/experiments/v3-2-reservation-load-baseline.md
+- records/experiments/v3-2-reservation-load-baseline.csv
+
+Baseline load observations:
+- normal redis-lua 1000 users: created 100, sold out 900, gap 0, oversell 0, unexpected 0, p95 2487.89 ms, p99 2745.12 ms
+- normal rdb-atomic 1000 users: created 100, sold out 900, gap 0, oversell 0, unexpected 0, p95 1659.16 ms, p99 1803.32 ms
+- redis-lua failure injection 100 users: retryable failures 10, compensation successes 10, compensation failures 0, gap 0
+- redis-lua duplicate 100 users x 2 requests: created 100, reused 100, idempotency hits 100, duplicate reservations 0
+
+Follow-up:
+- current v3.2 load matrix isolates the reservation path with waiting room disabled
+- next comparison should separate direct burst, waiting-room-admitted flow, and active-token bypass flow
+- next ADR should define whether Redis Lua remains stock-decision-only or becomes a minimal front gate
 ```
 
 ### v3.3 Payment Delay Isolation
