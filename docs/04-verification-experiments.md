@@ -261,39 +261,43 @@ Primary records:
 - records/experiments/v3-1-entry-control-initial.md
 ```
 
-### v3.2 Reservation / Idempotency / Compensation
+### v3.2 Reservation / Idempotency / Front Gate
 
 Question:
 
 ```text
-Can the Redis Lua stock decision path recover from DB reservation persistence failure?
+After v3.1 waiting-room entry control, is RDB atomic enough?
+Or is a Redis front gate worth the extra marker, TTL, and compensation cost?
 ```
 
 Alternatives:
 
 ```text
-v2 redis-lua without compensation
-redis-lua with synchronous reservation and immediate compensation
-rdb-atomic control baseline
+redis-frontgate
+rdb-atomic
 ```
 
 Expected:
 
 ```text
-Redis stock decision count and DB reservation count stay aligned under normal load
-failure injection after Redis deduction is compensated or recorded as recoverable
-duplicate request retry does not create duplicate active reservations
+requests without active token are rejected before DB reservation work when waiting room is enabled
+redis-frontgate rejects or accepts candidates before DB reservation reads/writes
+redis-frontgate stock decision count and DB reservation count stay aligned under normal load
+redis-frontgate persistence failure is compensated or recorded as recoverable
+duplicate request retry does not create duplicate active reservations in either architecture
 idempotency hit count is observable
 compensation success/failure count is observable
+front-gate accept/reject count by reason is observable when redis-frontgate is selected
+rdb-atomic remains a simpler DB-truth control path
 ```
 
-Smoke verification:
+Baseline smoke verification:
 
 ```text
 scripts/v3-2/run-reservation-consistency-smoke.ps1
 ```
 
-Smoke checks:
+Baseline smoke checks:
 
 ```text
 normal reservation creates one RESERVED row
@@ -305,6 +309,20 @@ Redis stock compensation restores stock after injected persistence failure
 active token is restored after successful compensation
 retry after restored token creates the reservation
 gap = DB RESERVED count - Redis stock decision count remains 0
+```
+
+Final redis-frontgate smoke checks:
+
+```text
+redis-frontgate normal reservation creates RESERVED rows up to stock
+redis-frontgate same idempotency key reuses the existing DB reservation after RESERVED marker
+redis-frontgate in-flight duplicate does not decrement stock twice
+redis-frontgate same user/product duplicate is rejected
+redis-frontgate active-token bypass is rejected before DB reservation work when waiting room is enabled
+redis-frontgate direct burst can skip active-token validation when waiting room is disabled
+redis-frontgate injected persistence failure compensates Redis stock and PROCESSING markers
+rdb-atomic active-token bypass is rejected before DB reservation work when waiting room is enabled
+rdb-atomic normal flow still preserves oversell_count = 0 and gap = 0
 ```
 
 Result:
@@ -325,8 +343,14 @@ Baseline load observations:
 
 Follow-up:
 - current v3.2 load matrix isolates the reservation path with waiting room disabled
-- next comparison should separate direct burst, waiting-room-admitted flow, and active-token bypass flow
-- next ADR should define whether Redis Lua remains stock-decision-only or becomes a minimal front gate
+- ADR 0002 accepted a minimal Redis front gate for the next pass
+- final v3.2 comparison should use redis-frontgate vs rdb-atomic
+- final comparison should separate direct burst, waiting-room-admitted flow, active-token bypass flow, duplicate/idempotency flow, and persistence failure flow
+- final load-test design is tracked in docs/experiments/v3-2-load-test-design.md
+- portfolio explanation is tracked in docs/experiments/v3-2-frontgate-comparison-summary.md
+- primary VU runner: scripts/v3-2/run-architecture-vu-matrix.ps1
+- DB pool sweep runner: scripts/v3-2/run-architecture-pool-sweep.ps1
+- measured final comparison record: records/experiments/v3-2-architecture-load-comparison.md
 ```
 
 ### v3.3 Payment Delay Isolation
@@ -430,6 +454,8 @@ k6/v3-1/waiting-room.js
 k6/v3-1/waiting-room-bypass.js
 k6/v3-1/direct-purchase.js
 k6/v3-2/reservation-compensation.js
+k6/v3-2/reservation-consistency.js
+k6/v3-2/architecture-vu-baseline.js
 k6/v3-3/payment-worker-delay.js
 ```
 
@@ -440,6 +466,9 @@ scripts/v2/run-stock-strategy-matrix.ps1
 scripts/v2/run-stock-failure-injection-matrix.ps1
 scripts/v3-1/run-entry-control-matrix.ps1
 scripts/v3-2/run-reservation-consistency-smoke.ps1
+scripts/v3-2/run-reservation-load-matrix.ps1
+scripts/v3-2/run-architecture-vu-matrix.ps1
+scripts/v3-2/run-architecture-pool-sweep.ps1
 ```
 
 Each scenario should record:

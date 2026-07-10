@@ -5,29 +5,37 @@ import { Counter, Trend } from 'k6/metrics';
 
 const baseUrl = __ENV.BASE_URL || 'http://localhost:8080';
 const productId = Number(__ENV.PRODUCT_ID || 1);
-const purchaseArchitecture = __ENV.PURCHASE_ARCHITECTURE || __ENV.STOCK_STRATEGY || 'redis-frontgate';
-const vus = Number(__ENV.VUS || 100);
-const iterations = Number(__ENV.ITERATIONS || vus);
-const runId = __ENV.RUN_ID || 'v3-2-local';
+const architecture = __ENV.PURCHASE_ARCHITECTURE || 'redis-frontgate';
 const scenarioMode = __ENV.SCENARIO_MODE || 'normal';
+const runId = __ENV.RUN_ID || 'v3-2-architecture-vu-local';
+const vus = Number(__ENV.VUS || 1000);
+const iterations = Number(__ENV.ITERATIONS || vus);
 const duplicateRequests = Number(__ENV.DUPLICATE_REQUESTS || 1);
+const initialStock = Number(__ENV.INITIAL_STOCK || 100);
+const hikariMaxPoolSize = __ENV.HIKARI_MAX_POOL_SIZE || '10';
+const waitingRoomEnabled = __ENV.WAITING_ROOM_ENABLED || 'false';
+
+http.setResponseCallback(http.expectedStatuses({ min: 200, max: 399 }, 409, 503));
 
 export const options = {
   summaryTrendStats: ['min', 'avg', 'med', 'p(50)', 'p(95)', 'p(99)', 'max'],
   tags: {
     version: 'v3.2',
-    strategy: purchaseArchitecture,
-    architecture: purchaseArchitecture,
+    architecture,
+    strategy: architecture,
     scenario: scenarioMode,
     run_id: runId,
     users: String(vus),
+    initial_stock: String(initialStock),
+    hikari_max_pool_size: hikariMaxPoolSize,
+    waiting_room_enabled: waitingRoomEnabled,
   },
   scenarios: {
-    reservation_consistency: {
+    architecture_vu_baseline: {
       executor: 'shared-iterations',
       vus,
       iterations,
-      maxDuration: __ENV.MAX_DURATION || '2m',
+      maxDuration: __ENV.MAX_DURATION || '3m',
     },
   },
 };
@@ -39,6 +47,7 @@ const soldOutResponses = new Counter('sold_out_responses');
 const alreadyReservedResponses = new Counter('already_reserved_responses');
 const retryableFailureResponses = new Counter('retryable_failure_responses');
 const activeTokenRequiredResponses = new Counter('active_token_required_responses');
+const idempotencyProcessingResponses = new Counter('idempotency_processing_responses');
 const unexpectedResponses = new Counter('unexpected_responses');
 const reservationReqDuration = new Trend('reservation_req_duration');
 
@@ -65,6 +74,7 @@ export function setup() {
 export default function () {
   const userId = exec.scenario.iterationInTest + 1;
   const idempotencyKey = `${runId}-${userId}`;
+
   purchase(userId, idempotencyKey);
 
   if (scenarioMode !== 'duplicate') {
@@ -124,6 +134,10 @@ function purchase(userId, idempotencyKey) {
     activeTokenRequiredResponses.add(1);
     return;
   }
+  if (code === 'IDEMPOTENCY_PROCESSING') {
+    idempotencyProcessingResponses.add(1);
+    return;
+  }
 
   unexpectedResponses.add(1);
 }
@@ -142,14 +156,18 @@ export function handleSummary(data) {
 
   return {
     stdout: [
-      'v3.2 reservation consistency',
+      'v3.2 architecture VU baseline',
       `run_id=${runId}`,
-      `purchase_architecture=${purchaseArchitecture}`,
+      `architecture=${architecture}`,
       `scenario_mode=${scenarioMode}`,
       `product_id=${productId}`,
       `users=${vus}`,
       `iterations=${iterations}`,
       `duplicate_requests=${duplicateRequests}`,
+      `initial_stock=${initialStock}`,
+      `hikari_max_pool_size=${hikariMaxPoolSize}`,
+      `waiting_room_enabled=${waitingRoomEnabled}`,
+      `http_req_failed_rate=${data.metrics.http_req_failed?.values.rate || 0}`,
       `http_req_duration_p50_ms=${duration['p(50)'] || duration.med || 0}`,
       `http_req_duration_p95_ms=${duration['p(95)'] || 0}`,
       `http_req_duration_p99_ms=${duration['p(99)'] || 0}`,
@@ -163,6 +181,7 @@ export function handleSummary(data) {
       `already_reserved_responses=${data.metrics.already_reserved_responses?.values.count || 0}`,
       `retryable_failure_responses=${data.metrics.retryable_failure_responses?.values.count || 0}`,
       `active_token_required_responses=${data.metrics.active_token_required_responses?.values.count || 0}`,
+      `idempotency_processing_responses=${data.metrics.idempotency_processing_responses?.values.count || 0}`,
       `unexpected_responses=${data.metrics.unexpected_responses?.values.count || 0}`,
       '',
     ].join('\n'),

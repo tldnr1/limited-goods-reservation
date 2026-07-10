@@ -5,7 +5,7 @@ param(
     [int] $NormalUsers = 1000,
     [int] $FailureUsers = 100,
     [int] $DuplicateUsers = 100,
-    [string] $ResultName = "v3-2-reservation-load-baseline",
+    [string] $ResultName = "v3-2-frontgate-load",
     [switch] $SkipBuild
 )
 
@@ -48,12 +48,13 @@ function Wait-Api {
 
 function Start-Api {
     param(
-        [string] $Strategy,
+        [string] $Architecture,
         [string] $FailureMode,
         [int] $FailureLimit
     )
 
-    $env:STOCK_STRATEGY = $Strategy
+    $env:PURCHASE_ARCHITECTURE = $Architecture
+    $env:STOCK_STRATEGY = "rdb-atomic"
     $env:PURCHASE_FAILURE_MODE = $FailureMode
     $env:PURCHASE_FAILURE_LIMIT = "$FailureLimit"
     $env:WAITING_ROOM_ENABLED = "false"
@@ -83,7 +84,7 @@ function Reset-State {
 function Invoke-K6Run {
     param(
         [string] $RunId,
-        [string] $Strategy,
+        [string] $Architecture,
         [string] $ScenarioMode,
         [int] $Users,
         [int] $DuplicateRequests
@@ -93,7 +94,8 @@ function Invoke-K6Run {
     $env:K6_SCRIPT = "/scripts/v3-2/reservation-consistency.js"
 
     & docker compose --profile load-test run -T --rm `
-        -e STOCK_STRATEGY=$Strategy `
+        -e PURCHASE_ARCHITECTURE=$Architecture `
+        -e STOCK_STRATEGY=rdb-atomic `
         -e PRODUCT_ID=$ProductId `
         -e VUS=$Users `
         -e ITERATIONS=$Users `
@@ -171,12 +173,12 @@ function Read-RedisInteger {
 function Read-ActuatorCount {
     param(
         [string] $MetricName,
-        [string] $Strategy
+        [string] $Architecture
     )
 
     try {
         $encodedName = [System.Uri]::EscapeDataString($MetricName)
-        $response = Invoke-RestMethod -Uri "http://localhost:8080/actuator/metrics/$encodedName`?tag=strategy:$Strategy" -TimeoutSec 5
+        $response = Invoke-RestMethod -Uri "http://localhost:8080/actuator/metrics/$encodedName`?tag=strategy:$Architecture" -TimeoutSec 5
         $countMeasurement = $response.measurements | Where-Object { $_.statistic -eq "COUNT" } | Select-Object -First 1
         if ($null -ne $countMeasurement) {
             return [double] $countMeasurement.value
@@ -190,11 +192,11 @@ function Read-ActuatorCount {
 
 function Get-StockDecisionCount {
     param(
-        [string] $Strategy,
+        [string] $Architecture,
         $DbMetrics
     )
 
-    if ($Strategy -eq "redis-lua") {
+    if ($Architecture -eq "redis-frontgate") {
         $redisAvailable = Read-RedisInteger -Arguments @("GET", "stock:available:$ProductId")
         return $InitialStock - $redisAvailable
     }
@@ -210,22 +212,23 @@ Invoke-Compose -Arguments @("down", "-v")
 
 $startedAt = Get-Date -Format "yyyyMMdd-HHmmss"
 $runs = @(
-    [pscustomobject]@{ Strategy = "redis-lua"; ScenarioMode = "normal"; Users = $NormalUsers; FailureMode = "off"; FailureLimit = 0; DuplicateRequests = 1 },
-    [pscustomobject]@{ Strategy = "rdb-atomic"; ScenarioMode = "normal"; Users = $NormalUsers; FailureMode = "off"; FailureLimit = 0; DuplicateRequests = 1 },
-    [pscustomobject]@{ Strategy = "redis-lua"; ScenarioMode = "failure"; Users = $FailureUsers; FailureMode = "AFTER_STOCK_DECISION_BEFORE_RESERVATION_SAVE"; FailureLimit = 10; DuplicateRequests = 1 },
-    [pscustomobject]@{ Strategy = "rdb-atomic"; ScenarioMode = "failure"; Users = $FailureUsers; FailureMode = "AFTER_STOCK_DECISION_BEFORE_RESERVATION_SAVE"; FailureLimit = 10; DuplicateRequests = 1 },
-    [pscustomobject]@{ Strategy = "redis-lua"; ScenarioMode = "duplicate"; Users = $DuplicateUsers; FailureMode = "off"; FailureLimit = 0; DuplicateRequests = 2 }
+    [pscustomobject]@{ Architecture = "redis-frontgate"; ScenarioMode = "normal"; Users = $NormalUsers; FailureMode = "off"; FailureLimit = 0; DuplicateRequests = 1 },
+    [pscustomobject]@{ Architecture = "rdb-atomic"; ScenarioMode = "normal"; Users = $NormalUsers; FailureMode = "off"; FailureLimit = 0; DuplicateRequests = 1 },
+    [pscustomobject]@{ Architecture = "redis-frontgate"; ScenarioMode = "failure"; Users = $FailureUsers; FailureMode = "AFTER_STOCK_DECISION_BEFORE_RESERVATION_SAVE"; FailureLimit = 10; DuplicateRequests = 1 },
+    [pscustomobject]@{ Architecture = "rdb-atomic"; ScenarioMode = "failure"; Users = $FailureUsers; FailureMode = "AFTER_STOCK_DECISION_BEFORE_RESERVATION_SAVE"; FailureLimit = 10; DuplicateRequests = 1 },
+    [pscustomobject]@{ Architecture = "redis-frontgate"; ScenarioMode = "duplicate"; Users = $DuplicateUsers; FailureMode = "off"; FailureLimit = 0; DuplicateRequests = 2 },
+    [pscustomobject]@{ Architecture = "rdb-atomic"; ScenarioMode = "duplicate"; Users = $DuplicateUsers; FailureMode = "off"; FailureLimit = 0; DuplicateRequests = 2 }
 )
 
 foreach ($run in $runs) {
-    $runId = "$startedAt-$($run.Strategy)-$($run.ScenarioMode)-u$($run.Users)"
+    $runId = "$startedAt-$($run.Architecture)-$($run.ScenarioMode)-u$($run.Users)"
     Write-Host "Starting $runId"
-    Start-Api -Strategy $run.Strategy -FailureMode $run.FailureMode -FailureLimit $run.FailureLimit
+    Start-Api -Architecture $run.Architecture -FailureMode $run.FailureMode -FailureLimit $run.FailureLimit
     Reset-State
     Wait-Api
     Invoke-K6Run `
         -RunId $runId `
-        -Strategy $run.Strategy `
+        -Architecture $run.Architecture `
         -ScenarioMode $run.ScenarioMode `
         -Users $run.Users `
         -DuplicateRequests $run.DuplicateRequests
@@ -234,8 +237,8 @@ foreach ($run in $runs) {
     $duration = $summary.metrics.http_req_duration.values
     $reservationDuration = $summary.metrics.reservation_req_duration.values
     $db = Read-DbMetrics
-    $stockDecisionCount = Get-StockDecisionCount -Strategy $run.Strategy -DbMetrics $db
-    $redisAvailable = if ($run.Strategy -eq "redis-lua") {
+    $stockDecisionCount = Get-StockDecisionCount -Architecture $run.Architecture -DbMetrics $db
+    $redisAvailable = if ($run.Architecture -eq "redis-frontgate") {
         Read-RedisInteger -Arguments @("GET", "stock:available:$ProductId")
     } else {
         $null
@@ -243,7 +246,8 @@ foreach ($run in $runs) {
 
     $row = [pscustomobject]@{
         run_id = $runId
-        strategy = $run.Strategy
+        architecture = $run.Architecture
+        strategy = $run.Architecture
         scenario_mode = $run.ScenarioMode
         users = $run.Users
         initial_stock = $InitialStock
@@ -270,10 +274,11 @@ foreach ($run in $runs) {
         stock_decision_count = $stockDecisionCount
         decision_reservation_gap = $db.ReservedCount - $stockDecisionCount
         oversell_count = [Math]::Max($db.ReservedCount - $InitialStock, 0)
-        idempotency_hit_metric = Read-ActuatorCount -MetricName "reservation.idempotency.hit" -Strategy $run.Strategy
-        duplicate_rejected_metric = Read-ActuatorCount -MetricName "reservation.duplicate.rejected" -Strategy $run.Strategy
-        compensation_success_metric = Read-ActuatorCount -MetricName "reservation.compensation.success" -Strategy $run.Strategy
-        compensation_failure_metric = Read-ActuatorCount -MetricName "reservation.compensation.failure" -Strategy $run.Strategy
+        idempotency_hit_metric = Read-ActuatorCount -MetricName "reservation.idempotency.hit" -Architecture $run.Architecture
+        duplicate_rejected_metric = Read-ActuatorCount -MetricName "reservation.duplicate.rejected" -Architecture $run.Architecture
+        front_gate_accepted_metric = Read-ActuatorCount -MetricName "reservation.front-gate.accepted" -Architecture $run.Architecture
+        compensation_success_metric = Read-ActuatorCount -MetricName "reservation.compensation.success" -Architecture $run.Architecture
+        compensation_failure_metric = Read-ActuatorCount -MetricName "reservation.compensation.failure" -Architecture $run.Architecture
     }
 
     $row | Export-Csv -Path $CsvPath -NoTypeInformation -Append

@@ -43,6 +43,15 @@ public class ReservationMetrics {
         counter("reservation.active-token.restored", strategyName).increment();
     }
 
+    public void incrementFrontGateAccepted(String strategyName) {
+        counter("reservation.front-gate.accepted", strategyName).increment();
+    }
+
+    public void incrementFrontGateRejected(String strategyName, String reason) {
+        meterRegistry.counter("reservation.front-gate.rejected", "strategy", strategyName, "reason", reason)
+                .increment();
+    }
+
     public <T> T recordSave(String strategyName, Supplier<T> supplier) {
         return meterRegistry.timer("reservation.save.duration", "strategy", strategyName).record(supplier);
     }

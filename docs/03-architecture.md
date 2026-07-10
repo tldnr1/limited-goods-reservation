@@ -233,7 +233,7 @@ v0: Spring API container + PostgreSQL + k6 smoke container
 v1: Spring API container + PostgreSQL + k6 oversell scenario
 v2: Spring API container + PostgreSQL + Redis when Redis strategies are tested
 v3.1: Spring API container + PostgreSQL + Redis + waiting room / active token
-v3.2: Spring API container + PostgreSQL + Redis + reservation / idempotency / compensation
+v3.2: Spring API container + PostgreSQL + Redis + reservation / idempotency / front gate / compensation
 v3.3: Spring API container + PostgreSQL + Redis + RabbitMQ + Payment Worker + Mock PG
 ```
 
@@ -254,6 +254,7 @@ PostgreSQL:
 Redis:
 - real-time high-concurrency control
 - stock reservation decision when selected
+- front-gate idempotency and user/product guard markers when selected
 - waiting queue
 - active token
 - reservation TTL when introduced
@@ -274,7 +275,7 @@ Do not make Redis the only durable source of business truth.
 Purpose:
 
 ```text
-make the Redis Lua stock decision recoverable when PostgreSQL reservation persistence fails
+compare Redis front-gate protection with the simpler PostgreSQL atomic truth path after v3.1 entry control
 ```
 
 Package direction:
@@ -284,11 +285,12 @@ src/main/java/com/limitedgoodsreservation/
   reservation/
     entity/
     exception/
+    gate/
     metrics/
     repository/
 ```
 
-Request order:
+The first v3.2 baseline implemented this order:
 
 ```text
 idempotency check
@@ -299,11 +301,51 @@ idempotency check
 -> compensation and active-token restore on persistence failure
 ```
 
+That baseline proved compensation can close the Redis decision to DB reservation gap, but it also showed Redis stock-decision-only does not protect DB from early idempotency and duplicate reads.
+
+Target redis-frontgate order:
+
+```text
+validate request
+-> Redis front gate
+   - active token check/consume when waiting room is enabled
+   - idempotency marker check
+   - user/product marker check
+   - stock check/decrement
+   - PROCESSING marker write
+-> reservation insert
+-> Redis marker finalize on success
+-> Redis stock/marker compensation and active-token restore on persistence failure
+```
+
+Target rdb-atomic order:
+
+```text
+validate request
+-> active token guard before DB reservation work when waiting room is enabled
+-> DB idempotency check
+-> DB existing user/product reservation check
+-> RDB atomic stock update
+-> reservation insert
+```
+
 Rules:
 
 ```text
 PostgreSQL reservations are the v3.2 durable truth.
-Redis stock remains the fast decision source for redis-lua.
-Redis stock compensation runs only after a successful Redis decision followed by reservation persistence failure.
+Redis front-gate markers are short-lived admission/idempotency hints, not durable truth.
+Do not force redis-frontgate into StockDeductionStrategy because it needs userId, productId, idempotency key, and active-token state.
+The rdb-atomic path remains the control baseline and should keep correctness in PostgreSQL.
+Redis compensation runs only after a successful Redis front-gate decision followed by reservation persistence failure.
 Active token restore runs only when the persistence failure was handled as retryable.
+```
+
+Configuration rule:
+
+```text
+The existing stock.strategy / STOCK_STRATEGY setting selects StockDeductionStrategy implementations.
+redis-frontgate is a reservation architecture, not a StockDeductionStrategy.
+The implementation should introduce a small v3.2 architecture selector, for example purchase.architecture / PURCHASE_ARCHITECTURE, with values redis-frontgate and rdb-atomic.
+When purchase.architecture is blank, the app may keep the existing STOCK_STRATEGY-based legacy flow for old experiment scripts.
+Load scripts may still write a column named strategy for continuity, but it should represent the compared architecture in v3.2 final results.
 ```

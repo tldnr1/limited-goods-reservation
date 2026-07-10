@@ -24,7 +24,7 @@ v0: documentation and runnable skeleton
 v1: naive purchase baseline with feature-based N-tier
 v2: stock strategy comparison with v1-like layered strategy
 v3.1: waiting room + active token
-v3.2: reservation + idempotency + compensation
+v3.2: reservation + idempotency + Redis front gate comparison
 v3.3: RabbitMQ + payment worker
 v4: reward allocation policy
 v5+: advanced scope
@@ -364,17 +364,17 @@ Evidence:
 
 ---
 
-## v3.2. Reservation + Idempotency + Compensation
+## v3.2. Reservation + Idempotency + Redis Front Gate
 
 ### Goal
 
-Make the Redis Lua stock decision path recoverable when DB reservation persistence fails after Redis deduction.
+Close the Redis-to-DB reservation consistency gap, then compare whether Redis should be used as a true front gate or whether the simpler RDB atomic path is enough after v3.1 waiting-room entry control.
 
 ### Architecture Level
 
 ```text
 modular monolith feature module: reservation
-Redis Lua stock decision remains the main path
+redis-frontgate and rdb-atomic become the final v3.2 comparison candidates
 PostgreSQL remains the durable business truth
 ```
 
@@ -385,11 +385,13 @@ reservation table
 reservation status
 short-term idempotency key
 one active reservation per user/product
-reservation TTL marker in Redis
+Redis PROCESSING / RESERVED markers for redis-frontgate
 immediate Redis stock compensation after DB reservation save failure
 failure injection after Redis stock decision
 duplicate request comparison
 reservation and compensation metrics
+front-gate accept/reject metrics
+v3.2 architecture selector for redis-frontgate vs rdb-atomic
 ```
 
 ### Forbidden
@@ -410,10 +412,11 @@ MSA-style service split
 ### Success Metrics
 
 ```text
-Redis stock decision count and DB reservation count stay aligned under normal load
-failure injection after Redis deduction is compensated or recorded as a recoverable gap
+front-gate decision count and DB reservation count stay aligned under normal load
+failure injection after Redis front-gate acceptance is compensated or recorded as a recoverable gap
 duplicate purchase retry does not create duplicate active reservations
 idempotency hit count is observable
+front-gate accept/reject count by reason is observable
 compensation success/failure count is observable
 rdb-atomic remains available as the control baseline
 ```
@@ -439,7 +442,19 @@ Baseline load result:
 Observation:
 - current v3.2 consistency checks passed
 - current Redis Lua normal path was not faster than RDB atomic in the baseline run
-- follow-up ADR should decide whether Redis remains a stock-decision component or moves forward as a minimal front gate
+- ADR 0002 accepted moving Redis forward as a minimal front gate for the next implementation pass
+- final v3.2 comparison used redis-frontgate vs rdb-atomic
+- redis-frontgate should not be forced into StockDeductionStrategy because it needs userId, productId, idempotency key, and active-token state
+
+Final redis-frontgate vs rdb-atomic comparison:
+- implementation record: docs/experiments/v3-2-frontgate-comparison-summary.md
+- load design: docs/experiments/v3-2-load-test-design.md
+- measured result: records/experiments/v3-2-architecture-load-comparison.md
+- primary matrix: 24 runs across normal, sold-out, duplicate, and failure scenarios at 1000/3000/5000 VU
+- correctness gate passed in all primary runs: http_req_failed_rate 0, unexpected_responses 0, oversell_count 0, decision_reservation_gap 0
+- redis-frontgate reduced p95 latency by about 43.5% to 69.5% across the primary matrix
+- rdb-atomic remained a correct and simpler baseline, but paid higher tail latency when rejected traffic reached the DB path
+- DB pool sweep showed rdb-atomic latency is pool-sensitive; pool 20 was best in the 3000 VU normal sweep, while pool 40 regressed
 ```
 
 ---

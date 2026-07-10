@@ -3,6 +3,7 @@ package com.limitedgoodsreservation.global;
 import com.limitedgoodsreservation.purchase.failure.InjectedPurchaseFailureException;
 import com.limitedgoodsreservation.reservation.exception.AlreadyReservedException;
 import com.limitedgoodsreservation.reservation.exception.IdempotencyKeyConflictException;
+import com.limitedgoodsreservation.reservation.exception.ReservationInProgressException;
 import com.limitedgoodsreservation.reservation.exception.ReservationFailedRetryableException;
 import com.limitedgoodsreservation.stock.strategy.StockDeductionException;
 import com.limitedgoodsreservation.waitingroom.service.ActiveTokenRequiredException;
@@ -42,6 +43,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleIdempotencyKeyConflict(IdempotencyKeyConflictException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("IDEMPOTENCY_KEY_CONFLICT", exception.getMessage()));
+    }
+
+    @ExceptionHandler(ReservationInProgressException.class)
+    public ResponseEntity<ErrorResponse> handleReservationInProgress(ReservationInProgressException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("IDEMPOTENCY_PROCESSING", exception.getMessage()));
     }
 
     @ExceptionHandler(ReservationFailedRetryableException.class)
