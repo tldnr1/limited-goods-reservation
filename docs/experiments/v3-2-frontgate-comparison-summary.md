@@ -187,8 +187,8 @@ The front gate uses Redis keys like:
 
 ```text
 stock:available:{productId}
-reservation:idempotency:{idempotencyKey}
-reservation:user-product:{productId}:{userId}
+reservation:idem:{idempotencyKey}
+reservation:user:{productId}:{userId}
 ```
 
 The key states are:
