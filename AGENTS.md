@@ -10,8 +10,8 @@ This file is the **current work index**. It may change as the project version ch
 
 ```text
 current_version: v3.2
-current_goal: Redis front gate vs RDB atomic v3.2 comparison documented
-next_target: review final v3.2 portfolio narrative, then plan v3.3 payment delay isolation
+current_goal: v3.2 comparison and project narrative documented
+next_target: plan v3.3 payment delay isolation
 project_type: Spring Boot backend portfolio project
 architecture_now: v3.1 waiting room complete; v3.2 modular monolith transition
 official_verification_path: Docker Compose first
@@ -20,6 +20,7 @@ official_verification_path: Docker Compose first
 v3.1 is complete. v3.2 reservation, idempotency, compensation smoke verification, and the first reservation load baseline are implemented.
 The first Redis Lua reservation baseline is recorded as evidence that stock-decision-only Redis is not enough after idempotency and reservation truth are added.
 The v3.2 Redis front gate vs RDB atomic comparison is implemented, load-tested, and documented.
+The root README now presents the measured project progression, while `RUNBOOK.md` owns local execution and experiment reproduction.
 
 ---
 

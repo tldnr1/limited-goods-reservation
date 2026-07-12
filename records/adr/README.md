@@ -6,11 +6,11 @@ ADR files are committed to `dev` and `main` when a decision affects the project 
 
 Use ADRs for decisions that are hard to reverse or important to explain in a portfolio review.
 
-Suggested file name:
+Current decisions:
 
 ```text
-0001-keep-v1-as-naive-n-tier-baseline.md
-0002-select-redis-lua-for-stock-reservation.md
+0001-v2-layered-stock-strategy.md
+0002-v3-2-minimal-redis-front-gate.md
 ```
 
 Template:

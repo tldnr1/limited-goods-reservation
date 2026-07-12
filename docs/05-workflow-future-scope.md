@@ -94,6 +94,8 @@ Use `AGENTS.md` as the current status index. Use docs as version Truth.
 Document levels:
 
 ```text
+README.md              project overview and measured progression
+RUNBOOK.md             local execution and experiment reproduction
 docs/                  version Truth and current project rules
 records/adr/           accepted architecture decisions
 records/experiments/   measured experiment evidence
