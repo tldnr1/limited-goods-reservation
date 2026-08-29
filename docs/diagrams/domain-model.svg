@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1000" viewBox="0 0 1500 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Limited Goods 핵심 도메인 모델</title>
+  <desc id="desc">사용자는 주문을 소유한다. 판매 이벤트에는 재고를 가진 판매 상품이 포함된다. 주문에는 주문 항목, 하나의 점유, 여러 결제 시도가 연결된다.</desc>
+  <defs>
+    <style>
+      :root { color-scheme: light dark; }
+      .bg { fill: #f8fafc; }
+      .entity { fill: #ffffff; stroke: #64748b; stroke-width: 2; }
+      .entity-core { fill: #ecfeff; stroke: #0f766e; stroke-width: 2.4; }
+      .header { fill: #e2e8f0; }
+      .header-core { fill: #99f6e4; }
+      .title { fill: #0f172a; font: 700 30px "Malgun Gothic", system-ui, sans-serif; }
+      .name { fill: #0f172a; font: 700 17px "Malgun Gothic", system-ui, sans-serif; }
+      .field { fill: #334155; font: 400 13px ui-monospace, SFMono-Regular, Consolas, monospace; }
+      .relation { fill: none; stroke: #64748b; stroke-width: 2; }
+      .cardinality { fill: #0f172a; font: 700 13px "Malgun Gothic", system-ui, sans-serif; }
+      .caption { fill: #475569; font: 400 14px "Malgun Gothic", system-ui, sans-serif; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0f172a; }
+        .entity { fill: #1e293b; stroke: #64748b; }
+        .entity-core { fill: #134e4a; stroke: #2dd4bf; }
+        .header { fill: #334155; }
+        .header-core { fill: #115e59; }
+        .title, .name, .cardinality { fill: #f8fafc; }
+        .field, .caption { fill: #cbd5e1; }
+        .relation { stroke: #94a3b8; }
+      }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1500" height="1000"/>
+  <text class="title" x="50" y="55">핵심 도메인 모델</text>
+  <text class="caption" x="50" y="82">개념 관계를 표현하며 구현 단계에서 기술 컬럼과 인덱스를 추가할 수 있음</text>
+
+  <!-- relationships are drawn first so entities remain readable -->
+  <path class="relation" d="M180 280 V390"/>
+  <text class="cardinality" x="191" y="301">1</text><text class="cardinality" x="191" y="382">N</text>
+
+  <path class="relation" d="M630 230 V320"/>
+  <text class="cardinality" x="642" y="251">1</text><text class="cardinality" x="642" y="312">N</text>
+
+  <path class="relation" d="M500 180 H430 V440 H350"/>
+  <text class="cardinality" x="481" y="171">1</text><text class="cardinality" x="362" y="431">N</text>
+
+  <path class="relation" d="M200 620 V720"/>
+  <text class="cardinality" x="212" y="641">1</text><text class="cardinality" x="212" y="712">N</text>
+
+  <path class="relation" d="M390 790 H440 V455 H500"/>
+  <text class="cardinality" x="401" y="781">N</text><text class="cardinality" x="481" y="446">1</text>
+
+  <path class="relation" d="M780 430 H960"/>
+  <text class="cardinality" x="792" y="421">1</text><text class="cardinality" x="941" y="421">1</text>
+
+  <path class="relation" d="M350 500 H420 V760 H500"/>
+  <text class="cardinality" x="362" y="491">1</text><text class="cardinality" x="481" y="751">1</text>
+
+  <path class="relation" d="M350 560 H860 V750 H960"/>
+  <text class="cardinality" x="362" y="551">1</text><text class="cardinality" x="941" y="741">N</text>
+
+  <!-- User -->
+  <rect class="entity" x="50" y="120" width="260" height="160" rx="10"/>
+  <path class="header" d="M60 120H300Q310 120 310 130V165H50V130Q50 120 60 120Z"/>
+  <text class="name" x="180" y="149" text-anchor="middle">User</text>
+  <text class="field" x="75" y="196">id (PK)</text>
+  <text class="field" x="75" y="224">identity_key</text>
+  <text class="field" x="75" y="252">created_at</text>
+
+  <!-- SaleEvent -->
+  <rect class="entity" x="500" y="100" width="260" height="130" rx="10"/>
+  <path class="header" d="M510 100H750Q760 100 760 110V145H500V110Q500 100 510 100Z"/>
+  <text class="name" x="630" y="129" text-anchor="middle">SaleEvent</text>
+  <text class="field" x="525" y="176">id (PK)</text>
+  <text class="field" x="525" y="204">opens_at</text>
+
+  <!-- Order -->
+  <rect class="entity-core" x="50" y="390" width="300" height="230" rx="10"/>
+  <path class="header-core" d="M60 390H340Q350 390 350 400V435H50V400Q50 390 60 390Z"/>
+  <text class="name" x="200" y="419" text-anchor="middle">Order</text>
+  <text class="field" x="75" y="466">id (PK)</text>
+  <text class="field" x="75" y="494">user_id (FK)</text>
+  <text class="field" x="75" y="522">sale_event_id (FK)</text>
+  <text class="field" x="75" y="550">status · total_amount</text>
+  <text class="field" x="75" y="578">idempotency_key</text>
+
+  <!-- SaleItem -->
+  <rect class="entity-core" x="500" y="320" width="280" height="220" rx="10"/>
+  <path class="header-core" d="M510 320H770Q780 320 780 330V365H500V330Q500 320 510 320Z"/>
+  <text class="name" x="640" y="349" text-anchor="middle">SaleItem</text>
+  <text class="field" x="525" y="396">id (PK)</text>
+  <text class="field" x="525" y="424">sale_event_id (FK)</text>
+  <text class="field" x="525" y="452">name · price</text>
+  <text class="field" x="525" y="480">per_user_limit</text>
+  <text class="field" x="525" y="508">status</text>
+
+  <!-- Inventory -->
+  <rect class="entity-core" x="960" y="300" width="320" height="270" rx="10"/>
+  <path class="header-core" d="M970 300H1270Q1280 300 1280 310V345H960V310Q960 300 970 300Z"/>
+  <text class="name" x="1120" y="329" text-anchor="middle">Inventory</text>
+  <text class="field" x="985" y="376">sale_item_id (PK, FK)</text>
+  <text class="field" x="985" y="404">total_quantity</text>
+  <text class="field" x="985" y="432">available_quantity</text>
+  <text class="field" x="985" y="460">held_quantity</text>
+  <text class="field" x="985" y="488">sold_quantity</text>
+  <text class="field" x="985" y="516">updated_at</text>
+  <text class="caption" x="1120" y="548" text-anchor="middle">total = available + held + sold</text>
+
+  <!-- OrderItem -->
+  <rect class="entity" x="50" y="720" width="340" height="180" rx="10"/>
+  <path class="header" d="M60 720H380Q390 720 390 730V765H50V730Q50 720 60 720Z"/>
+  <text class="name" x="220" y="749" text-anchor="middle">OrderItem</text>
+  <text class="field" x="75" y="796">id (PK) · order_id (FK)</text>
+  <text class="field" x="75" y="824">sale_item_id (FK)</text>
+  <text class="field" x="75" y="852">quantity · unit_price</text>
+  <text class="field" x="75" y="880">unique(order_id, sale_item_id)</text>
+
+  <!-- Reservation -->
+  <rect class="entity-core" x="500" y="700" width="300" height="210" rx="10"/>
+  <path class="header-core" d="M510 700H790Q800 700 800 710V745H500V710Q500 700 510 700Z"/>
+  <text class="name" x="650" y="729" text-anchor="middle">Reservation</text>
+  <text class="field" x="525" y="776">id (PK)</text>
+  <text class="field" x="525" y="804">order_id (FK, unique)</text>
+  <text class="field" x="525" y="832">status</text>
+  <text class="field" x="525" y="860">hold_expires_at</text>
+  <text class="field" x="525" y="888">confirmation_deadline</text>
+
+  <!-- PaymentAttempt -->
+  <rect class="entity" x="960" y="680" width="390" height="230" rx="10"/>
+  <path class="header" d="M970 680H1340Q1350 680 1350 690V725H960V690Q960 680 970 680Z"/>
+  <text class="name" x="1155" y="709" text-anchor="middle">PaymentAttempt</text>
+  <text class="field" x="985" y="756">id (PK) · order_id (FK)</text>
+  <text class="field" x="985" y="784">status · amount</text>
+  <text class="field" x="985" y="812">idempotency_key</text>
+  <text class="field" x="985" y="840">provider_reference (unique)</text>
+  <text class="field" x="985" y="868">started_at · resolved_at</text>
+  <text class="field" x="985" y="896">provider_payload</text>
+</svg>

@@ -1,33 +1,38 @@
 # AGENTS.md
 
-Codex entrypoint for the new Limited Goods project.
+새 Limited Goods 프로젝트에서 코딩 에이전트가 처음 읽는 문서입니다.
 
-## Current Status
+## 현재 상태
 
 ```text
-phase: initialization
-current_goal: define the core limited-goods purchase business contract
+phase: design baseline complete
+current_goal: implement the initial end-to-end purchase flow
 implementation: none
 language_direction: Python
 framework: undecided
+persistence: PostgreSQL
+architecture: feature-oriented modular monolith
 legacy_reference: archive/java-spring-v3.2 and version tags
 ```
 
-## Read Next
+## 다음으로 읽을 문서
 
 ```text
-Need project intent or open business questions?
+프로젝트 목적이나 열려 있는 비즈니스 질문이 필요한가?
 -> PROJECT.md
 
-Need design principles or open technical questions?
+설계 원칙이나 열려 있는 기술 질문이 필요한가?
 -> DESIGN.md
+
+상태, 데이터 관계, 결정 근거가 필요한가?
+-> docs/architecture 와 docs/decisions
 ```
 
-## Working Rules
+## 작업 규칙
 
-- Treat undecided items in `PROJECT.md` and `DESIGN.md` as open questions, not implicit requirements.
-- Define the business flow, states, invariants, and failure behavior before selecting detailed architecture.
-- Do not port or continue the archived Java/Spring implementation.
-- Use archived experiments only as evidence when a new decision needs comparison data.
-- Keep changes minimal and record decisions before implementation makes them expensive to reverse.
-- Add more documents or directories only when their content has a clear owner and purpose.
+- `PROJECT.md`와 `DESIGN.md`에서 확정하지 않은 항목을 암묵적인 요구사항으로 취급하지 않는다.
+- 구현 세부사항을 선택할 때 문서화된 비즈니스 흐름, 상태, 불변식, 실패 동작을 보존한다.
+- 보관된 Java/Spring 구현을 이식하거나 이어서 개발하지 않는다.
+- 새 결정에 비교 근거가 필요할 때만 과거 실험을 참고한다.
+- 변경을 최소화하고 되돌리기 비싼 결정은 구현 전에 기록한다.
+- 소유자와 목적이 명확할 때만 문서나 디렉터리를 추가한다.

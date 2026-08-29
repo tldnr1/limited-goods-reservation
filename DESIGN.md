@@ -1,31 +1,63 @@
-# Design
+# 설계
 
-## Status
+## 상태
 
-This document records the initialization direction. It is not yet an architecture specification.
+이 문서는 초기 버전 구현을 위한 기준이며 최종 운영 아키텍처가 아닙니다. [PROJECT.md](PROJECT.md)에서 잠정으로 표시한 정책은 테스트와 논의를 통해 변경할 수 있습니다.
 
-## Initial Principles
+## 아키텍처 방향
 
-- Business contract before framework and infrastructure choices.
-- Correctness boundaries before optimization.
-- Cost-aware design for limited cloud and compute resources.
-- Evidence-driven choices based on reproducible measurements.
-- Minimal implementation until the core purchase flow is explicit.
-- Historical experiments may inform decisions, but do not determine the new structure.
+서비스는 **기능 중심 모듈러 모놀리스**로 시작합니다. 하나의 Python 코드베이스가 비즈니스 트랜잭션을 소유하고, API와 백그라운드 Worker는 필요에 따라 별도 컨테이너로 실행할 수 있습니다. PostgreSQL만 영속적인 상태의 기준으로 사용합니다.
 
-## Undecided Areas
+초기 구현에는 Redis, 메시지 브로커, 독립 마이크로서비스를 도입하지 않습니다. 해당 기술은 측정된 병목이나 가용성 요구에 답할 때 추가합니다.
 
-- Python framework and dependency set
-- FastAPI or another API boundary
-- synchronous versus asynchronous request handling
-- persistence model and durable source of truth
-- cache, queue, and background-worker needs
-- deployment topology and cloud services
-- observability and load-test targets
-- security controls and operational failure handling
+![컨테이너 구성](docs/diagrams/container-view.svg)
 
-These choices should be made only after the project defines its states, invariants, failure cases, and measurable constraints.
+실행 경계와 모듈 책임은 [시스템 개요](docs/architecture/system-overview.md)에 기록합니다.
 
-## Historical Evidence
+## 모듈 경계
 
-The archived project contains measured comparisons for RDB atomic updates, Redis Lua stock decisions, waiting-room admission, reservation consistency, idempotency, compensation, and a Redis front gate. Reference that evidence when the new business contract raises the same decision question; do not copy the old implementation by default.
+- **sales:** 판매 이벤트, 시작 정책, 상품 가격, 초기 재고, 인당 제한
+- **purchases:** 주문, 주문 항목, 구매 요청 조정, 멱등한 요청 결과
+- **reservations:** 원자적 재고 점유, 만료, 반환, 확정, 제한 수량 계산
+- **payments:** 결제 시도, Mock PG 연동, 콜백, 재시도 가능 여부, 정합성 확인
+
+모듈은 하나의 배포 단위와 DB를 공유하지만 각자의 비즈니스 규칙과 테이블을 소유합니다. 다른 모듈의 내부 저장소 코드를 직접 재사용하지 않고 애플리케이션 유스케이스가 모듈 간 작업을 조정합니다.
+
+## 실행 책임
+
+- **API 프로세스:** 조회, 구매 요청, 결제 시도, Mock PG 콜백, 상태 확인 엔드포인트
+- **Worker 프로세스:** 점유 만료와 결제 결과 미확정 상태의 정합성 확인
+- **PostgreSQL:** 트랜잭션 정합성, 제약 조건, 영속 상태, 최초 동시성 제어 전략
+- **Mock PG:** 결정 가능한 결제 결과와 지연·중복 알림
+
+로컬 환경에서도 이 경계를 컨테이너로 실행합니다. API 프레임워크와 작업 스케줄러는 문서화된 비즈니스 계약을 바꾸지 않는 범위에서 구현 단계에 선택합니다.
+
+## 품질 검증 전략
+
+처리량을 최적화하기 전에 정합성을 증명합니다.
+
+- 상태 전이와 구매 제한 계산을 검증하는 단위 테스트
+- 전체 성공·실패 점유와 동시 요청을 검증하는 DB 통합 테스트
+- 구매·결제·만료·재시도·지연·중복 콜백을 검증하는 E2E 테스트
+- 요청·주문·결제 시도·사용자를 연결할 수 있는 구조화 로그
+- 점유·결제·만료·미확정 상태·지연시간·불변식 위반 메트릭
+- 실행 환경과 자원 사용량을 함께 기록하는 반복 가능한 부하 시나리오
+
+성능 목표는 동작하는 기준 구현을 측정한 뒤 정합니다. 과거 실험은 새 실험을 설계하는 참고 자료일 뿐, 현재 구현에서 재현하기 전에는 근거로 확정하지 않습니다.
+
+## 결정 기록
+
+- [ADR 0001: 기능 중심 모듈러 모놀리스](docs/decisions/0001-feature-oriented-modular-monolith.md)
+- [ADR 0002: PostgreSQL을 상태의 기준으로 사용](docs/decisions/0002-postgresql-as-source-of-truth.md)
+- [ADR 0003: 주문과 결제 시도 분리](docs/decisions/0003-separate-payment-attempts.md)
+
+## 의도적으로 미룬 내용
+
+- Redis 또는 큐 기반 진입·재고 제어
+- 마이크로서비스 분리
+- 실제 PG 연동과 결제사별 보안 계약
+- 영구적으로 결과를 알 수 없는 모든 결제의 자동 해결
+- 초기 프로세스 경계를 넘는 분산 추적
+- 운영 클라우드와 오토스케일링 설계
+
+초기 시스템이나 측정 결과에서 구체적인 필요가 확인될 때 이 항목들을 다시 논의합니다.

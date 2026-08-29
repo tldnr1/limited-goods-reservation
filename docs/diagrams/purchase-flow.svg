@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="940" viewBox="0 0 1500 940" role="img" aria-labelledby="title desc">
+  <title id="title">Limited Goods 구매 상태 흐름</title>
+  <desc id="desc">구매자는 상품을 조회하고 모든 상품을 원자적으로 점유한 뒤 결제를 시도한다. 이후 구매 확정, 점유 만료, 결제 재시도, 결제 결과 미확정 상태로 이어질 수 있다.</desc>
+  <defs>
+    <style>
+      :root { color-scheme: light dark; }
+      .bg { fill: #f8fafc; }
+      .phase { fill: #ffffff; stroke: #94a3b8; stroke-width: 2; }
+      .active { fill: #ecfeff; stroke: #0f766e; stroke-width: 2.4; }
+      .success { fill: #ecfdf5; stroke: #15803d; stroke-width: 2.4; }
+      .warning { fill: #fffbeb; stroke: #b45309; stroke-width: 2.2; }
+      .terminal { fill: #f1f5f9; stroke: #64748b; stroke-width: 2; }
+      .title { fill: #0f172a; font: 700 30px "Malgun Gothic", system-ui, sans-serif; }
+      .name { fill: #0f172a; font: 700 17px "Malgun Gothic", system-ui, sans-serif; }
+      .copy { fill: #475569; font: 400 13px "Malgun Gothic", system-ui, sans-serif; }
+      .state { fill: #0f766e; font: 600 12px ui-monospace, SFMono-Regular, Consolas, monospace; }
+      .arrow { fill: none; stroke: #64748b; stroke-width: 2.2; marker-end: url(#arrow); }
+      .edge-label { fill: #334155; font: 600 12px "Malgun Gothic", system-ui, sans-serif; }
+      .note { fill: #334155; font: 500 13px "Malgun Gothic", system-ui, sans-serif; }
+      @media (prefers-color-scheme: dark) {
+        .bg { fill: #0f172a; }
+        .phase, .terminal { fill: #1e293b; stroke: #64748b; }
+        .active { fill: #134e4a; stroke: #2dd4bf; }
+        .success { fill: #14532d; stroke: #4ade80; }
+        .warning { fill: #451a03; stroke: #f59e0b; }
+        .title, .name { fill: #f8fafc; }
+        .copy, .edge-label, .note { fill: #cbd5e1; }
+        .state { fill: #5eead4; }
+        .arrow { stroke: #94a3b8; }
+      }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker>
+  </defs>
+
+  <rect class="bg" width="1500" height="940"/>
+  <text class="title" x="50" y="55">구매 상태 흐름</text>
+  <text class="copy" x="50" y="82">하나의 주문과 점유가 여러 상품의 구매 요청 전체를 포괄</text>
+
+  <!-- main path -->
+  <rect class="phase" x="50" y="175" width="230" height="150" rx="14"/>
+  <text class="name" x="165" y="215" text-anchor="middle">상품 조회</text>
+  <text class="copy" x="165" y="245" text-anchor="middle">판매 시작 전에도 가능</text>
+  <text class="copy" x="165" y="268" text-anchor="middle">장바구니는 재고를 점유하지 않음</text>
+  <text class="state" x="165" y="298" text-anchor="middle">구매 상태 없음</text>
+
+  <rect class="active" x="350" y="155" width="250" height="190" rx="14"/>
+  <text class="name" x="475" y="195" text-anchor="middle">전체 상품 점유</text>
+  <text class="copy" x="475" y="225" text-anchor="middle">판매 시각·제한·재고를 검증하고</text>
+  <text class="copy" x="475" y="248" text-anchor="middle">상태를 원자적으로 생성</text>
+  <text class="state" x="475" y="280" text-anchor="middle">Order: PAYMENT_PENDING</text>
+  <text class="state" x="475" y="301" text-anchor="middle">Reservation: ACTIVE</text>
+  <text class="copy" x="475" y="326" text-anchor="middle">available → held</text>
+
+  <rect class="active" x="690" y="155" width="250" height="190" rx="14"/>
+  <text class="name" x="815" y="195" text-anchor="middle">결제 시도</text>
+  <text class="copy" x="815" y="225" text-anchor="middle">주문당 활성 시도는 하나</text>
+  <text class="copy" x="815" y="248" text-anchor="middle">재시도도 원래 기한을 유지</text>
+  <text class="state" x="815" y="280" text-anchor="middle">Order: PAYMENT_PROCESSING</text>
+  <text class="state" x="815" y="301" text-anchor="middle">Attempt: PROCESSING</text>
+  <text class="copy" x="815" y="326" text-anchor="middle">재고 점유 유지</text>
+
+  <rect class="success" x="1080" y="155" width="270" height="190" rx="14"/>
+  <text class="name" x="1215" y="195" text-anchor="middle">구매 확정</text>
+  <text class="copy" x="1215" y="225" text-anchor="middle">검증된 최초 성공만 반영</text>
+  <text class="copy" x="1215" y="248" text-anchor="middle">중복 성공은 no-op</text>
+  <text class="state" x="1215" y="280" text-anchor="middle">Order: CONFIRMED</text>
+  <text class="state" x="1215" y="301" text-anchor="middle">Reservation: CONFIRMED</text>
+  <text class="copy" x="1215" y="326" text-anchor="middle">held → sold</text>
+
+  <path class="arrow" d="M280 250 H350"/><text class="edge-label" x="291" y="234">판매 시작</text>
+  <path class="arrow" d="M600 250 H690"/><text class="edge-label" x="619" y="234">점유 성공</text>
+  <path class="arrow" d="M940 250 H1080"/><text class="edge-label" x="975" y="234">결제 성공</text>
+
+  <!-- reservation rejection -->
+  <rect class="terminal" x="350" y="455" width="250" height="135" rx="14"/>
+  <text class="name" x="475" y="495" text-anchor="middle">점유 요청 거절</text>
+  <text class="copy" x="475" y="526" text-anchor="middle">판매 전, 제한 초과 또는</text>
+  <text class="copy" x="475" y="548" text-anchor="middle">한 상품이라도 재고 부족</text>
+  <text class="state" x="475" y="572" text-anchor="middle">부분 상태 변경 없음</text>
+  <path class="arrow" d="M475 345 V455"/><text class="edge-label" x="490" y="405">검증 실패</text>
+
+  <!-- explicit failure and retry -->
+  <rect class="warning" x="690" y="455" width="250" height="155" rx="14"/>
+  <text class="name" x="815" y="495" text-anchor="middle">결제 시도 실패</text>
+  <text class="state" x="815" y="526" text-anchor="middle">Attempt: FAILED</text>
+  <text class="copy" x="815" y="553" text-anchor="middle">원래 만료 시각까지</text>
+  <text class="copy" x="815" y="575" text-anchor="middle">점유 상태를 유지</text>
+  <path class="arrow" d="M815 345 V455"/><text class="edge-label" x="831" y="405">명시적 실패</text>
+  <path class="arrow" d="M690 535 C620 535 625 385 730 345"/><text class="edge-label" x="610" y="463">기한 내 재시도</text>
+
+  <!-- expiry -->
+  <rect class="terminal" x="265" y="710" width="280" height="145" rx="14"/>
+  <text class="name" x="405" y="750" text-anchor="middle">점유 만료</text>
+  <text class="copy" x="405" y="780" text-anchor="middle">진행 중인 유효 결제 없음</text>
+  <text class="state" x="405" y="810" text-anchor="middle">Order / Reservation: EXPIRED</text>
+  <text class="copy" x="405" y="836" text-anchor="middle">held → available, 정확히 한 번</text>
+  <path class="arrow" d="M350 300 C230 380 185 635 405 710"/><text class="edge-label" x="205" y="610">결제 없이 만료</text>
+  <path class="arrow" d="M760 610 C700 700 620 760 545 780"/><text class="edge-label" x="628" y="712">재시도 없이 만료</text>
+
+  <!-- grace and unknown -->
+  <rect class="warning" x="1030" y="455" width="320" height="170" rx="14"/>
+  <text class="name" x="1190" y="495" text-anchor="middle">결제 확인 유예</text>
+  <text class="copy" x="1190" y="525" text-anchor="middle">점유 만료 전 결제 시작</text>
+  <text class="copy" x="1190" y="548" text-anchor="middle">결제사 결과가 지연됨</text>
+  <text class="state" x="1190" y="580" text-anchor="middle">Reservation: ACTIVE 유지</text>
+  <text class="copy" x="1190" y="604" text-anchor="middle">유예 후에도 미확정이면 상태 조회</text>
+  <path class="arrow" d="M900 345 C930 415 990 450 1030 495"/><text class="edge-label" x="936" y="413">결과 지연</text>
+  <path class="arrow" d="M1240 455 C1300 410 1305 365 1270 345"/><text class="edge-label" x="1285" y="408">유예 내 성공</text>
+
+  <rect class="warning" x="1030" y="710" width="320" height="145" rx="14"/>
+  <text class="name" x="1190" y="750" text-anchor="middle">결제 결과 미확정</text>
+  <text class="state" x="1190" y="780" text-anchor="middle">Attempt: UNKNOWN</text>
+  <text class="copy" x="1190" y="808" text-anchor="middle">점유 유지·새 시도 차단</text>
+  <text class="copy" x="1190" y="831" text-anchor="middle">운영 신호 생성</text>
+  <path class="arrow" d="M1190 625 V710"/><text class="edge-label" x="1207" y="674">계속 미확정</text>
+
+  <text class="note" x="50" y="910">잠정 시간: 운영 유사 환경 10분 / 로컬 1분 점유, 결제 확인 유예는 설정으로 조정</text>
+</svg>

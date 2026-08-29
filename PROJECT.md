@@ -1,31 +1,83 @@
-# Project
+# 프로젝트 계약
 
-## Purpose
+## 목적
 
-Limited Goods will implement the core purchase flow for limited streamer merchandise: a buyer secures scarce inventory and completes payment.
+Limited Goods는 한정 수량의 스트리머 굿즈를 구매하는 핵심 흐름을 구현합니다. 판매자는 유한한 재고와 판매 시작 시각을 등록하고, 구매자는 상품별 인당 제한을 넘거나 재고를 초과 판매하지 않으면서 하나 이상의 상품을 점유하고 결제합니다.
 
-The architecture goal is to verify inventory and payment consistency, performance, and security within limited cloud cost and compute resources, then select architecture and technology from measured bottlenecks.
+이 프로젝트는 제한된 컴퓨팅 자원과 클라우드 비용 안에서 정합성·성능·운영 가능성을 검증하는 것도 목표로 합니다. 최적화 기술은 측정 결과가 필요성을 보여줄 때 추가합니다.
 
-## Starting Point
+## 참여자와 경계
 
-- This `main` starts from a new Git history and has no application code yet.
-- The service will be Python-based, but its framework and execution model are not decided.
-- The previous Java/Spring project is preserved in `archive/java-spring-v3.2`.
-- Previous RDB atomic update, Redis Lua, waiting-room, reservation, idempotency, compensation, and front-gate results remain reference evidence rather than implementation requirements.
-- `README.md`, `AGENTS.md`, `PROJECT.md`, and `DESIGN.md` are the initial project documents.
+- **판매자:** 판매, 시작 시각, 상품 수량, 가격, 인당 제한을 등록한다.
+- **구매자:** 인증된 사용자로 상품을 조회하고 여러 상품의 수량을 요청한 뒤 결제를 시도한다.
+- **결제사:** 초기 버전에서는 Mock PG로 대체한다.
+- **운영자:** 실패와 결제 결과 미확정 상태를 관찰한다. 완전한 운영자 도구는 초기 범위에 포함하지 않는다.
 
-## Questions to Resolve
+## 초기 구매 여정
 
-The new project must define these before implementation scope is committed:
+1. 구매자는 판매 시작 전에도 판매와 상품 정보를 조회할 수 있다.
+2. 장바구니는 구매 의사만 나타내며 재고를 점유하지 않는다.
+3. 판매가 시작되면 구매자는 여러 상품의 수량을 하나의 구매 요청으로 보낸다.
+4. 시스템은 판매 시각, 요청 수량, 인당 제한, 모든 상품의 판매 가능 재고를 다시 검사한다.
+5. 모든 상품이 유효하면 하나의 트랜잭션에서 주문과 점유를 생성하고 요청 수량을 `available`에서 `held`로 이동한다.
+6. 구매자는 점유 시간 안에 결제를 시도한다. 한 주문에 여러 결제 시도가 존재할 수 있지만 동시에 활성 상태인 시도는 하나뿐이다.
+7. 결제 성공은 주문을 확정하고 수량을 `held`에서 `sold`로 이동한다. 적용 가능한 기한 안에 결제를 완료하지 못하면 점유를 만료시키고 수량을 `available`로 돌려놓는다.
 
-- the exact buyer journey and external actors
-- inventory, reservation, order, and payment states and invariants
-- reservation expiry and inventory release behavior
-- retry and idempotency boundaries
-- payment failure, timeout, and recovery behavior
-- API and identity boundaries
-- security and abuse assumptions
-- measurable performance and cost targets
-- the initial cloud and local verification environments
+상세 상태 전이는 [구매 흐름](docs/architecture/purchase-flow.md)에 기록합니다.
 
-No broader commerce scope is implied until these questions are resolved.
+## 비즈니스 규칙
+
+- 여러 상품의 점유는 전체 성공 또는 전체 실패로 처리한다. 한 상품이라도 구매할 수 없으면 어떤 상품도 점유하지 않는다.
+- 구매 제한은 `sale item + user_id`를 기준으로 적용한다.
+- 제한 사용량은 결제 진행·결과 미확정을 포함한 활성 점유 수량과 확정 구매 수량의 합이다. 만료되거나 실패가 확정되어 재고로 돌아간 수량은 제외한다.
+- 같은 `user_id`로 인증한 여러 브라우저와 동시 요청은 하나의 구매자로 취급한다.
+- 멱등키는 반복된 구매 또는 결제 요청을 식별하며, 구매자 신원을 식별하지 않는다.
+- 중복 결제 알림은 판매를 두 번 확정하거나 재고를 다시 변경하지 않는다.
+- 결과가 `UNKNOWN`인 결제 시도가 있으면 정합성 확인 전까지 해당 주문의 새 결제 시도를 막는다.
+
+## 핵심 불변식
+
+- 재고 수량은 음수가 되지 않으며 등록 수량보다 많이 판매되지 않는다.
+- 각 판매 상품에서 `total = available + held + sold`가 항상 성립한다.
+- 구매 요청은 하나의 DB 트랜잭션에서 모든 상품을 점유하거나 아무것도 변경하지 않는다.
+- 한 주문에는 성공한 결제 시도가 최대 하나만 존재한다.
+- 같은 점유를 여러 번 확정하거나 만료해도 최초 한 번 이외에는 상태와 재고가 바뀌지 않는다.
+- 같은 계정의 동시 요청으로 인당 제한을 우회할 수 없다.
+
+## 초기 범위
+
+포함하는 내용:
+
+- 테스트 판매를 준비할 수 있는 수준의 판매·상품 등록
+- 판매 시작 전 조회와 시작 시각 검증
+- 인증된 사용자의 여러 상품 구매 요청
+- 기한이 있는 재고 점유, 결제 재시도, 만료와 재고 반환
+- Mock PG의 성공, 명시적 실패, 지연 결과, 중복 알림 시나리오
+- 구조화 로그, 기본 메트릭, 정합성 테스트, 반복 가능한 부하 테스트
+- 배포 시 의도한 프로세스 경계와 유사한 컨테이너 기반 로컬 실행
+
+포함하지 않는 내용:
+
+- 실제 PG 연동과 실제 금액 결제
+- 배송, 주문 처리, 환불, 반품, 쿠폰, 세금
+- 카드·주소·IP·신분 정보를 이용한 다중 계정 악용 탐지
+- 측정된 필요가 없는 대기열, Redis 재고 게이트, 메시지 큐, 마이크로서비스
+- 운영자 UI와 모든 영구 결제 미확정 상태의 자동 해결
+
+## 잠정 정책
+
+다음 값은 검증을 위한 설정 기본값이며 영구적인 비즈니스 정책이 아닙니다.
+
+- 운영 환경과 유사한 점유 시간: 10분
+- 로컬·자동화 테스트의 점유 시간: 1분
+- 기한 내 시작한 결제의 확인 유예: 운영 유사 환경 60초, 로컬 10초
+
+정합성 확인 후에도 결제 결과를 알 수 없다면 재고를 계속 점유하고, 운영 신호를 남기며, 새 결제 시도를 막는 보수적인 정책을 사용합니다. 이후 버전에서 운영자 복구 흐름을 추가할 수 있습니다.
+
+## 남은 질문
+
+- Python 프레임워크와 구체적인 API 표현
+- 최초 처리량·지연시간·자원 사용 목표
+- `user_id`라는 비즈니스 경계를 제공할 인증 방식
+- 배포 사업자와 운영 환경 토폴로지
+- 구매 확정 이후의 취소·환불 정책
