@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "limited-goods"
+version = "0.1.0"
+description = "Contract-first limited goods purchase service"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic==1.16.4",
+    "fastapi==0.116.1",
+    "httpx==0.28.1",
+    "prometheus-client==0.22.1",
+    "psycopg[binary]==3.2.9",
+    "sqlalchemy==2.0.43",
+    "uvicorn[standard]==0.35.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.4.1",
+    "pytest-cov==6.2.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+cache_dir = "/tmp/pytest-cache"

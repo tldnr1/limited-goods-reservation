@@ -5,11 +5,11 @@
 ## 현재 상태
 
 ```text
-phase: design baseline complete
-current_goal: implement the initial end-to-end purchase flow
-implementation: none
-language_direction: Python
-framework: undecided
+phase: initial vertical slice implemented
+current_goal: validate the baseline and define the first measurable performance target
+implementation: functional local baseline
+language: Python 3.12
+framework: FastAPI, SQLAlchemy 2, Alembic
 persistence: PostgreSQL
 architecture: feature-oriented modular monolith
 legacy_reference: archive/java-spring-v3.2 and version tags

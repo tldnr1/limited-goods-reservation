@@ -1,0 +1,1 @@
+"""Limited Goods application package."""

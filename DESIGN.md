@@ -10,6 +10,8 @@
 
 초기 구현에는 Redis, 메시지 브로커, 독립 마이크로서비스를 도입하지 않습니다. 해당 기술은 측정된 병목이나 가용성 요구에 답할 때 추가합니다.
 
+초기 실행 기술로 FastAPI, SQLAlchemy 2, Alembic을 사용합니다. 이는 현재 계약을 구현하기 위한 되돌리기 가능한 선택이며, 프레임워크 자체보다 PostgreSQL 트랜잭션과 모듈 경계를 설계의 기준으로 둡니다.
+
 ![컨테이너 구성](docs/diagrams/container-view.svg)
 
 실행 경계와 모듈 책임은 [시스템 개요](docs/architecture/system-overview.md)에 기록합니다.

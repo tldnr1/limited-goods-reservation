@@ -1,0 +1,113 @@
+name: limited-goods-next
+
+x-app-environment: &app-environment
+  DATABASE_URL: postgresql+psycopg://limited_goods:limited_goods@db:5432/limited_goods
+  MOCK_PG_URL: http://mock-pg:8080
+  MOCK_PG_CALLBACK_URL: http://api:8000/internal/payments/callback
+  MOCK_PG_SECRET: local-mock-pg-secret
+  RESERVATION_TTL_SECONDS: "60"
+  PAYMENT_GRACE_SECONDS: "10"
+  WORKER_POLL_SECONDS: "1"
+  LOG_LEVEL: INFO
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: limited_goods
+      POSTGRES_USER: limited_goods
+      POSTGRES_PASSWORD: limited_goods
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init-test-db.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U limited_goods -d limited_goods"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: .
+    environment: *app-environment
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  mock-pg:
+    build: .
+    environment: *app-environment
+    command: ["uvicorn", "limited_goods.mock_pg:app", "--host", "0.0.0.0", "--port", "8080"]
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8080/health/live')",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    environment: *app-environment
+    command: ["uvicorn", "limited_goods.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mock-pg:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  worker:
+    build: .
+    environment: *app-environment
+    command: ["python", "-m", "limited_goods.worker"]
+    depends_on:
+      api:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
+    volumes:
+      - ./ops/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  test:
+    build: .
+    profiles: ["test"]
+    environment:
+      <<: *app-environment
+      DATABASE_URL: postgresql+psycopg://limited_goods:limited_goods@db:5432/limited_goods_test
+      COVERAGE_FILE: /tmp/.coverage
+    command: ["pytest", "--cov=limited_goods", "--cov-report=term-missing"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
