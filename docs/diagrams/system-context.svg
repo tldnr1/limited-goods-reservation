@@ -70,7 +70,7 @@
   <text class="edge-label" x="318" y="363">조회와 구매</text>
 
   <path class="arrow" d="M 430 475 C 370 500, 360 560, 300 565"/>
-  <text class="edge-label" x="322" y="536">로그·메트릭·알림</text>
+  <text class="edge-label" x="322" y="536">로그·메트릭 확인</text>
 
   <path class="arrow" d="M 790 360 L 900 360"/>
   <text class="edge-label" x="806" y="343">결제 요청</text>

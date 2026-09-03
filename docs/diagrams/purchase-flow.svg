@@ -103,7 +103,7 @@
   <text class="copy" x="1190" y="525" text-anchor="middle">점유 만료 전 결제 시작</text>
   <text class="copy" x="1190" y="548" text-anchor="middle">결제사 결과가 지연됨</text>
   <text class="state" x="1190" y="580" text-anchor="middle">Reservation: ACTIVE 유지</text>
-  <text class="copy" x="1190" y="604" text-anchor="middle">유예 후에도 미확정이면 상태 조회</text>
+  <text class="copy" x="1190" y="604" text-anchor="middle">참조값이 있으면 유예 후 상태 조회</text>
   <path class="arrow" d="M900 345 C930 415 990 450 1030 495"/><text class="edge-label" x="936" y="413">결과 지연</text>
   <path class="arrow" d="M1240 455 C1300 410 1305 365 1270 345"/><text class="edge-label" x="1285" y="408">유예 내 성공</text>
 

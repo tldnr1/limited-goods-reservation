@@ -75,7 +75,7 @@ DB 스키마 변경은 Alembic으로 관리하고, 구조화 JSON 로그와 Prom
 
 - [PROJECT.md](PROJECT.md): 비즈니스 범위, 규칙, 아직 확정하지 않은 정책
 - [DESIGN.md](DESIGN.md): 아키텍처 방향과 품질 검증 전략
-- [시스템 개요](docs/architecture/system-overview.md): 시스템 경계와 실행 책임
+- [시스템 개요](docs/architecture/system-overview.md): 현재 실행 구성과 대표 사용자 흐름
 - [도메인 모델](docs/architecture/domain-model.md): 핵심 데이터 관계와 불변식
 - [구매 흐름](docs/architecture/purchase-flow.md): 상태 전이와 실패 경로
 - [아키텍처 결정 기록](docs/decisions/README.md): 주요 기술 선택의 이유
