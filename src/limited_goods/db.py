@@ -4,6 +4,7 @@ from sqlalchemy import MetaData, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from limited_goods.config import get_settings
+from limited_goods.metrics import DB_POOL_CAPACITY, DB_POOL_CONNECTIONS
 
 
 NAMING_CONVENTION = {
@@ -19,12 +20,18 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
+POOL_SIZE = 10
+POOL_MAX_OVERFLOW = 20
+
 engine = create_engine(
     get_settings().database_url,
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    pool_size=POOL_SIZE,
+    max_overflow=POOL_MAX_OVERFLOW,
 )
+DB_POOL_CONNECTIONS.labels(state="checked_out").set_function(engine.pool.checkedout)
+DB_POOL_CONNECTIONS.labels(state="checked_in").set_function(engine.pool.checkedin)
+DB_POOL_CAPACITY.set(POOL_SIZE + POOL_MAX_OVERFLOW)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 

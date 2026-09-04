@@ -21,9 +21,9 @@ Limited Goods is a contract-first backend project for purchasing scarce streamer
 
 ## 실행
 
-Docker가 실행 중인 환경에서 다음 명령으로 API, Worker, PostgreSQL, Mock PG, Prometheus를 시작합니다. Compose 프로젝트 이름은 과거 실험 리소스와 겹치지 않도록 `limited-goods-next`로 고정되어 있습니다.
+Docker가 실행 중인 환경에서 다음 명령으로 API, Worker, PostgreSQL, Mock PG, Prometheus, Grafana를 시작합니다. Compose 프로젝트 이름은 과거 실험 리소스와 겹치지 않도록 `limited-goods-next`로 고정되어 있습니다.
 
-```powershell
+```console
 docker compose up -d --build
 docker compose ps
 ```
@@ -35,6 +35,7 @@ docker compose ps
 | API 메트릭 | http://localhost:8000/metrics |
 | Mock PG | http://localhost:8080 |
 | Prometheus | http://localhost:9090 |
+| Grafana | http://localhost:3000 |
 | PostgreSQL | `localhost:5434` |
 
 실행을 멈출 때는 `docker compose down`을 사용합니다. 이 명령은 데이터 볼륨을 보존합니다.
@@ -43,7 +44,7 @@ docker compose ps
 
 테스트도 동일한 PostgreSQL 이미지와 별도의 `limited_goods_test` 데이터베이스를 사용합니다.
 
-```powershell
+```console
 docker compose --profile test run --rm test
 ```
 
@@ -78,6 +79,7 @@ DB 스키마 변경은 Alembic으로 관리하고, 구조화 JSON 로그와 Prom
 - [시스템 개요](docs/architecture/system-overview.md): 현재 실행 구성과 대표 사용자 흐름
 - [도메인 모델](docs/architecture/domain-model.md): 핵심 데이터 관계와 불변식
 - [구매 흐름](docs/architecture/purchase-flow.md): 상태 전이와 실패 경로
+- [성능 측정 가이드](docs/performance.md): 현재 관측 구성, 첫 capacity 실험, 이후 workload 계획
 - [아키텍처 결정 기록](docs/decisions/README.md): 주요 기술 선택의 이유
 - [AGENTS.md](AGENTS.md): 현재 상태와 코딩 에이전트 작업 규칙
 

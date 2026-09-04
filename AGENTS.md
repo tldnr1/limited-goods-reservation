@@ -26,6 +26,9 @@ legacy_reference: archive/java-spring-v3.2 and version tags
 
 상태, 데이터 관계, 결정 근거가 필요한가?
 -> docs/architecture 와 docs/decisions
+
+성능 관측이나 실험 계획이 필요한가?
+-> docs/performance.md
 ```
 
 ## 작업 규칙

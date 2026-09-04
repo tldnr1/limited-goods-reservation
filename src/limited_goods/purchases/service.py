@@ -13,7 +13,12 @@ from sqlalchemy.orm import Session, selectinload
 from limited_goods.clock import utc_now
 from limited_goods.config import get_settings
 from limited_goods.errors import AppError
-from limited_goods.metrics import RESERVATIONS
+from limited_goods.metrics import (
+    PURCHASE_OUTCOMES,
+    RESERVATIONS,
+    observe_purchase,
+    observe_purchase_stage,
+)
 from limited_goods.payments.models import PaymentAttempt
 from limited_goods.purchases.models import Order, OrderItem, OrderStatus
 from limited_goods.purchases.schemas import (
@@ -107,6 +112,7 @@ def get_order_for_user(session: Session, order_id: UUID, user_id: str) -> OrderV
     return order_to_view(order)
 
 
+@observe_purchase
 def create_purchase(
     session: Session,
     user_id: str,
@@ -114,11 +120,12 @@ def create_purchase(
     request: PurchaseRequest,
 ) -> OrderView:
     fingerprint = purchase_fingerprint(request)
-    existing = session.scalar(
-        select(Order).where(
-            Order.user_id == user_id, Order.idempotency_key == idempotency_key
+    with observe_purchase_stage("idempotency_lookup"):
+        existing = session.scalar(
+            select(Order).where(
+                Order.user_id == user_id, Order.idempotency_key == idempotency_key
+            )
         )
-    )
     if existing is not None:
         if existing.request_fingerprint != fingerprint:
             raise AppError(
@@ -126,12 +133,15 @@ def create_purchase(
                 "IDEMPOTENCY_KEY_REUSED",
                 "같은 멱등키를 다른 구매 요청에 사용할 수 없습니다.",
             )
-        return order_to_view(load_order(session, existing.id))
+        view = order_to_view(load_order(session, existing.id))
+        PURCHASE_OUTCOMES.labels(outcome="reused").inc()
+        return view
 
     try:
-        sale = session.scalar(
-            select(SaleEvent).where(SaleEvent.id == request.sale_event_id)
-        )
+        with observe_purchase_stage("sale_lookup"):
+            sale = session.scalar(
+                select(SaleEvent).where(SaleEvent.id == request.sale_event_id)
+            )
         if sale is None:
             raise AppError(404, "SALE_NOT_FOUND", "판매를 찾을 수 없습니다.")
         now = utc_now()
@@ -144,13 +154,14 @@ def create_purchase(
             )
 
         requested = {item.sale_item_id: item.quantity for item in request.items}
-        rows = session.execute(
-            select(SaleItem, Inventory)
-            .join(Inventory, Inventory.sale_item_id == SaleItem.id)
-            .where(SaleItem.id.in_(sorted(requested, key=str)))
-            .order_by(SaleItem.id)
-            .with_for_update(of=Inventory)
-        ).all()
+        with observe_purchase_stage("inventory_lock"):
+            rows = session.execute(
+                select(SaleItem, Inventory)
+                .join(Inventory, Inventory.sale_item_id == SaleItem.id)
+                .where(SaleItem.id.in_(sorted(requested, key=str)))
+                .order_by(SaleItem.id)
+                .with_for_update(of=Inventory)
+            ).all()
         if len(rows) != len(requested) or any(
             item.sale_event_id != request.sale_event_id for item, _ in rows
         ):
@@ -160,16 +171,17 @@ def create_purchase(
                 "요청 상품이 존재하지 않거나 판매에 속하지 않습니다.",
             )
 
-        usage_rows = session.execute(
-            select(OrderItem.sale_item_id, func.sum(OrderItem.quantity))
-            .join(Order, Order.id == OrderItem.order_id)
-            .where(
-                Order.user_id == user_id,
-                Order.status.in_(OrderStatus.COUNTING),
-                OrderItem.sale_item_id.in_(requested),
-            )
-            .group_by(OrderItem.sale_item_id)
-        ).all()
+        with observe_purchase_stage("usage_lookup"):
+            usage_rows = session.execute(
+                select(OrderItem.sale_item_id, func.sum(OrderItem.quantity))
+                .join(Order, Order.id == OrderItem.order_id)
+                .where(
+                    Order.user_id == user_id,
+                    Order.status.in_(OrderStatus.COUNTING),
+                    OrderItem.sale_item_id.in_(requested),
+                )
+                .group_by(OrderItem.sale_item_id)
+            ).all()
         usage = {sale_item_id: quantity for sale_item_id, quantity in usage_rows}
 
         failures: list[dict[str, object]] = []
@@ -229,7 +241,8 @@ def create_purchase(
             + timedelta(seconds=get_settings().reservation_ttl_seconds),
         )
         session.add(order)
-        session.commit()
+        with observe_purchase_stage("commit"):
+            session.commit()
     except IntegrityError:
         session.rollback()
         existing = session.scalar(
@@ -238,7 +251,9 @@ def create_purchase(
             )
         )
         if existing is not None and existing.request_fingerprint == fingerprint:
-            return order_to_view(load_order(session, existing.id))
+            view = order_to_view(load_order(session, existing.id))
+            PURCHASE_OUTCOMES.labels(outcome="reused").inc()
+            return view
         raise AppError(
             409,
             "CONCURRENT_CONFLICT",
@@ -248,9 +263,11 @@ def create_purchase(
         session.rollback()
         raise
 
+    view = order_to_view(load_order(session, order.id))
     RESERVATIONS.labels(outcome="created").inc()
+    PURCHASE_OUTCOMES.labels(outcome="created").inc()
     logger.info(
         "reservation created",
         extra={"event": "reservation_created", "order_id": str(order.id), "user_id": user_id},
     )
-    return order_to_view(load_order(session, order.id))
+    return view

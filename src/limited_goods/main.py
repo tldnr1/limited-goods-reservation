@@ -46,19 +46,22 @@ async def app_error_handler(_: Request, error: AppError) -> JSONResponse:
 async def request_metrics(request: Request, call_next):
     request_id = request.headers.get("X-Request-Id", str(uuid4()))
     started = perf_counter()
+    status_code = 500
     try:
         response = await call_next(request)
+        status_code = response.status_code
     except Exception:
         logger.exception(
             "unhandled request error",
             extra={"event": "http_unhandled_error", "request_id": request_id},
         )
         raise
-    route = request.scope.get("route")
-    path = getattr(route, "path", request.url.path)
-    duration = perf_counter() - started
-    HTTP_REQUESTS.labels(request.method, path, str(response.status_code)).inc()
-    HTTP_DURATION.labels(request.method, path).observe(duration)
+    finally:
+        route = request.scope.get("route")
+        path = getattr(route, "path", request.url.path)
+        duration = perf_counter() - started
+        HTTP_REQUESTS.labels(request.method, path, str(status_code)).inc()
+        HTTP_DURATION.labels(request.method, path).observe(duration)
     response.headers["X-Request-Id"] = request_id
     logger.info(
         "request completed",

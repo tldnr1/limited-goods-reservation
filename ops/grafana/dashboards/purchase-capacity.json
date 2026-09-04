@@ -1,0 +1,143 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "sum(rate(limited_goods_http_requests_total{method=\"POST\",path=\"/purchases\"}[10s]))",
+          "legendFormat": "HTTP requests",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (outcome) (rate(limited_goods_purchase_outcomes_total[10s]))",
+          "legendFormat": "purchase {{outcome}}",
+          "refId": "B"
+        }
+      ],
+      "title": "처리량: 요청과 구매 결과",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(limited_goods_http_request_duration_seconds_bucket{method=\"POST\",path=\"/purchases\"}[10s])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(limited_goods_http_request_duration_seconds_bucket{method=\"POST\",path=\"/purchases\"}[10s])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(limited_goods_http_request_duration_seconds_bucket{method=\"POST\",path=\"/purchases\"}[10s])))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "title": "HTTP 응답 시간",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(limited_goods_purchase_stage_duration_seconds_bucket[10s])))",
+          "legendFormat": "{{stage}} p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(limited_goods_purchase_duration_seconds_bucket[10s])))",
+          "legendFormat": "service total p95",
+          "refId": "B"
+        }
+      ],
+      "title": "구매 내부 구간 응답 시간",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "limited_goods_db_pool_connections",
+          "legendFormat": "{{state}}",
+          "refId": "A"
+        },
+        {
+          "expr": "limited_goods_db_pool_capacity",
+          "legendFormat": "capacity",
+          "refId": "B"
+        }
+      ],
+      "title": "SQLAlchemy 연결 풀",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "cores" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 5,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "rate(process_cpu_seconds_total{job=\"limited-goods-api\"}[10s])",
+          "legendFormat": "API CPU",
+          "refId": "A"
+        }
+      ],
+      "title": "API 프로세스 CPU",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "id": 6,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "process_resident_memory_bytes{job=\"limited-goods-api\"}",
+          "legendFormat": "API RSS",
+          "refId": "A"
+        }
+      ],
+      "title": "API 프로세스 메모리",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "1s",
+  "schemaVersion": 39,
+  "tags": ["limited-goods", "capacity"],
+  "templating": { "list": [] },
+  "time": { "from": "now-5m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Purchase Capacity",
+  "uid": "purchase-capacity",
+  "version": 1,
+  "weekStart": ""
+}
