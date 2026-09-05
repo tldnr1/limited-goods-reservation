@@ -120,6 +120,8 @@ def create_purchase(
     request: PurchaseRequest,
 ) -> OrderView:
     fingerprint = purchase_fingerprint(request)
+    with observe_purchase_stage("connection_checkout"):
+        session.connection()
     with observe_purchase_stage("idempotency_lookup"):
         existing = session.scalar(
             select(Order).where(

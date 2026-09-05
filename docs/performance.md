@@ -44,13 +44,13 @@ Counter와 Histogram은 `/metrics`에서 계속 증가하는 누적값이다. �
 | 애플리케이션 | `limited_goods_http_request_duration_seconds` / Histogram | HTTP middleware | API 전체 p50·p95·p99 지연 | DB, 직렬화, 네트워크 중 원인 | service total과 구간별 지연 비교 |
 | 애플리케이션 | `limited_goods_purchase_outcomes_total` / Counter | 구매 서비스 진입부터 종료까지 | `created`, `reused`, `rejected`, `conflict`, `error` 비율 | 거절의 세부 사유와 DB 정합성 | 응답 error code, 로그, 사후 재고 조회 |
 | 애플리케이션 | `limited_goods_purchase_duration_seconds` / Histogram | 구매 서비스 전체 | FastAPI 바깥 비용을 제외한 구매 로직 지연 | 느린 내부 구간 | 구간별 Histogram |
-| 애플리케이션 | `limited_goods_purchase_stage_duration_seconds` / Histogram | 멱등 조회, 판매 조회, 재고 잠금 쿼리, 사용량 조회, commit 주위 | 어느 DB 구간의 시간이 함께 증가하는지 | `inventory_lock` 중 순수 lock wait와 쿼리 실행 시간의 분리 | PostgreSQL activity·lock 관측 |
+| 애플리케이션 | `limited_goods_purchase_stage_duration_seconds` / Histogram | 연결 획득, 멱등 조회, 판매 조회, 재고 잠금 쿼리, 사용량 조회, commit 주위 | 어느 DB 구간의 시간이 함께 증가하는지 | `connection_checkout`의 pool 대기와 pre-ping 분리, `inventory_lock` 중 순수 lock wait와 쿼리 실행 시간의 분리 | PostgreSQL activity·lock 관측 |
 | SQLAlchemy | `limited_goods_db_pool_connections` / Gauge | engine pool의 `checked_in`, `checked_out` 현재값 | 연결 사용량과 고갈 징후 | checkout 대기시간, 아주 짧은 포화 | pool timeout/checkout 계측과 PostgreSQL connection 확인 |
 | SQLAlchemy | `limited_goods_db_pool_capacity` / Gauge | pool 설정 `10 + 20` | 현재 API 프로세스가 열 수 있는 최대 연결 수 | 그 크기가 적절한지 | DB 동시 연결과 CPU를 함께 비교 |
 | 애플리케이션 런타임 | `process_cpu_seconds_total`, `process_resident_memory_bytes` / Counter·Gauge | Prometheus Python client 기본 collector | API 프로세스 CPU 사용률과 RSS 변화 | 컨테이너 제한, PostgreSQL·host 자원 | `docker stats`, host/container exporter |
 | k6 | `http_reqs`, `http_req_duration`, `checks`, `dropped_iterations` / Counter·Trend·Rate·Counter | 부하 발생기 | 보낸 요청 수, 클라이언트 지연, 201 비율, 목표 도착률 누락 | 서버 내부 원인 | 같은 시간대 Grafana 지표 |
 
-`inventory_lock`은 `SELECT ... FOR UPDATE` 호출 전체를 잰다. 이름과 달리 순수 잠금 대기시간만 재는 값은 아니다. 이 값이 커졌을 때 비로소 `pg_stat_activity`, `pg_locks` 같은 PostgreSQL 자체 관측으로 내려간다.
+`connection_checkout`은 첫 쿼리 전에 `Session.connection()`으로 연결을 얻는 전체 시간을 잰다. pool queue 대기가 주된 관심사지만 `pool_pre_ping`과 checkout 자체 비용도 포함한다. `inventory_lock`은 `SELECT ... FOR UPDATE` 호출 전체를 재므로 순수 잠금 대기시간만 뜻하지 않는다. 원인 진단 시 [`ops/performance/sample-postgres-waits.sql`](../ops/performance/sample-postgres-waits.sql)로 `pg_stat_activity`, `pg_blocking_pids`, 미획득 `pg_locks`를 실행 중에 함께 표본 수집한다.
 
 ### 지금은 수집하지 않는 것
 
