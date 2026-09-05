@@ -156,17 +156,48 @@ def create_purchase(
             )
 
         requested = {item.sale_item_id: item.quantity for item in request.items}
-        with observe_purchase_stage("inventory_lock"):
-            rows = session.execute(
-                select(SaleItem, Inventory)
-                .join(Inventory, Inventory.sale_item_id == SaleItem.id)
-                .where(SaleItem.id.in_(sorted(requested, key=str)))
-                .order_by(SaleItem.id)
-                .with_for_update(of=Inventory)
-            ).all()
-        if len(rows) != len(requested) or any(
-            item.sale_event_id != request.sale_event_id for item, _ in rows
+        items = session.scalars(
+            select(SaleItem)
+            .where(SaleItem.id.in_(requested))
+            .order_by(SaleItem.id)
+        ).all()
+        if len(items) != len(requested) or any(
+            item.sale_event_id != request.sale_event_id for item in items
         ):
+            raise AppError(
+                400,
+                "INVALID_SALE_ITEMS",
+                "요청 상품이 존재하지 않거나 판매에 속하지 않습니다.",
+            )
+
+        order = Order(
+            user_id=user_id,
+            sale_event_id=request.sale_event_id,
+            status=OrderStatus.PAYMENT_PENDING,
+            total_amount=sum(item.price * requested[item.id] for item in items),
+            idempotency_key=idempotency_key,
+            request_fingerprint=fingerprint,
+        )
+        for item in items:
+            order.items.append(
+                OrderItem(
+                    sale_item_id=item.id,
+                    quantity=requested[item.id],
+                    unit_price=item.price,
+                )
+            )
+        session.add(order)
+        session.flush()
+
+        with observe_purchase_stage("inventory_lock"):
+            inventories = session.scalars(
+                select(Inventory)
+                .where(Inventory.sale_item_id.in_(requested))
+                .order_by(Inventory.sale_item_id)
+                .with_for_update(of=Inventory)
+                .execution_options(populate_existing=True)
+            ).all()
+        if len(inventories) != len(requested):
             raise AppError(
                 400,
                 "INVALID_SALE_ITEMS",
@@ -180,6 +211,7 @@ def create_purchase(
                 .where(
                     Order.user_id == user_id,
                     Order.status.in_(OrderStatus.COUNTING),
+                    Order.id != order.id,
                     OrderItem.sale_item_id.in_(requested),
                 )
                 .group_by(OrderItem.sale_item_id)
@@ -187,8 +219,7 @@ def create_purchase(
         usage = {sale_item_id: quantity for sale_item_id, quantity in usage_rows}
 
         failures: list[dict[str, object]] = []
-        total_amount = 0
-        for item, inventory in rows:
+        for item, inventory in zip(items, inventories, strict=True):
             quantity = requested[item.id]
             used = int(usage.get(item.id, 0))
             if quantity > inventory.available_quantity:
@@ -207,7 +238,6 @@ def create_purchase(
                         "remaining_limit": max(item.per_user_limit - used, 0),
                     }
                 )
-            total_amount += item.price * quantity
 
         if failures:
             RESERVATIONS.labels(outcome="rejected").inc()
@@ -218,31 +248,15 @@ def create_purchase(
                 {"failures": failures},
             )
 
-        order = Order(
-            user_id=user_id,
-            sale_event_id=request.sale_event_id,
-            status=OrderStatus.PAYMENT_PENDING,
-            total_amount=total_amount,
-            idempotency_key=idempotency_key,
-            request_fingerprint=fingerprint,
-        )
-        for item, inventory in rows:
-            quantity = requested[item.id]
+        for inventory in inventories:
+            quantity = requested[inventory.sale_item_id]
             inventory.available_quantity -= quantity
             inventory.held_quantity += quantity
-            order.items.append(
-                OrderItem(
-                    sale_item_id=item.id,
-                    quantity=quantity,
-                    unit_price=item.price,
-                )
-            )
         order.reservation = Reservation(
             status=ReservationStatus.ACTIVE,
             hold_expires_at=now
             + timedelta(seconds=get_settings().reservation_ttl_seconds),
         )
-        session.add(order)
         with observe_purchase_stage("commit"):
             session.commit()
     except IntegrityError:
