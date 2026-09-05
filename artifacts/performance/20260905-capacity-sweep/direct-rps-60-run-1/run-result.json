@@ -1,0 +1,42 @@
+{
+  "network": "compose-direct",
+  "rate": 60,
+  "run": 1,
+  "start": "2026-09-05T15:53:17.9728029+09:00",
+  "end": "2026-09-05T15:54:20.1673626+09:00",
+  "k6_exit": 0,
+  "iterations": 3589,
+  "actual_rate": 59.123854103043335,
+  "checks_passed": 3589,
+  "checks_failed": 0,
+  "http_failed": 0,
+  "dropped": 12,
+  "avg_ms": 410.5252213100285,
+  "p95_ms": 1793.6642668499994,
+  "max_ms": 3143.631672,
+  "sale_id": "96254c8c-8f51-4fe6-b1a0-780e6a63ac7a",
+  "total": 1000000,
+  "available": 996411,
+  "held": 3589,
+  "sold": 0,
+  "invariant_sum": 1000000,
+  "host_cpu_avg": 23.76,
+  "host_cpu_max": 68.35,
+  "container_cpu": [
+    {
+      "Name": "limited-goods-k6-capacity",
+      "MaxCPU": 9.83,
+      "AvgCPU": 6.7
+    },
+    {
+      "Name": "limited-goods-next-api-1",
+      "MaxCPU": 167.32,
+      "AvgCPU": 92.47
+    },
+    {
+      "Name": "limited-goods-next-db-1",
+      "MaxCPU": 44.4,
+      "AvgCPU": 28.35
+    }
+  ]
+}

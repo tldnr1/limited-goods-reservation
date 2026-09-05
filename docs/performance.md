@@ -117,7 +117,7 @@ export PRE_ALLOCATED_VUS="20"
 k6 run k6/capacity/purchase.js
 ```
 
-Apple Silicon에서도 Compose가 각 이미지의 ARM64 variant를 자동으로 선택한다. k6를 Docker 컨테이너로 실행하는 경우에만 `localhost`가 API 컨테이너가 아닌 k6 컨테이너 자신을 가리키므로 `BASE_URL=http://host.docker.internal:8000`처럼 바꿔야 한다. 첫 학습 실행은 위의 macOS native k6 방식을 기준으로 한다.
+Apple Silicon에서도 Compose가 각 이미지의 ARM64 variant를 자동으로 선택한다. k6를 Docker 컨테이너로 실행하면 `localhost`는 API가 아니라 k6 컨테이너 자신을 가리킨다. 이때는 k6를 Compose network에 연결하고 `BASE_URL=http://api:8000`을 사용한다. 첫 학습 실행은 위의 macOS native k6 방식을 기준으로 한다.
 
 k6는 open model인 `constant-arrival-rate`로 응답이 느려져도 초당 시작할 iteration 수를 유지하려 한다. `dropped_iterations`가 0이 아니면 서버 capacity라고 결론 내리기 전에 `PRE_ALLOCATED_VUS`와 부하 발생기 CPU가 충분한지 먼저 확인한다. 기본 VU는 20으로 고정했다. RPS만큼 VU를 자동 생성하면 단순한 요청에서도 부하 발생기 메모리와 CPU를 불필요하게 사용하므로, 실제 지연과 dropped 여부를 보고 명시적으로 올린다.
 
@@ -186,7 +186,7 @@ Grafana의 10초 `rate()`와 Histogram 분위수는 시간에 따른 모양을 �
      "http://localhost:3000/d/purchase-capacity/purchase-capacity?orgId=1&from=now-5m&to=now"
    ```
 
-4. 결과 폴더를 만든 뒤 k6를 Docker로 실행한다. k6 컨테이너에서 Windows host의 API를 부르므로 `host.docker.internal`을 사용한다.
+4. 결과 폴더를 만든 뒤 k6를 Docker로 실행한다. 최초 smoke에서는 `host.docker.internal`을 사용했지만, 이후 탐색에서 Windows published-port 경로의 연결 오류가 관측됐다. 재실행할 때는 k6를 Compose network에 직접 연결해 같은 조건을 사용한다.
 
    ```powershell
    $runId = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -195,7 +195,8 @@ Grafana의 10초 `rate()`와 Histogram 분위수는 시간에 따른 모양을 �
    $testStart = Get-Date
 
    docker run --rm `
-     -e BASE_URL=http://host.docker.internal:8000 `
+     --network limited-goods-next_default `
+     -e BASE_URL=http://api:8000 `
      -e RATE=10 `
      -e DURATION=60s `
      -e STOCK=1000000 `
@@ -298,7 +299,8 @@ warm-up은 같은 구매 스크립트를 별도 k6 process로 20초 실행한다
 
 ```powershell
 docker run --rm --name limited-goods-k6-warmup `
-  -e BASE_URL=http://host.docker.internal:8000 `
+  --network limited-goods-next_default `
+  -e BASE_URL=http://api:8000 `
   -e PHASE=warmup `
   -e RATE=10 `
   -e DURATION=20s `
@@ -318,7 +320,8 @@ $resultDir = Join-Path $PWD "artifacts/performance/$runId-capacity-r10"
 New-Item -ItemType Directory -Path $resultDir | Out-Null
 
 docker run --rm --name limited-goods-k6-capacity `
-  -e BASE_URL=http://host.docker.internal:8000 `
+  --network limited-goods-next_default `
+  -e BASE_URL=http://api:8000 `
   -e PHASE=measurement `
   -e RATE=10 `
   -e DURATION=60s `
@@ -349,6 +352,36 @@ docker stats limited-goods-k6-capacity `
 - 경계 구간은 k6를 다른 장비에서 다시 실행해 같은 처리량과 지연 형태가 나오는지 확인한다.
 
 한 host에서 찾은 첫 이상 구간은 탐색 결과다. 포트폴리오의 비교 근거로 채택할 때는 같은 RPS를 반복하고 k6·API·DB·host 자원을 함께 기록한다.
+
+## 첫 capacity 탐색 결과
+
+2026-09-05 Windows 로컬 환경에서 `POST /purchases`의 단일 상품 신규 구매 성공 경로를 측정했다. 매 run 전에 `limited_goods_perf`를 초기화하고 `10 RPS × 20초` warm-up, 15초 분리, 60초 본 측정을 적용했다. 재고는 1,000,000개, VU는 100개였으며 Worker와 결제 흐름은 제외했다.
+
+게임·Discord·게임 launcher는 실행 중이지 않았다. Wallpaper Engine과 Riot Vanguard tray는 백그라운드에 남아 있었다. Docker Desktop에는 12 logical CPU와 약 7.7 GiB 메모리가 할당돼 있었고 Codex, ChatGPT, Chrome, NVIDIA Broadcast도 실행 중이었으므로 결과는 이 로컬 구성 전체의 값이다.
+
+초기 탐색에서는 k6가 `host.docker.internal:8000`을 통해 Windows published port로 접근했다. 55~60 RPS에서 30초 부근의 연결 timeout이 반복돼 이 경로의 결과는 capacity 판단에서 제외했다. 공식 결과는 k6를 `limited-goods-next_default`에 연결하고 `http://api:8000`으로 호출해 Windows port proxy를 우회한 run만 사용한다.
+
+| 목표 RPS | 반복 | 실제 구매/s | dropped | HTTP 실패 | k6 HTTP p95 / max | pool peak | k6 CPU 평균 | 결과 |
+|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 50 | 1 | 49.995 | 0 | 0 | 18.91 / 80.11 ms | 2 | 5.61% | 정상 |
+| 55 | 1 | 54.942 | 0 | 0 | 31.24 / 158.52 ms | 5 | 6.70% | 정상 |
+| 55 | 2 | 54.977 | 0 | 0 | 61.62 / 306.65 ms | 4 | 6.52% | 정상, tail 변동 있음 |
+| 55 | 3 | 54.994 | 0 | 0 | 20.87 / 176.12 ms | 2 | 6.12% | 정상 |
+| 60 | 1 | 59.124 | 12 | 0 | 1,793.66 / 3,143.63 ms | 30 | 6.70% | 포화 |
+
+55 RPS는 세 번 모두 실패와 dropped 없이 목표 처리량을 유지했다. 세 run의 실제 처리량 평균은 54.971 RPS이고 p95 평균은 37.91 ms, 범위는 20.87~61.62 ms다. 모든 run에서 `available + held + sold = 1,000,000`과 `held = 성공 구매 수`가 유지됐다.
+
+60 RPS에서는 전송된 요청 3,589건은 모두 201이었지만, 12개 iteration을 시작하지 못했고 실제 처리량도 목표에 미달했다. p95는 1.79초로 비선형 상승했고 SQLAlchemy `checked_out`은 capacity 30에 도달했다. 같은 구간에서 Prometheus 기준 `idempotency_lookup` p95 최대 1.78초와 `inventory_lock` p95 최대 1.63초가 함께 나타났다. 앞 구간의 잠금 대기로 연결 점유 시간이 길어지고, 다음 요청의 connection 획득까지 밀리는 연쇄를 우선 의심할 수 있다. 다만 stage 계측만으로 순수 PostgreSQL lock wait를 확정할 수는 없으므로 개선안을 고르기 전 `pg_stat_activity`와 `pg_locks` 관측이 필요하다.
+
+k6 CPU 평균은 경계 구간에서도 약 6~7%였고 host CPU도 지속 포화되지 않았다. API와 PostgreSQL 로그에서도 오류는 발견되지 않았다. 따라서 이번 60 RPS 이상 징후는 부하 발생기 CPU 한계나 서버 오류보다는 서비스 내부 대기와 연결 풀 포화로 보는 편이 타당하다. 60 RPS 첫 회차가 중단 조건을 이미 충족했으므로 같은 과부하를 세 번 반복하지 않았고, 마지막 정상 후보인 55 RPS만 세 번 확인했다.
+
+이번 결과는 하나의 hot Inventory 행을 비관적 lock으로 처리하는 로컬 단일 API 구성의 범위다. 보편적인 서비스 capacity를 55 RPS라고 단정하지 않고, **반복 확인된 정상 하한은 55 RPS, 첫 불안정 구간은 60 RPS**라고 기록한다.
+
+- [실험 전체 요약](../artifacts/performance/20260905-capacity-sweep/sweep-summary.json)
+- [55 RPS 대표 Grafana 화면](../artifacts/performance/20260905-capacity-sweep/grafana-direct-rps55-representative.png)
+- [60 RPS 포화 Grafana 화면](../artifacts/performance/20260905-capacity-sweep/grafana-direct-rps60-saturation.png)
+- [직접 network run 전체 Grafana 화면](../artifacts/performance/20260905-capacity-sweep/grafana-direct-overview.png)
+- 각 run의 k6·Prometheus·자원·재고 결과: [`artifacts/performance/20260905-capacity-sweep`](../artifacts/performance/20260905-capacity-sweep)
 
 ## 실행 환경을 언제 분리할까
 

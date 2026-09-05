@@ -1,0 +1,29 @@
+{
+  "run": "direct-rps-55-run-3",
+  "throughput_max_rps": 55.22,
+  "http_p95_max_ms": 48.75,
+  "pool_checked_out_max": 2.0,
+  "api_cpu_cores_max": 0.531,
+  "stage_p95_max": [
+    {
+      "stage": "commit",
+      "max_p95_ms": 9.75
+    },
+    {
+      "stage": "idempotency_lookup",
+      "max_p95_ms": 4.8
+    },
+    {
+      "stage": "inventory_lock",
+      "max_p95_ms": 4.87
+    },
+    {
+      "stage": "sale_lookup",
+      "max_p95_ms": 4.77
+    },
+    {
+      "stage": "usage_lookup",
+      "max_p95_ms": 9.42
+    }
+  ]
+}
