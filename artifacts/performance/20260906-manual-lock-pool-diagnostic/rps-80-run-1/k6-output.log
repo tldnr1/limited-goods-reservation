@@ -1,0 +1,378 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: /scripts/capacity/purchase.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 200 max VUs, 1m10s max duration (incl. graceful stop):
+              * purchase_capacity: 80.00 iterations/s for 1m0s (maxVUs: 200, gracefulStop: 10s)
+
+time="2026-09-05T15:09:23Z" level=info msg="measurement sale_event_id=8c937683-c84b-4b35-99a6-265f1e15b09f sale_item_id=33a1e57c-bd7f-426c-a0bb-e04992b7b1e7" source=console
+
+running (0m01.0s), 040/200 VUs, 38 complete and 0 interrupted iterations
+purchase_capacity   [   2% ] 040/200 VUs  0m01.0s/1m0s  80.00 iters/s
+
+running (0m02.0s), 072/200 VUs, 86 complete and 0 interrupted iterations
+purchase_capacity   [   3% ] 072/200 VUs  0m02.0s/1m0s  80.00 iters/s
+
+running (0m03.0s), 092/200 VUs, 146 complete and 0 interrupted iterations
+purchase_capacity   [   5% ] 092/200 VUs  0m03.0s/1m0s  80.00 iters/s
+
+running (0m04.0s), 111/200 VUs, 207 complete and 0 interrupted iterations
+purchase_capacity   [   7% ] 111/200 VUs  0m04.0s/1m0s  80.00 iters/s
+
+running (0m05.0s), 136/200 VUs, 262 complete and 0 interrupted iterations
+purchase_capacity   [   8% ] 136/200 VUs  0m05.0s/1m0s  80.00 iters/s
+time="2026-09-05T15:09:29Z" level=warning msg="Insufficient VUs, reached 200 active VUs and cannot initialize more" executor=constant-arrival-rate scenario=purchase_capacity
+
+running (0m06.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  10% ] 200/200 VUs  0m06.0s/1m0s  80.00 iters/s
+
+running (0m07.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  12% ] 200/200 VUs  0m07.0s/1m0s  80.00 iters/s
+
+running (0m08.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  13% ] 200/200 VUs  0m08.0s/1m0s  80.00 iters/s
+
+running (0m09.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  15% ] 200/200 VUs  0m09.0s/1m0s  80.00 iters/s
+
+running (0m10.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  17% ] 200/200 VUs  0m10.0s/1m0s  80.00 iters/s
+
+running (0m11.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  18% ] 200/200 VUs  0m11.0s/1m0s  80.00 iters/s
+
+running (0m12.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  20% ] 200/200 VUs  0m12.0s/1m0s  80.00 iters/s
+
+running (0m13.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  22% ] 200/200 VUs  0m13.0s/1m0s  80.00 iters/s
+
+running (0m14.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  23% ] 200/200 VUs  0m14.0s/1m0s  80.00 iters/s
+
+running (0m15.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  25% ] 200/200 VUs  0m15.0s/1m0s  80.00 iters/s
+
+running (0m16.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  27% ] 200/200 VUs  0m16.0s/1m0s  80.00 iters/s
+
+running (0m17.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  28% ] 200/200 VUs  0m17.0s/1m0s  80.00 iters/s
+
+running (0m18.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  30% ] 200/200 VUs  0m18.0s/1m0s  80.00 iters/s
+
+running (0m19.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  32% ] 200/200 VUs  0m19.0s/1m0s  80.00 iters/s
+
+running (0m20.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  33% ] 200/200 VUs  0m20.0s/1m0s  80.00 iters/s
+
+running (0m21.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  35% ] 200/200 VUs  0m21.0s/1m0s  80.00 iters/s
+
+running (0m22.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  37% ] 200/200 VUs  0m22.0s/1m0s  80.00 iters/s
+
+running (0m23.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  38% ] 200/200 VUs  0m23.0s/1m0s  80.00 iters/s
+
+running (0m24.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  40% ] 200/200 VUs  0m24.0s/1m0s  80.00 iters/s
+
+running (0m25.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  42% ] 200/200 VUs  0m25.0s/1m0s  80.00 iters/s
+
+running (0m26.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  43% ] 200/200 VUs  0m26.0s/1m0s  80.00 iters/s
+
+running (0m27.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  45% ] 200/200 VUs  0m27.0s/1m0s  80.00 iters/s
+
+running (0m28.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  47% ] 200/200 VUs  0m28.0s/1m0s  80.00 iters/s
+
+running (0m29.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  48% ] 200/200 VUs  0m29.0s/1m0s  80.00 iters/s
+
+running (0m30.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  50% ] 200/200 VUs  0m30.0s/1m0s  80.00 iters/s
+
+running (0m31.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  52% ] 200/200 VUs  0m31.0s/1m0s  80.00 iters/s
+
+running (0m32.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  53% ] 200/200 VUs  0m32.0s/1m0s  80.00 iters/s
+
+running (0m33.0s), 200/200 VUs, 273 complete and 0 interrupted iterations
+purchase_capacity   [  55% ] 200/200 VUs  0m33.0s/1m0s  80.00 iters/s
+
+running (0m34.0s), 200/200 VUs, 276 complete and 0 interrupted iterations
+purchase_capacity   [  57% ] 200/200 VUs  0m34.0s/1m0s  80.00 iters/s
+
+running (0m35.0s), 200/200 VUs, 316 complete and 0 interrupted iterations
+purchase_capacity   [  58% ] 200/200 VUs  0m35.0s/1m0s  80.00 iters/s
+
+running (0m36.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  60% ] 200/200 VUs  0m36.0s/1m0s  80.00 iters/s
+
+running (0m37.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  62% ] 200/200 VUs  0m37.0s/1m0s  80.00 iters/s
+
+running (0m38.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  63% ] 200/200 VUs  0m38.0s/1m0s  80.00 iters/s
+
+running (0m39.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  65% ] 200/200 VUs  0m39.0s/1m0s  80.00 iters/s
+
+running (0m40.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  67% ] 200/200 VUs  0m40.0s/1m0s  80.00 iters/s
+
+running (0m41.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  68% ] 200/200 VUs  0m41.0s/1m0s  80.00 iters/s
+
+running (0m42.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  70% ] 200/200 VUs  0m42.0s/1m0s  80.00 iters/s
+
+running (0m43.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  72% ] 200/200 VUs  0m43.0s/1m0s  80.00 iters/s
+
+running (0m44.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  73% ] 200/200 VUs  0m44.0s/1m0s  80.00 iters/s
+
+running (0m45.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  75% ] 200/200 VUs  0m45.0s/1m0s  80.00 iters/s
+
+running (0m46.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  77% ] 200/200 VUs  0m46.0s/1m0s  80.00 iters/s
+
+running (0m47.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  78% ] 200/200 VUs  0m47.0s/1m0s  80.00 iters/s
+
+running (0m48.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  80% ] 200/200 VUs  0m48.0s/1m0s  80.00 iters/s
+
+running (0m49.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  82% ] 200/200 VUs  0m49.0s/1m0s  80.00 iters/s
+
+running (0m50.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  83% ] 200/200 VUs  0m50.0s/1m0s  80.00 iters/s
+
+running (0m51.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  85% ] 200/200 VUs  0m51.0s/1m0s  80.00 iters/s
+
+running (0m52.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  87% ] 200/200 VUs  0m52.0s/1m0s  80.00 iters/s
+
+running (0m53.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  88% ] 200/200 VUs  0m53.0s/1m0s  80.00 iters/s
+
+running (0m54.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  90% ] 200/200 VUs  0m54.0s/1m0s  80.00 iters/s
+
+running (0m55.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  92% ] 200/200 VUs  0m55.0s/1m0s  80.00 iters/s
+
+running (0m56.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  93% ] 200/200 VUs  0m56.0s/1m0s  80.00 iters/s
+
+running (0m57.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  95% ] 200/200 VUs  0m57.0s/1m0s  80.00 iters/s
+
+running (0m58.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  97% ] 200/200 VUs  0m58.0s/1m0s  80.00 iters/s
+
+running (0m59.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [  98% ] 200/200 VUs  0m59.0s/1m0s  80.00 iters/s
+
+running (1m00.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity   [ 100% ] 200/200 VUs  1m00.0s/1m0s  80.00 iters/s
+
+running (1m01.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  80.00 iters/s
+
+running (1m02.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  80.00 iters/s
+
+running (1m03.0s), 200/200 VUs, 350 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  80.00 iters/s
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+
+running (1m04.0s), 199/200 VUs, 351 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  80.00 iters/s
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:27Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+
+running (1m05.0s), 153/200 VUs, 397 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  80.00 iters/s
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:28Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:29Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:29Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+time="2026-09-05T15:10:29Z" level=warning msg="Request Failed" error="Post \"http://api:8000/purchases\": request timeout"
+
+running (1m06.0s), 077/200 VUs, 473 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  80.00 iters/s
+
+running (1m07.0s), 077/200 VUs, 473 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  80.00 iters/s
+
+running (1m08.0s), 077/200 VUs, 473 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  80.00 iters/s
+
+running (1m09.0s), 077/200 VUs, 473 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  80.00 iters/s
+
+running (1m10.0s), 077/200 VUs, 473 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  80.00 iters/s
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 473    6.756072/s
+    checks_succeeded...: 69.76% 330 out of 473
+    checks_failed......: 30.23% 143 out of 473
+
+    ✗ purchase created
+      ↳  69% — ✓ 330 / ✗ 143
+
+    HTTP
+    http_req_duration..............: avg=21.19s min=9.88ms  med=1.52s max=59.99s p(90)=59.99s p(95)=59.99s
+      { expected_response:true }...: avg=6.18s  min=9.88ms  med=1.23s max=31.61s p(90)=30.84s p(95)=31.16s
+    http_req_failed................: 30.16% 143 out of 474
+    http_reqs......................: 474    6.770356/s
+
+    EXECUTION
+    dropped_iterations.............: 4251   60.71895/s
+    iteration_duration.............: avg=21.23s min=28.36ms med=1.52s max=1m0s   p(90)=1m0s   p(95)=1m0s  
+    iterations.....................: 473    6.756072/s
+    vus............................: 77     min=39         max=200
+    vus_max........................: 200    min=200        max=200
+
+    NETWORK
+    data_received..................: 240 kB 3.4 kB/s
+    data_sent......................: 219 kB 3.1 kB/s
+
+
+
+
+running (1m10.0s), 000/200 VUs, 473 complete and 77 interrupted iterations
+purchase_capacity ✓ [ 100% ] 077/200 VUs  1m0s  80.00 iters/s

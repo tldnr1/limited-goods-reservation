@@ -1,0 +1,19 @@
+=== docker info ===
+ CPUs: 12
+ Total Memory: 7.715GiB
+
+=== compose ps ===
+NAME                              IMAGE                        COMMAND                   SERVICE      CREATED          STATUS                    PORTS
+limited-goods-next-api-1          limited-goods-next-api       "uvicorn limited_goo…"   api          16 minutes ago   Up 16 minutes (healthy)   0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp
+limited-goods-next-db-1           postgres:16-alpine           "docker-entrypoint.s…"   db           16 minutes ago   Up 16 minutes (healthy)   0.0.0.0:5434->5432/tcp, [::]:5434->5432/tcp
+limited-goods-next-grafana-1      grafana/grafana:11.2.2       "/run.sh"                 grafana      16 minutes ago   Up 16 minutes             0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp
+limited-goods-next-mock-pg-1      limited-goods-next-mock-pg   "uvicorn limited_goo…"   mock-pg      16 minutes ago   Up 16 minutes (healthy)   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+limited-goods-next-prometheus-1   prom/prometheus:v2.55.1      "/bin/prometheus --c…"   prometheus   16 minutes ago   Up 16 minutes             0.0.0.0:9090->9090/tcp, [::]:9090->9090/tcp
+
+=== docker stats ===
+NAME                              CPU %     MEM USAGE / LIMIT     MEM %
+limited-goods-next-grafana-1      4.97%     64.75MiB / 7.715GiB   0.82%
+limited-goods-next-prometheus-1   2.98%     43.53MiB / 7.715GiB   0.55%
+limited-goods-next-api-1          12.37%    83.7MiB / 7.715GiB    1.06%
+limited-goods-next-db-1           0.00%     50.78MiB / 7.715GiB   0.64%
+limited-goods-next-mock-pg-1      22.14%    38.61MiB / 7.715GiB   0.49%

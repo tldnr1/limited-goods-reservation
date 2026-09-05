@@ -1,0 +1,260 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: /scripts/capacity/purchase.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 200 max VUs, 1m10s max duration (incl. graceful stop):
+              * purchase_capacity: 70.00 iterations/s for 1m0s (maxVUs: 200, gracefulStop: 10s)
+
+time="2026-09-05T14:54:27Z" level=info msg="measurement sale_event_id=f93aada7-833d-4d01-91d7-b01f378d0d95 sale_item_id=f874d945-c191-443e-90a1-e6351e800b58" source=console
+
+running (0m01.0s), 002/200 VUs, 66 complete and 0 interrupted iterations
+purchase_capacity   [   2% ] 002/200 VUs  0m01.0s/1m0s  70.00 iters/s
+
+running (0m02.0s), 006/200 VUs, 132 complete and 0 interrupted iterations
+purchase_capacity   [   3% ] 006/200 VUs  0m02.0s/1m0s  70.00 iters/s
+
+running (0m03.0s), 015/200 VUs, 193 complete and 0 interrupted iterations
+purchase_capacity   [   5% ] 015/200 VUs  0m03.0s/1m0s  70.00 iters/s
+
+running (0m04.0s), 020/200 VUs, 258 complete and 0 interrupted iterations
+purchase_capacity   [   7% ] 020/200 VUs  0m04.0s/1m0s  70.00 iters/s
+
+running (0m05.0s), 022/200 VUs, 326 complete and 0 interrupted iterations
+purchase_capacity   [   8% ] 022/200 VUs  0m05.0s/1m0s  70.00 iters/s
+
+running (0m06.0s), 023/200 VUs, 395 complete and 0 interrupted iterations
+purchase_capacity   [  10% ] 023/200 VUs  0m06.0s/1m0s  70.00 iters/s
+
+running (0m07.0s), 038/200 VUs, 450 complete and 0 interrupted iterations
+purchase_capacity   [  12% ] 038/200 VUs  0m07.0s/1m0s  70.00 iters/s
+
+running (0m08.0s), 036/200 VUs, 522 complete and 0 interrupted iterations
+purchase_capacity   [  13% ] 036/200 VUs  0m08.0s/1m0s  70.00 iters/s
+
+running (0m09.0s), 039/200 VUs, 589 complete and 0 interrupted iterations
+purchase_capacity   [  15% ] 039/200 VUs  0m09.0s/1m0s  70.00 iters/s
+
+running (0m10.0s), 047/200 VUs, 651 complete and 0 interrupted iterations
+purchase_capacity   [  17% ] 047/200 VUs  0m10.0s/1m0s  70.00 iters/s
+
+running (0m11.0s), 055/200 VUs, 713 complete and 0 interrupted iterations
+purchase_capacity   [  18% ] 055/200 VUs  0m11.0s/1m0s  70.00 iters/s
+
+running (0m12.0s), 063/200 VUs, 775 complete and 0 interrupted iterations
+purchase_capacity   [  20% ] 063/200 VUs  0m12.0s/1m0s  70.00 iters/s
+
+running (0m13.0s), 061/200 VUs, 847 complete and 0 interrupted iterations
+purchase_capacity   [  22% ] 061/200 VUs  0m13.0s/1m0s  70.00 iters/s
+
+running (0m14.0s), 068/200 VUs, 910 complete and 0 interrupted iterations
+purchase_capacity   [  23% ] 068/200 VUs  0m14.0s/1m0s  70.00 iters/s
+
+running (0m15.0s), 076/200 VUs, 972 complete and 0 interrupted iterations
+purchase_capacity   [  25% ] 076/200 VUs  0m15.0s/1m0s  70.00 iters/s
+
+running (0m16.0s), 080/200 VUs, 1038 complete and 0 interrupted iterations
+purchase_capacity   [  27% ] 080/200 VUs  0m16.0s/1m0s  70.00 iters/s
+
+running (0m17.0s), 085/200 VUs, 1103 complete and 0 interrupted iterations
+purchase_capacity   [  28% ] 085/200 VUs  0m17.0s/1m0s  70.00 iters/s
+
+running (0m18.0s), 088/200 VUs, 1170 complete and 0 interrupted iterations
+purchase_capacity   [  30% ] 088/200 VUs  0m18.0s/1m0s  70.00 iters/s
+
+running (0m19.0s), 094/200 VUs, 1234 complete and 0 interrupted iterations
+purchase_capacity   [  32% ] 094/200 VUs  0m19.0s/1m0s  70.00 iters/s
+
+running (0m20.0s), 100/200 VUs, 1298 complete and 0 interrupted iterations
+purchase_capacity   [  33% ] 100/200 VUs  0m20.0s/1m0s  70.00 iters/s
+
+running (0m21.0s), 106/200 VUs, 1362 complete and 0 interrupted iterations
+purchase_capacity   [  35% ] 106/200 VUs  0m21.0s/1m0s  70.00 iters/s
+
+running (0m22.0s), 111/200 VUs, 1427 complete and 0 interrupted iterations
+purchase_capacity   [  37% ] 111/200 VUs  0m22.0s/1m0s  70.00 iters/s
+
+running (0m23.0s), 118/200 VUs, 1490 complete and 0 interrupted iterations
+purchase_capacity   [  38% ] 118/200 VUs  0m23.0s/1m0s  70.00 iters/s
+
+running (0m24.0s), 163/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  40% ] 163/200 VUs  0m24.0s/1m0s  70.00 iters/s
+time="2026-09-05T14:54:52Z" level=warning msg="Insufficient VUs, reached 200 active VUs and cannot initialize more" executor=constant-arrival-rate scenario=purchase_capacity
+
+running (0m25.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  42% ] 200/200 VUs  0m25.0s/1m0s  70.00 iters/s
+
+running (0m26.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  43% ] 200/200 VUs  0m26.0s/1m0s  70.00 iters/s
+
+running (0m27.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  45% ] 200/200 VUs  0m27.0s/1m0s  70.00 iters/s
+
+running (0m28.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  47% ] 200/200 VUs  0m28.0s/1m0s  70.00 iters/s
+
+running (0m29.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  48% ] 200/200 VUs  0m29.0s/1m0s  70.00 iters/s
+
+running (0m30.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  50% ] 200/200 VUs  0m30.0s/1m0s  70.00 iters/s
+
+running (0m31.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  52% ] 200/200 VUs  0m31.0s/1m0s  70.00 iters/s
+
+running (0m32.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  53% ] 200/200 VUs  0m32.0s/1m0s  70.00 iters/s
+
+running (0m33.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  55% ] 200/200 VUs  0m33.0s/1m0s  70.00 iters/s
+
+running (0m34.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  57% ] 200/200 VUs  0m34.0s/1m0s  70.00 iters/s
+
+running (0m35.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  58% ] 200/200 VUs  0m35.0s/1m0s  70.00 iters/s
+
+running (0m36.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  60% ] 200/200 VUs  0m36.0s/1m0s  70.00 iters/s
+
+running (0m37.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  62% ] 200/200 VUs  0m37.0s/1m0s  70.00 iters/s
+
+running (0m38.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  63% ] 200/200 VUs  0m38.0s/1m0s  70.00 iters/s
+
+running (0m39.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  65% ] 200/200 VUs  0m39.0s/1m0s  70.00 iters/s
+
+running (0m40.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  67% ] 200/200 VUs  0m40.0s/1m0s  70.00 iters/s
+
+running (0m41.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  68% ] 200/200 VUs  0m41.0s/1m0s  70.00 iters/s
+
+running (0m42.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  70% ] 200/200 VUs  0m42.0s/1m0s  70.00 iters/s
+
+running (0m43.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  72% ] 200/200 VUs  0m43.0s/1m0s  70.00 iters/s
+
+running (0m44.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  73% ] 200/200 VUs  0m44.0s/1m0s  70.00 iters/s
+
+running (0m45.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  75% ] 200/200 VUs  0m45.0s/1m0s  70.00 iters/s
+
+running (0m46.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  77% ] 200/200 VUs  0m46.0s/1m0s  70.00 iters/s
+
+running (0m47.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  78% ] 200/200 VUs  0m47.0s/1m0s  70.00 iters/s
+
+running (0m48.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  80% ] 200/200 VUs  0m48.0s/1m0s  70.00 iters/s
+
+running (0m49.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  82% ] 200/200 VUs  0m49.0s/1m0s  70.00 iters/s
+
+running (0m50.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  83% ] 200/200 VUs  0m50.0s/1m0s  70.00 iters/s
+
+running (0m51.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  85% ] 200/200 VUs  0m51.0s/1m0s  70.00 iters/s
+
+running (0m52.0s), 200/200 VUs, 1515 complete and 0 interrupted iterations
+purchase_capacity   [  87% ] 200/200 VUs  0m52.0s/1m0s  70.00 iters/s
+
+running (0m53.0s), 200/200 VUs, 1552 complete and 0 interrupted iterations
+purchase_capacity   [  88% ] 200/200 VUs  0m53.0s/1m0s  70.00 iters/s
+
+running (0m54.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity   [  90% ] 200/200 VUs  0m54.0s/1m0s  70.00 iters/s
+
+running (0m55.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity   [  92% ] 200/200 VUs  0m55.0s/1m0s  70.00 iters/s
+
+running (0m56.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity   [  93% ] 200/200 VUs  0m56.0s/1m0s  70.00 iters/s
+
+running (0m57.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity   [  95% ] 200/200 VUs  0m57.0s/1m0s  70.00 iters/s
+
+running (0m58.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity   [  97% ] 200/200 VUs  0m58.0s/1m0s  70.00 iters/s
+
+running (0m59.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity   [  98% ] 200/200 VUs  0m59.0s/1m0s  70.00 iters/s
+
+running (1m00.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity   [ 100% ] 200/200 VUs  1m00.0s/1m0s  70.00 iters/s
+
+running (1m01.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  70.00 iters/s
+
+running (1m02.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  70.00 iters/s
+
+running (1m03.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  70.00 iters/s
+
+running (1m04.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  70.00 iters/s
+
+running (1m05.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  70.00 iters/s
+
+running (1m06.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  70.00 iters/s
+
+running (1m07.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  70.00 iters/s
+
+running (1m08.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  70.00 iters/s
+
+running (1m09.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  70.00 iters/s
+
+running (1m10.0s), 200/200 VUs, 1579 complete and 0 interrupted iterations
+purchase_capacity ↓ [ 100% ] 200/200 VUs  1m0s  70.00 iters/s
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 1579   22.551253/s
+    checks_succeeded...: 99.36% 1569 out of 1579
+    checks_failed......: 0.63%  10 out of 1579
+
+    ✗ purchase created
+      ↳  99% — ✓ 1569 / ✗ 10
+
+    HTTP
+    http_req_duration..............: avg=2.02s min=12.92ms med=881.51ms max=32.85s p(90)=1.71s p(95)=2.17s
+      { expected_response:true }...: avg=1.83s min=12.92ms med=875.51ms max=32.85s p(90)=1.68s p(95)=2.06s
+    http_req_failed................: 0.63%  10 out of 1580
+    http_reqs......................: 1580   22.565535/s
+
+    EXECUTION
+    dropped_iterations.............: 2421   34.576684/s
+    iteration_duration.............: avg=2.02s min=13.39ms med=882.14ms max=32.86s p(90)=1.71s p(95)=2.17s
+    iterations.....................: 1579   22.551253/s
+    vus............................: 200    min=2          max=200
+    vus_max........................: 200    min=200        max=200
+
+    NETWORK
+    data_received..................: 1.1 MB 16 kB/s
+    data_sent......................: 710 kB 10 kB/s
+
+
+
+
+running (1m10.0s), 000/200 VUs, 1579 complete and 200 interrupted iterations
+purchase_capacity ✓ [ 100% ] 200/200 VUs  1m0s  70.00 iters/s

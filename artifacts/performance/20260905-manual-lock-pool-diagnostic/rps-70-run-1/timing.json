@@ -1,0 +1,12 @@
+{
+  "rate_rps": 70,
+  "duration": "60s",
+  "pre_allocated_vus": 200,
+  "stock": 1000000,
+  "warmup_rate_rps": 10,
+  "warmup_duration": "20s",
+  "warmup_idle_seconds": 15,
+  "measurement_started_at": "2026-09-05T23:54:26+09:00",
+  "measurement_finished_at": "2026-09-05T23:55:38+09:00",
+  "docker_exit_code": 0
+}
