@@ -8,3 +8,4 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+artifacts/performance/**/k6-output.log

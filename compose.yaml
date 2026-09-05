@@ -1,7 +1,7 @@
 name: limited-goods-next
 
 x-app-environment: &app-environment
-  DATABASE_URL: postgresql+psycopg://limited_goods:limited_goods@db:5432/limited_goods
+  DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://limited_goods:limited_goods@db:5432/limited_goods}
   MOCK_PG_URL: http://mock-pg:8080
   MOCK_PG_CALLBACK_URL: http://api:8000/internal/payments/callback
   MOCK_PG_SECRET: local-mock-pg-secret

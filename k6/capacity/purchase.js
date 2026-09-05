@@ -6,9 +6,11 @@ const BASE_URL = __ENV.BASE_URL || 'http://localhost:8000';
 const RATE = Number(__ENV.RATE || 10);
 const DURATION = __ENV.DURATION || '60s';
 const STOCK = Number(__ENV.STOCK || 1000000);
-const PRE_ALLOCATED_VUS = Number(__ENV.PRE_ALLOCATED_VUS || Math.max(20, RATE));
+const PRE_ALLOCATED_VUS = Number(__ENV.PRE_ALLOCATED_VUS || 20);
+const PHASE = __ENV.PHASE || 'measurement';
 
 export const options = {
+  discardResponseBodies: true,
   scenarios: {
     purchase_capacity: {
       executor: 'constant-arrival-rate',
@@ -17,6 +19,7 @@ export const options = {
       duration: DURATION,
       preAllocatedVUs: PRE_ALLOCATED_VUS,
       gracefulStop: '10s',
+      tags: { phase: PHASE },
     },
   },
 };
@@ -25,7 +28,7 @@ export function setup() {
   const response = http.post(
     `${BASE_URL}/admin/sales`,
     JSON.stringify({
-      name: `capacity-${Date.now()}`,
+      name: `${PHASE}-${Date.now()}`,
       opens_at: new Date(Date.now() - 60000).toISOString(),
       items: [
         {
@@ -38,6 +41,7 @@ export function setup() {
     }),
     {
       headers: { 'Content-Type': 'application/json' },
+      responseType: 'text',
       tags: { name: 'POST /admin/sales' },
     },
   );
@@ -47,12 +51,12 @@ export function setup() {
   }
 
   const sale = response.json();
-  console.log(`capacity sale_event_id=${sale.id} sale_item_id=${sale.items[0].id}`);
+  console.log(`${PHASE} sale_event_id=${sale.id} sale_item_id=${sale.items[0].id}`);
   return { saleEventId: sale.id, saleItemId: sale.items[0].id };
 }
 
 export default function (data) {
-  const requestIdentity = `${data.saleItemId}-${exec.scenario.iterationInTest}`;
+  const requestIdentity = `${PHASE}-${data.saleItemId}-${exec.scenario.iterationInTest}`;
   const response = http.post(
     `${BASE_URL}/purchases`,
     JSON.stringify({

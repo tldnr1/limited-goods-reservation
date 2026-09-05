@@ -79,8 +79,10 @@ Compose를 시작하면 `http://localhost:3000`의 `Limited Goods / Purchase Cap
 ### 1. 고정할 조건
 
 - API 인스턴스 1개, SQLAlchemy pool `10 + 20`, PostgreSQL 1개
+- 애플리케이션 데이터는 전용 `limited_goods_perf` database 사용
 - 단일 상품, 수량 1, 충분한 재고, 요청마다 다른 사용자와 멱등키
 - Worker 중지, 결제 호출 없음
+- 본 측정 전 `10 RPS × 20초` warm-up과 15초 관측 분리 구간
 - 한 번의 run은 constant arrival rate 60초
 - run마다 k6 `setup()`이 새 SaleEvent와 SaleItem을 만든다
 
@@ -117,7 +119,7 @@ k6 run k6/capacity/purchase.js
 
 Apple Silicon에서도 Compose가 각 이미지의 ARM64 variant를 자동으로 선택한다. k6를 Docker 컨테이너로 실행하는 경우에만 `localhost`가 API 컨테이너가 아닌 k6 컨테이너 자신을 가리키므로 `BASE_URL=http://host.docker.internal:8000`처럼 바꿔야 한다. 첫 학습 실행은 위의 macOS native k6 방식을 기준으로 한다.
 
-k6는 open model인 `constant-arrival-rate`로 응답이 느려져도 초당 시작할 iteration 수를 유지하려 한다. `dropped_iterations`가 0이 아니면 서버 capacity라고 결론 내리기 전에 `PRE_ALLOCATED_VUS`와 부하 발생기 CPU가 충분한지 먼저 확인한다.
+k6는 open model인 `constant-arrival-rate`로 응답이 느려져도 초당 시작할 iteration 수를 유지하려 한다. `dropped_iterations`가 0이 아니면 서버 capacity라고 결론 내리기 전에 `PRE_ALLOCATED_VUS`와 부하 발생기 CPU가 충분한지 먼저 확인한다. 기본 VU는 20으로 고정했다. RPS만큼 VU를 자동 생성하면 단순한 요청에서도 부하 발생기 메모리와 CPU를 불필요하게 사용하므로, 실제 지연과 dropped 여부를 보고 명시적으로 올린다.
 
 ### 3. RPS를 올리는 방식
 
@@ -138,7 +140,7 @@ k6는 open model인 `constant-arrival-rate`로 응답이 느려져도 초당 시
 
 테스트가 끝나면 k6 setup 로그의 `sale_event_id`로 `GET /sales/{sale_id}`를 조회한다. Worker를 멈춘 성공 경로에서는 `available + held + sold = total`이고, 생성된 구매 수와 `held` 증가량이 같아야 한다. 성능 수치보다 이 정합성 확인이 먼저다.
 
-현재 예제는 run마다 새 판매를 만들지만 이전 주문 데이터까지 지우지는 않는다. 학습용 첫 실행에는 충분하지만 공식 비교 결과를 남기기 전에는 동일한 DB snapshot에서 시작하는 초기화 방법을 별도로 합의해야 한다.
+탐색 실행도 아래의 전용 database 초기화와 고정 warm-up을 거친다. 그래야 RPS가 다른 run끼리 누적 주문 수와 시작 상태가 달라지지 않는다.
 
 ## 첫 smoke 실행 기록
 
@@ -243,7 +245,110 @@ Grafana의 10초 `rate()`와 Histogram 분위수는 시간에 따른 모양을 �
      $fixedUrl
    ```
 
-이번에는 `k6-summary.json`, 실행 로그, 메타데이터, 대표 Grafana PNG를 모두 작업 폴더에 남겼지만 아직 보관 정책으로 확정하지 않는다. 포트폴리오 기준으로는 요약 수치·실험 조건·해석과 대표 이미지 1장만 Git에 남기고, 반복 run의 전체 로그는 로컬 또는 별도 저장소에 두는 편을 우선 제안한다. 원본 전체가 필요한 실패 분석 run만 예외로 보관하면 기록은 재현 가능하면서도 저장소가 실험 부산물로 커지는 것을 막을 수 있다.
+첫 smoke는 측정 경로를 처음 검증한 근거라 `k6-summary.json`, 실행 로그, 메타데이터, 대표 Grafana PNG를 함께 보관한다. 이후 반복 run의 `k6-output.log`는 기본적으로 Git에서 제외하고, 결과 표·메타데이터·요약 JSON·대표 이미지 중 비교나 결정에 필요한 것만 커밋한다. 원문이 원인 분석의 근거인 실패 run만 로그를 예외로 보관한다.
+
+## 반복 capacity 실행 준비
+
+### 전용 database 만들기와 되돌리기
+
+성능 실험은 일반 로컬 데이터와 분리한 `limited_goods_perf`를 사용한다. 같은 PostgreSQL 컨테이너를 사용하되 database를 나누는 첫 단계 구성이다. `ops/performance/performance.env`를 함께 넘기면 API와 migration이 이 database를 바라본다.
+
+처음 한 번은 database를 만들고 migration을 적용한다. PowerShell에서는 SQL 파일을 표준 입력으로 전달한다.
+
+```powershell
+docker compose --env-file ops/performance/performance.env up -d db
+
+Get-Content ops/performance/create-database.sql -Raw |
+  docker compose --env-file ops/performance/performance.env exec -T db `
+  psql -U limited_goods -d postgres
+
+docker compose --env-file ops/performance/performance.env run --rm migrate
+```
+
+각 warm-up과 본 측정 묶음을 시작하기 전에는 애플리케이션 테이블만 비운다. SQL 자체가 현재 database 이름을 검사하므로 `limited_goods_perf`가 아니면 중단한다. PostgreSQL volume과 Alembic schema는 유지된다.
+
+```powershell
+Get-Content ops/performance/reset-database.sql -Raw |
+  docker compose --env-file ops/performance/performance.env exec -T db `
+  psql -U limited_goods -d limited_goods_perf
+```
+
+`docker compose down -v`는 routine 초기화로 사용하지 않는다. 전체 volume을 삭제하고 DB까지 cold 상태로 돌리므로 측정 조건이 달라지고 일반 로컬 데이터도 잃을 수 있다.
+
+macOS의 zsh/bash에서는 같은 파일을 입력 redirect로 전달한다.
+
+```bash
+docker compose --env-file ops/performance/performance.env exec -T db \
+  psql -U limited_goods -d postgres < ops/performance/create-database.sql
+
+docker compose --env-file ops/performance/performance.env exec -T db \
+  psql -U limited_goods -d limited_goods_perf < ops/performance/reset-database.sql
+```
+
+### warm-up과 본 측정 분리
+
+초기화 후 Worker를 제외한 서비스를 performance 설정으로 시작한다.
+
+```powershell
+docker compose --env-file ops/performance/performance.env up -d --build `
+  db migrate mock-pg api prometheus grafana
+```
+
+warm-up은 같은 구매 스크립트를 별도 k6 process로 20초 실행한다. 이 결과는 버리고, 종료 후 15초를 기다려 Grafana의 10초 rate 구간과 본 측정이 겹치지 않게 한다. warm-up도 매번 같은 조건으로 실행하므로 본 측정은 동일한 소량의 선행 데이터가 있는 상태에서 시작한다.
+
+```powershell
+docker run --rm --name limited-goods-k6-warmup `
+  -e BASE_URL=http://host.docker.internal:8000 `
+  -e PHASE=warmup `
+  -e RATE=10 `
+  -e DURATION=20s `
+  -e STOCK=1000000 `
+  -e PRE_ALLOCATED_VUS=20 `
+  -v "${PWD}/k6:/scripts:ro" `
+  grafana/k6:latest run /scripts/capacity/purchase.js
+
+Start-Sleep -Seconds 15
+```
+
+그다음 `PHASE=measurement`로 본 측정을 실행한다. warm-up과 본 측정을 별도 process로 실행하므로 k6 summary가 섞이지 않는다. 각 묶음의 시작 전에는 database reset부터 다시 수행한다.
+
+```powershell
+$runId = Get-Date -Format "yyyyMMdd-HHmmss"
+$resultDir = Join-Path $PWD "artifacts/performance/$runId-capacity-r10"
+New-Item -ItemType Directory -Path $resultDir | Out-Null
+
+docker run --rm --name limited-goods-k6-capacity `
+  -e BASE_URL=http://host.docker.internal:8000 `
+  -e PHASE=measurement `
+  -e RATE=10 `
+  -e DURATION=60s `
+  -e STOCK=1000000 `
+  -e PRE_ALLOCATED_VUS=20 `
+  -v "${PWD}/k6:/scripts:ro" `
+  -v "${resultDir}:/results" `
+  grafana/k6:latest run `
+  --summary-export=/results/k6-summary.json `
+  /scripts/capacity/purchase.js
+```
+
+### k6가 먼저 한계에 닿는지 확인
+
+현재 k6도 Docker Desktop 안에서 API·DB와 CPU를 공유한다. 단순 HTTP 한 건인 현재 스크립트는 낮은 RPS에서 부담이 작았지만, RPS와 VU를 크게 올리면 k6가 먼저 CPU나 메모리를 사용할 수 있다. 응답 본문은 구매 성공 여부에 필요하지 않아 `discardResponseBodies`로 버리도록 설정했다.
+
+본 측정 k6 컨테이너에는 `limited-goods-k6-capacity`처럼 고정 이름을 붙이고, 다른 터미널에서 함께 관찰한다.
+
+```powershell
+docker stats limited-goods-k6-capacity `
+  limited-goods-next-api-1 `
+  limited-goods-next-db-1
+```
+
+- k6 CPU가 높고 host CPU가 포화됐는데 API·DB와 pool은 여유가 있으면 generator 한계를 의심한다.
+- API·DB 또는 pool이 포화되고 k6에 여유가 있으면 서비스 한계를 의심한다.
+- `dropped_iterations`는 VU 부족이나 generator 지연과 서비스 응답 지연 양쪽에서 생길 수 있으므로 이것만으로 서버 병목을 결론 내리지 않는다.
+- 경계 구간은 k6를 다른 장비에서 다시 실행해 같은 처리량과 지연 형태가 나오는지 확인한다.
+
+한 host에서 찾은 첫 이상 구간은 탐색 결과다. 포트폴리오의 비교 근거로 채택할 때는 같은 RPS를 반복하고 k6·API·DB·host 자원을 함께 기록한다.
 
 ## 실행 환경을 언제 분리할까
 
