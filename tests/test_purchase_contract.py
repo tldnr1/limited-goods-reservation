@@ -139,9 +139,10 @@ def test_concurrent_buyers_cannot_take_the_same_last_unit(session):
         results = list(executor.map(attempt, ("buyer-a", "buyer-b")))
 
     assert sorted(results) == ["PURCHASE_REJECTED", "created"]
-    inventory = get_sale(session, sale.id).items[0]
-    assert (inventory.available_quantity, inventory.held_quantity) == (0, 1)
-    assert_purchase_row_counts(session, 1, 1, 1)
+    with SessionLocal() as verification:
+        inventory = get_sale(verification, sale.id).items[0]
+        assert (inventory.available_quantity, inventory.held_quantity) == (0, 1)
+        assert_purchase_row_counts(verification, 1, 1, 1)
 
 
 def test_same_user_concurrency_cannot_bypass_limit(session):
@@ -162,9 +163,10 @@ def test_same_user_concurrency_cannot_bypass_limit(session):
         results = list(executor.map(attempt, ("key-a", "key-b")))
 
     assert sorted(results) == ["PURCHASE_REJECTED", "created"]
-    inventory = get_sale(session, sale.id).items[0]
-    assert inventory.held_quantity == 2
-    assert_purchase_row_counts(session, 1, 1, 1)
+    with SessionLocal() as verification:
+        inventory = get_sale(verification, sale.id).items[0]
+        assert inventory.held_quantity == 2
+        assert_purchase_row_counts(verification, 1, 1, 1)
 
 
 def test_same_idempotency_key_race_returns_one_purchase(session):
@@ -183,9 +185,10 @@ def test_same_idempotency_key_race_returns_one_purchase(session):
 
     assert first.id == second.id
     assert first.reservation.id == second.reservation.id
-    assert_purchase_row_counts(session, 1, 1, 1)
-    inventory = get_sale(session, sale.id).items[0]
-    assert (inventory.available_quantity, inventory.held_quantity) == (0, 1)
+    with SessionLocal() as verification:
+        assert_purchase_row_counts(verification, 1, 1, 1)
+        inventory = get_sale(verification, sale.id).items[0]
+        assert (inventory.available_quantity, inventory.held_quantity) == (0, 1)
 
 
 def test_multi_item_concurrency_uses_same_lock_order(session):
@@ -210,9 +213,10 @@ def test_multi_item_concurrency_uses_same_lock_order(session):
         results = list(executor.map(attempt, (("a", request), ("b", reversed_request))))
 
     assert sorted(results) == ["PURCHASE_REJECTED", "created"]
-    assert_purchase_row_counts(session, 1, 2, 1)
-    for inventory in get_sale(session, sale.id).items:
-        assert (inventory.available_quantity, inventory.held_quantity) == (0, 1)
+    with SessionLocal() as verification:
+        assert_purchase_row_counts(verification, 1, 2, 1)
+        for inventory in get_sale(verification, sale.id).items:
+            assert (inventory.available_quantity, inventory.held_quantity) == (0, 1)
 
 
 def test_inventory_lock_refreshes_preloaded_state(session):
