@@ -1,0 +1,60 @@
+{
+  "run_id": "20260905-084524-smoke-r10",
+  "purpose": "Verify the purchase capacity test path and observability stack at 10 RPS; not a capacity limit measurement.",
+  "status": "passed",
+  "started_at": "2026-09-05T08:45:52.2984717+09:00",
+  "ended_at": "2026-09-05T08:46:53.3108991+09:00",
+  "target": {
+    "endpoint": "POST /purchases",
+    "rate_rps": 10,
+    "duration": "60s",
+    "stock": 1000000,
+    "pre_allocated_vus": 20,
+    "worker_running": false
+  },
+  "environment": {
+    "os": "Microsoft Windows 11 Home 10.0.26200",
+    "cpu": "AMD Ryzen 5 3600 6-Core Processor",
+    "logical_processors": 12,
+    "host_ram_gib": 15.92,
+    "docker_memory_limit_gib": 7.715,
+    "docker_engine": "29.5.3",
+    "docker_compose": "5.1.4",
+    "k6": "2.2.0 linux/amd64 via grafana/k6:latest",
+    "git_commit": "52403280b8de853571f56d04955628c429824848"
+  },
+  "result": {
+    "purchase_iterations": 601,
+    "purchase_check_success_percent": 100.0,
+    "http_requests_including_setup": 602,
+    "http_request_failure_percent": 0.0,
+    "http_request_rate_per_second_including_setup": 10.01965481269529,
+    "iteration_rate_per_second": 10.003010867823702,
+    "dropped_iterations": 0,
+    "http_duration_ms": {
+      "average": 17.342659646179406,
+      "p50": 16.7330215,
+      "p95": 20.22936585,
+      "p99": null,
+      "maximum": 71.11096
+    },
+    "observed_api_cpu_cores_max": 0.1222,
+    "observed_api_rss_mib_max": 88.24,
+    "observed_db_pool_checked_out_max": 1
+  },
+  "consistency_check": {
+    "sale_event_id": "d8a0a67b-1ea4-4bb3-8e7d-2e83c2b48fdb",
+    "sale_item_id": "1b40b031-b40f-46d8-b15f-e5997f9d2dcf",
+    "total": 1000000,
+    "available": 999399,
+    "held": 601,
+    "sold": 0,
+    "invariant_preserved": true
+  },
+  "grafana": {
+    "from": "2026-09-05T08:45:42.2984717+09:00",
+    "to": "2026-09-05T08:47:03.3108991+09:00",
+    "fixed_url": "http://localhost:3000/d/purchase-capacity/purchase-capacity?orgId=1&from=1788565542298&to=1788565623310",
+    "screenshot": "grafana-dashboard.png"
+  }
+}

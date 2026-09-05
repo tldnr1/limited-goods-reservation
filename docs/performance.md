@@ -93,7 +93,7 @@ docker compose stop worker
 
 ### 2. 가장 작은 확인 실행
 
-로컬에 설치된 k6를 사용하는 PowerShell 예시다. 이 대화에서는 실행하지 않는다.
+로컬에 설치된 k6를 사용하는 PowerShell 예시다.
 
 ```powershell
 $env:BASE_URL = "http://localhost:8000"
@@ -139,6 +139,111 @@ k6는 open model인 `constant-arrival-rate`로 응답이 느려져도 초당 시
 테스트가 끝나면 k6 setup 로그의 `sale_event_id`로 `GET /sales/{sale_id}`를 조회한다. Worker를 멈춘 성공 경로에서는 `available + held + sold = total`이고, 생성된 구매 수와 `held` 증가량이 같아야 한다. 성능 수치보다 이 정합성 확인이 먼저다.
 
 현재 예제는 run마다 새 판매를 만들지만 이전 주문 데이터까지 지우지는 않는다. 학습용 첫 실행에는 충분하지만 공식 비교 결과를 남기기 전에는 동일한 DB snapshot에서 시작하는 초기화 방법을 별도로 합의해야 한다.
+
+## 첫 smoke 실행 기록
+
+2026-09-05에 Windows 로컬 환경에서 `10 RPS × 60초` smoke를 실행했다. 이 실행의 목적은 한계를 찾는 것이 아니라, k6 요청부터 Prometheus 수집과 Grafana 표시, 사후 재고 검증까지 측정 경로가 이어지는지 확인하는 것이었다.
+
+### 실행 결과
+
+| 조건 | 구매 iteration/s | dropped | 201 비율 | HTTP avg / p95 / max | pool peak | API CPU peak | API RSS peak | 해석 |
+|---|---:|---:|---:|---|---:|---:|---:|---|
+| 10 RPS, 60초, Worker 중지 | 10.003 | 0 | 100% (601/601) | 17.34 / 20.23 / 71.11 ms | 1 | 0.122 core | 88.24 MiB | smoke 통과. 이 부하만으로 capacity 여유 폭이나 병목은 판단하지 않음 |
+
+k6의 전체 HTTP 요청 602건에는 `setup()`의 판매 생성 1건이 포함된다. 구매 자체는 601건이며, 종료 후 재고는 `available 999,399 + held 601 + sold 0 = total 1,000,000`이었다. Worker를 실행하지 않았으므로 구매 수와 held 증가량도 일치한다.
+
+Grafana의 10초 `rate()`와 Histogram 분위수는 시간에 따른 모양을 보는 값이다. 이 run처럼 새 label 시계열이 첫 요청과 함께 생기는 짧은 테스트에서는 Prometheus의 첫 scrape 전에 처리된 수가 구간 증가량에서 빠질 수 있다. 따라서 총 요청 수와 합격 여부는 k6 요약과 사후 데이터 검증을 기준으로 하고, Grafana는 처리량 유지·지연 변화·내부 구간의 동시 변화를 읽는 데 사용한다.
+
+- [실행 메타데이터와 환경](../artifacts/performance/20260905-084524-smoke-r10/run-metadata.json)
+- [k6 요약](../artifacts/performance/20260905-084524-smoke-r10/k6-summary.json)
+- [k6 전체 출력](../artifacts/performance/20260905-084524-smoke-r10/k6-output.log)
+- [고정 시간대 Grafana 화면](../artifacts/performance/20260905-084524-smoke-r10/grafana-dashboard.png)
+
+### Windows에서 같은 smoke를 직접 실행하는 순서
+
+현재 PC에는 native k6가 없어 공식 Docker image를 사용했다. 프로젝트 루트의 PowerShell에서 아래 순서로 실행한다.
+
+1. 구매 흐름에 필요한 컨테이너만 시작한다. Worker는 처음부터 제외한다.
+
+   ```powershell
+   docker compose up -d --build db migrate mock-pg api prometheus grafana
+   ```
+
+2. API와 관측 도구가 준비됐는지 확인한다.
+
+   ```powershell
+   Invoke-WebRequest -UseBasicParsing http://localhost:8000/health
+   Invoke-WebRequest -UseBasicParsing http://localhost:9090/-/ready
+   Invoke-RestMethod http://localhost:3000/api/health
+   ```
+
+3. Chrome에서 Grafana를 열고 테스트 전후 그래프를 본다.
+
+   ```powershell
+   Start-Process "C:\Program Files\Google\Chrome\Application\chrome.exe" `
+     "http://localhost:3000/d/purchase-capacity/purchase-capacity?orgId=1&from=now-5m&to=now"
+   ```
+
+4. 결과 폴더를 만든 뒤 k6를 Docker로 실행한다. k6 컨테이너에서 Windows host의 API를 부르므로 `host.docker.internal`을 사용한다.
+
+   ```powershell
+   $runId = Get-Date -Format "yyyyMMdd-HHmmss"
+   $resultDir = Join-Path $PWD "artifacts/performance/$runId-smoke-r10"
+   New-Item -ItemType Directory -Path $resultDir | Out-Null
+   $testStart = Get-Date
+
+   docker run --rm `
+     -e BASE_URL=http://host.docker.internal:8000 `
+     -e RATE=10 `
+     -e DURATION=60s `
+     -e STOCK=1000000 `
+     -e PRE_ALLOCATED_VUS=20 `
+     -v "${PWD}/k6:/scripts:ro" `
+     -v "${resultDir}:/results" `
+     grafana/k6:latest run `
+     --summary-export=/results/k6-summary.json `
+     /scripts/capacity/purchase.js 2>&1 |
+     Tee-Object -FilePath (Join-Path $resultDir "k6-output.log")
+
+   $testEnd = Get-Date
+   ```
+
+5. 출력에 찍힌 `sale_event_id`로 재고 합계를 확인한다.
+
+   ```powershell
+   $saleId = "출력된-sale_event_id"
+   Invoke-RestMethod "http://localhost:8000/sales/$saleId" |
+     ConvertTo-Json -Depth 5
+   ```
+
+6. 테스트 시작 10초 전과 종료 10초 후를 Unix millisecond로 바꿔 Grafana URL의 `from`, `to`에 넣는다. `now` 대신 절대시간을 쓰면 화면을 다시 열어도 관찰 구간이 움직이지 않는다.
+
+   ```powershell
+   $fromMs = ([DateTimeOffset]$testStart).AddSeconds(-10).ToUnixTimeMilliseconds()
+   $toMs = ([DateTimeOffset]$testEnd).AddSeconds(10).ToUnixTimeMilliseconds()
+   $fixedUrl = "http://localhost:3000/d/purchase-capacity/purchase-capacity?orgId=1&from=$fromMs&to=$toMs"
+   Start-Process "C:\Program Files\Google\Chrome\Application\chrome.exe" $fixedUrl
+   ```
+
+7. 눈으로 확인한 화면은 `Win + Shift + S`로 잘라 같은 결과 폴더에 `grafana-dashboard.png`로 저장하면 된다. 매번 같은 크기의 화면이 필요하면 이번 실행에서 사용한 Chrome headless 캡처 방식도 쓸 수 있다.
+
+   ```powershell
+   $chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+   $screenshot = Join-Path $resultDir "grafana-dashboard.png"
+   $captureProfile = Join-Path $env:TEMP "grafana-capture-$runId"
+
+   & $chrome `
+     --headless=new `
+     --disable-gpu `
+     --hide-scrollbars `
+     --window-size=1920,2200 `
+     --virtual-time-budget=15000 `
+     --user-data-dir=$captureProfile `
+     --screenshot=$screenshot `
+     $fixedUrl
+   ```
+
+이번에는 `k6-summary.json`, 실행 로그, 메타데이터, 대표 Grafana PNG를 모두 작업 폴더에 남겼지만 아직 보관 정책으로 확정하지 않는다. 포트폴리오 기준으로는 요약 수치·실험 조건·해석과 대표 이미지 1장만 Git에 남기고, 반복 run의 전체 로그는 로컬 또는 별도 저장소에 두는 편을 우선 제안한다. 원본 전체가 필요한 실패 분석 run만 예외로 보관하면 기록은 재현 가능하면서도 저장소가 실험 부산물로 커지는 것을 막을 수 있다.
 
 ## 실행 환경을 언제 분리할까
 
