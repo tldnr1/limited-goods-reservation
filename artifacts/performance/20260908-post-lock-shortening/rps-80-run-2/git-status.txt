@@ -1,0 +1,7 @@
+ M .gitignore
+ M docs/performance.md
+?? artifacts/performance/20260907-post-lock-shortening/
+?? artifacts/performance/20260908-post-lock-shortening/
+?? artifacts/performance/capacity-overload-by-chatgpt/
+?? notes/
+?? uv.lock
