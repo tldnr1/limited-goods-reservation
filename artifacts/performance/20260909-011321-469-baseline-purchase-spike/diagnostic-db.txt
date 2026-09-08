@@ -1,0 +1,15 @@
+ id | total | available | held | sold 
+----+-------+-----------+------+------
+(0 rows)
+
+  status   | count 
+-----------+-------
+ CONFIRMED |   297
+ EXPIRED   |     3
+(2 rows)
+
+  status   | count 
+-----------+-------
+ SUCCEEDED |   297
+(1 row)
+

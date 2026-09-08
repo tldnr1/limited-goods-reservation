@@ -1,0 +1,45 @@
+diff --git a/ops/performance.ps1 b/ops/performance.ps1
+index cd4aba0..a0bb600 100644
+--- a/ops/performance.ps1
++++ b/ops/performance.ps1
+@@ -81,6 +81,7 @@ try {
+         $runDir = Join-Path $root "artifacts/performance/$stamp-$Mode-$Scenario"
+         New-Item -ItemType Directory -Path $runDir -ErrorAction Stop | Out-Null
+         [ordered]@{ status='preparing'; mode=$Mode; scenario=$Scenario; openingRps=$OpeningRps; tailRps=$TailRps;
++            warmupRps=10; warmupSeconds=30;
+             startedAt=$startedAt.ToString('o') } | ConvertTo-Json | Set-Content "$runDir/run.json" -Encoding utf8
+         git rev-parse HEAD | Set-Content "$runDir/commit.txt" -Encoding utf8
+         if ($LASTEXITCODE -ne 0) { throw 'Git revision 조회 실패' }
+@@ -99,7 +100,6 @@ try {
+     Copy-Item -LiteralPath (Join-Path $root "k6/$Scenario.js") -Destination "$runDir/scenario.js"
+     Get-FileHash build/libs/limited-goods.jar | Select-Object Algorithm,Hash |
+         ConvertTo-Json | Set-Content "$runDir/jar-hash.json" -Encoding utf8
+-    Save-Snapshot -Label 'before'
+     Invoke-WebRequest 'http://127.0.0.1:9090/-/ready' -TimeoutSec 5 | Out-Null
+     $targetsReady = $false
+     for ($i=0; $i -lt 8; $i++) {
+@@ -114,6 +114,24 @@ try {
+         Start-Sleep -Seconds 2
+     }
+     if (-not $targetsReady) { throw 'Prometheus의 API 2개/Worker 수집 준비 미완료. 부하는 시작하지 않았습니다.' }
++    Copy-Item -LiteralPath (Join-Path $root 'k6/warmup.js') -Destination "$runDir/warmup.js"
++    Write-Output '워밍업: 별도 판매, 10 RPS × 30초'
++    $warmupArguments = @('run','--rm','--name','goods-k6','--cpus','1.5','--memory','1g',
++        '--mount',"type=bind,source=$root/k6,target=/scripts,readonly",
++        '--mount',"type=bind,source=$runDir,target=/results",
++        'grafana/k6:0.54.0','run','--summary-export=/results/warmup-summary.json','/scripts/warmup.js')
++    & docker @warmupArguments 2>&1 | Tee-Object -FilePath "$runDir/warmup.log"
++    if ($LASTEXITCODE -ne 0) { throw '워밍업 실패. 본 측정은 실행하지 않았습니다.' }
++    $warmupComplete = $false
++    for ($i=0; $i -lt 15; $i++) {
++        $counts = Invoke-Docker -Arguments ($compose + @('exec','-T','postgres','psql','-v','ON_ERROR_STOP=1',
++            '-U','goods','-d','limited_goods_perf','-Atc',
++            "SELECT count(*) FILTER (WHERE status='CONFIRMED') || '/' || count(*) FROM orders"))
++        if ($counts -eq '300/300') { $warmupComplete = $true; break }
++        Start-Sleep -Seconds 2
++    }
++    if (-not $warmupComplete) { throw "워밍업 주문 확정 불완전: $counts. 본 측정은 실행하지 않았습니다." }
++    Save-Snapshot -Label 'before'
+     $loadStart = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+     Write-Output "실제 부하 시작: $Mode / $OpeningRps RPS 10초 → $TailRps RPS 50초"
+     $arguments = @('run','--rm','--name','goods-k6','--cpus','1.5','--memory','1g',

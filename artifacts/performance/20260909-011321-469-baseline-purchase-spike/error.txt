@@ -1,0 +1,7 @@
+Exception: D:\Code\limited-goods-reservation\ops\performance.ps1:124
+Line |
+ 124 |      if ($LASTEXITCODE -ne 0) { throw '워밍업 실패. 본 측정은 실행하지 않았습니다.' }
+     |                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | 워밍업 실패. 본 측정은 실행하지 않았습니다.
+
+

@@ -1,0 +1,3 @@
+ M ops/performance.ps1
+?? artifacts/
+?? k6/warmup.js

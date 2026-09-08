@@ -1,0 +1,10 @@
+{
+  "status": "failed",
+  "mode": "baseline",
+  "scenario": "purchase-spike",
+  "openingRps": 10,
+  "tailRps": 10,
+  "warmupRps": 10,
+  "warmupSeconds": 30,
+  "startedAt": "2026-09-09T01:13:21.4281101+09:00"
+}
