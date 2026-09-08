@@ -1,13 +1,16 @@
+.gradle/
+build/
+out/
+.idea/
+*.iml
+.env
+# Existing ignored Python environments remain local when switching archive branches.
+.venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .coverage
 htmlcov/
-.venv/
-.env
-dist/
-build/
 *.egg-info/
+artifacts/performance/**/raw.json
 artifacts/performance/**/k6-output.log
-!artifacts/performance/rps-70-overload/k6-output.log
-!artifacts/performance/rps-80-overload/k6-output.log

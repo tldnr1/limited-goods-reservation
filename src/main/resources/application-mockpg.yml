@@ -1,0 +1,3 @@
+app:
+  mock.enabled: true
+  worker.enabled: false

@@ -1,7 +1,4 @@
-.git
-.gitignore
-.pytest_cache
-__pycache__
-*.pyc
-.venv
-notes
+*
+!build/
+!build/libs/
+!build/libs/limited-goods.jar

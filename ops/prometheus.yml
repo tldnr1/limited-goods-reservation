@@ -1,9 +1,7 @@
 global:
-  # Short local experiments need more than one sample inside a 5-10 second change.
-  scrape_interval: 1s
-
+  scrape_interval: 5s
 scrape_configs:
-  - job_name: limited-goods-api
-    metrics_path: /metrics
+  - job_name: goods
+    metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["api:8000"]
+      - targets: ["api1:8080","api2:8080","worker:8080"]

@@ -1,88 +1,78 @@
-# Limited Goods
+# Limited Goods — Java 기준 구현
 
-Limited Goods는 한정 수량의 스트리머 굿즈를 구매하는 핵심 흐름을 다루는 contract-first 백엔드 프로젝트입니다. 여러 구매자가 한정 재고를 동시에 요청할 때 여러 상품을 원자적으로 점유하고, 결제를 확정하며, 구매가 끝나지 않으면 재고를 복구하는 과정에 집중합니다.
+한정 굿즈의 다중 상품 점유, 멱등 구매, 비동기 결제, 만료·재고 반환을 Java 21 / Spring Boot로 구현했다.
+PostgreSQL이 재고의 기준 상태를 보관하며, 선택적으로 Redis Lua 진입 제한과 짧은 재고 소진 캐시를 사용한다.
 
-현재 브랜치에는 초기 비즈니스 계약을 실행하는 첫 번째 수직 흐름이 구현되어 있습니다. 판매 등록과 조회, 다중 상품의 원자적 점유, 동일 주문의 결제 재시도, 성공·실패·지연·중복·미확정 Mock PG 응답, 점유 만료와 재고 복구를 하나의 로컬 컨테이너 환경에서 확인할 수 있습니다.
+- main: 새 Java 구현
+- archive/python-fastapi-baseline: Python 구현과 당시 미커밋 실험/notes/uv.lock 보존
+- archive/java-spring-v3.2: 기존 Java archive 유지
 
-## English Summary
+이전 성능 결과는 archive에 있다. 새 Java 구현의 성능으로 인용하지 않는다.
 
-Limited Goods is a contract-first backend project for purchasing scarce streamer merchandise. It focuses on atomic multi-item reservations, payment consistency, expiry recovery, and evidence-driven performance improvements.
+## 실행과 확인 (PowerShell)
 
-![시스템 컨텍스트](docs/diagrams/system-context.svg)
+JDK 21 및 Docker Desktop이 필요하다. Gradle은 Wrapper가 내려받는다.
 
-## 초기 버전
-
-- 구매자는 판매 시작 전에도 상품을 조회할 수 있지만, 재고 점유는 시작 시각 이후에만 가능하다.
-- 여러 상품을 요청하면 전부 점유하거나 아무것도 점유하지 않는다.
-- 결제를 시도하는 동안 재고를 제한된 시간 동안 점유한다.
-- PostgreSQL을 재고·주문·점유·결제 시도의 영속적인 기준으로 사용한다.
-- 실제 결제 없이 성공·실패·지연·중복 콜백을 재현하는 Mock PG를 사용한다.
-- Python 기반 기능 중심 모듈러 모놀리스로 시작하며, 로컬에서도 컨테이너로 실행한다.
-
-## 실행
-
-Docker가 실행 중인 환경에서 다음 명령으로 API, Worker, PostgreSQL, Mock PG, Prometheus, Grafana를 시작합니다. Compose 프로젝트 이름은 과거 실험 리소스와 겹치지 않도록 `limited-goods-next`로 고정되어 있습니다.
-
-```console
+```powershell
+docker compose up -d postgres redis
+.\gradlew.bat --no-daemon test bootJar
 docker compose up -d --build
-docker compose ps
+.\ops\smoke.ps1
 ```
 
-| 용도 | 주소 |
+접속 주소는 http://localhost:8080이다. smoke 스크립트는 API 준비를 기다린다.
+현재 전체 재기동에서는 저 CPU 할당의 Mock PG가 더 늦게 기동하여 30초 결제 확인 대기를 넘을 수 있다.
+API 준비 확인에 Mock PG 준비가 포함되지는 않는다. 이 제한과 확인 결과는 docs/performance.md에 기록했다.
+통합 테스트는 실제 PostgreSQL의 limited_goods_test와 Redis의 테스트 namespace만 사용한다.
+test 실행 시 해당 테스트 DB는 각 테스트 전에 초기화된다. perf 실행과 동시에 테스트하지 않는다.
+
+Redis gate는 기본값 false로 DB 기준선부터 확인한다. 활성화 예:
+
+```powershell
+$env:ADMISSION_ENABLED='true'
+docker compose up -d
+docker compose restart nginx
+Remove-Item Env:ADMISSION_ENABLED
+```
+
+Compose 프로젝트/볼륨은 limited-goods-java로 기존 Python 리소스와 분리했다.
+일반 종료는 docker compose stop이다. 기존 실험 데이터를 보존하려면 down -v를 사용하지 않는다.
+
+## API
+
+| 요청 | 내용 |
 |---|---|
-| API 문서와 직접 호출 | http://localhost:8000/docs |
-| API 준비 상태 | http://localhost:8000/health/ready |
-| API 메트릭 | http://localhost:8000/metrics |
-| Mock PG | http://localhost:8080 |
-| Prometheus | http://localhost:9090 |
-| Grafana | http://localhost:3000 |
-| PostgreSQL | `localhost:5434` |
+| POST /api/sales | 로컬 판매 등록 |
+| GET /api/sales/{id} | 시작 전에도 판매·재고 조회 |
+| POST /api/purchases | X-User-Id + Idempotency-Key, 다중 상품 원자적 점유, 201 |
+| GET /api/orders/{id} | X-User-Id 소유자 확인, 점유·결제 상태 |
+| POST /api/orders/{id}/payments | 같은 헤더, scenario 지정, 영속 접수 후 202 |
+| POST /api/payments/callback | X-PG-Secret, attemptId/amount/result, 중복 안전 |
 
-실행을 멈출 때는 `docker compose down`을 사용합니다. 이 명령은 데이터 볼륨을 보존합니다.
+실제 요청 JSON은 [smoke.ps1](ops/smoke.ps1)을 보면 된다.
+Mock PG 시나리오는 SUCCESS / FAILURE / DELAYED_SUCCESS / LOST_RESPONSE / UNKNOWN이다.
+202는 결제 완료가 아니다. 주문 조회의 CONFIRMED로 완료를 확인한다.
 
-## 테스트
+## DB와 초기화
 
-테스트도 동일한 PostgreSQL 이미지와 별도의 `limited_goods_test` 데이터베이스를 사용합니다.
+PostgreSQL 컨테이너 하나에 dev/test/perf DB를 분리한다. Redis 키는 goods:dev:, goods:test:, goods:perf:다.
+Flyway V1/V2는 각 DB에 첫 연결할 때 적용한다. Hibernate는 validate만 한다.
+Mock PG receipt는 해당 DB에 있으므로 DB 초기화와 함께 초기화된다.
 
-```console
-docker compose --profile test run --rm test
+```powershell
+.\ops\reset-db.ps1 -Environment test
+# dev 데이터 삭제 의도를 명시할 때만:
+.\ops\reset-db.ps1 -Environment dev -AllowDevReset
 ```
 
-현재 자동화 검증은 마지막 재고에 대한 동시 요청, 같은 사용자의 구매 제한 경쟁, 다중 상품 전체 실패, 구매·결제 멱등성, 점유 만료, 실패 후 동일 주문 재시도, 결과 미확정 차단, 중복 결제 성공의 단일 반영을 포함합니다.
-
-## 구현 구조
-
-```text
-src/limited_goods/
-├─ sales/          판매와 상품·재고
-├─ purchases/      주문과 구매 요청 조정
-├─ reservations/   점유·확정·만료
-├─ payments/       결제 시도와 결과 정합성
-├─ main.py         HTTP API
-├─ worker.py       만료·결제 확인 작업
-└─ mock_pg.py      모의 결제사
-```
-
-DB 스키마 변경은 Alembic으로 관리하고, 구조화 JSON 로그와 Prometheus 메트릭을 제공합니다.
-
-## 현재 경계
-
-- `X-User-Id` 헤더는 확정된 인증 방식이 아니라 초기 구매자 경계를 표현하는 임시 수단이다.
-- 판매 등록 API는 테스트 준비용이며 운영자 인증·UI를 포함하지 않는다.
-- 실제 결제·배송·취소·환불은 범위 밖이고 Mock PG만 사용한다.
-- 성능 목표와 Redis·대기열 같은 최적화는 기준 구현을 부하 측정한 뒤 결정한다.
+스크립트는 이 프로젝트의 API/Worker/Mock PG를 먼저 멈추고, 대상 DB 확인 후 명시된 테이블만 초기화한다.
+Flyway 이력, PostgreSQL 볼륨, 다른 프로젝트는 보존한다. 실행 뒤 서비스는 중단 상태다.
+perf DB 최초 마이그레이션은 docker compose --env-file ops/perf.env up -d로 기동하여 적용한다.
+그 뒤 측정 전 reset-db.ps1 -Environment perf를 실행하고 같은 env-file로 다시 기동한다.
+측정 결과를 먼저 저장하고 부하 발생기를 끝낸 뒤 초기화한다.
 
 ## 문서
 
-- [PROJECT.md](PROJECT.md): 비즈니스 범위, 규칙, 아직 확정하지 않은 정책
-- [DESIGN.md](DESIGN.md): 아키텍처 방향과 품질 검증 전략
-- [시스템 개요](docs/architecture/system-overview.md): 현재 실행 구성과 대표 사용자 흐름
-- [도메인 모델](docs/architecture/domain-model.md): 핵심 데이터 관계와 불변식
-- [구매 흐름](docs/architecture/purchase-flow.md): 상태 전이와 실패 경로
-- [성능 측정 가이드](docs/performance.md): 현재 관측 구성, 첫 capacity 실험, 이후 workload 계획
-- [아키텍처 결정 기록](docs/decisions/README.md): 주요 기술 선택의 이유
-- [AGENTS.md](AGENTS.md): 현재 상태와 코딩 에이전트 작업 규칙
-
-## 이전 프로젝트
-
-완료된 Java/Spring v0~v3.2 이력은 `archive/java-spring-v3.2` 브랜치에 보존되어 있습니다. 버전 태그와 실험 기록은 참고 근거이며, 새 서비스의 구현 청사진으로 사용하지 않습니다.
+- [비즈니스 계약](PROJECT.md), [인프라·트랜잭션 설계](DESIGN.md)
+- [FastAPI 경험에서 Spring 코드 읽기](docs/learning.md)
+- [자원 예산·성능 목표·검증 범위](docs/performance.md)

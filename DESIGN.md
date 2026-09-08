@@ -1,65 +1,68 @@
 # 설계
 
-## 상태
+Java 21, Spring Boot 3.5.16, Spring MVC, JPA/Hibernate, HikariCP, Flyway를 사용한다.
+Java 21과 Gradle 8.10.2 조합은 [Spring Boot 3.5 지원 범위](https://docs.spring.io/spring-boot/3.5/system-requirements.html)에 맞춘다.
+기능별 패키지 안에서 Controller → Service → Repository를 읽는다. DTO는 HTTP 계약이며 호출 계층이 아니다.
 
-이 문서는 초기 버전 구현을 위한 기준이며 최종 운영 아키텍처가 아닙니다. [PROJECT.md](PROJECT.md)에서 잠정으로 표시한 정책은 테스트와 논의를 통해 변경할 수 있습니다.
+## 실행 경계
 
-## 아키텍처 방향
+```mermaid
+flowchart LR
+  Client --> Nginx
+  Nginx --> API1
+  Nginx --> API2
+  API1 --> Redis
+  API2 --> Redis
+  API1 --> PostgreSQL
+  API2 --> PostgreSQL
+  Worker --> PostgreSQL
+  Worker --> MockPG
+  MockPG --> PostgreSQL
+```
 
-서비스는 **기능 중심 모듈러 모놀리스**로 시작합니다. 하나의 Python 코드베이스가 비즈니스 트랜잭션을 소유하고, API와 백그라운드 Worker는 필요에 따라 별도 컨테이너로 실행할 수 있습니다. PostgreSQL만 영속적인 상태의 기준으로 사용합니다.
+동일 JAR를 API 2개, Worker, Mock PG에 사용한다. Mock PG의 영속 테이블도 로컬 PostgreSQL에 있다.
+이는 프로세스 장애 실험용이며 외부 PG의 물리적 독립성을 재현하지는 않는다.
+외부 노출은 localhost:8080의 Nginx뿐이며 PostgreSQL·Redis 개발 포트도 localhost에만 바인딩한다.
+판매 등록과 테스트 사용자 헤더는 공개 서비스용 인증이 아니다.
 
-초기 구현에는 Redis, 메시지 브로커, 독립 마이크로서비스를 도입하지 않습니다. 해당 기술은 측정된 병목이나 가용성 요구에 답할 때 추가합니다.
+## 구매 트랜잭션
 
-초기 실행 기술로 FastAPI, SQLAlchemy 2, Alembic을 사용합니다. 이는 현재 계약을 구현하기 위한 되돌리기 가능한 선택이며, 프레임워크 자체보다 PostgreSQL 트랜잭션과 모듈 경계를 설계의 기준으로 둡니다.
+PurchaseController의 @Valid가 JSON DTO를 검사한다.
+PurchaseService가 Redis permit을 얻고 별도 Spring bean인 PurchaseTransactionService를 호출한다.
+프록시가 DB 트랜잭션을 시작하고, 정상 반환 전에 커밋한다. 그 뒤 permit을 반환한다.
 
-![컨테이너 구성](docs/diagrams/container-view.svg)
+트랜잭션은 사용자+멱등키의 advisory lock을 얻고 기존 주문을 조회한다.
+키가 새것이면 판매 시작, 선택 상품, UUID 오름차순 재고 락, 인당 한도와 수량을 검사한다.
+주문·항목·점유·재고 변경을 함께 커밋한다. 실패는 전체 롤백이다.
+인당 합산은 재고 락을 얻은 뒤 READ COMMITTED의 새 statement snapshot에서 읽는다.
 
-실행 경계와 모듈 책임은 [시스템 개요](docs/architecture/system-overview.md)에 기록합니다.
+Redis 활성화 시 전체 API의 구매 permit은 8개, 죽은 프로세스의 permit 유효기간은 10초다.
+이는 부하 억제 장치이며 재고 정합성 락이 아니다. 재고 소진 결과는 1초만 캐싱한다.
+멱등 결과 보장을 위해 신규 키를 포함한 DB 조회가 여전히 남는다. Redis가 모든 DB 접근을 제거하지 않는다.
+캐시 조회/기록이 트랜잭션 안에 남은 비용도 다음 측정 대상이다.
+Redis 장애 시 새 구매는 503, 이미 접수된 결제·주문 조회·Worker 처리는 Redis에 의존하지 않는다.
+재고 반환은 캐시 TTL 이내에 보인다. 캐시 후처리 실패가 DB 성공을 실패로 뒤집지 않는다.
 
-## 모듈 경계
+## 결제와 복구
 
-- **sales:** 판매 이벤트, 시작 정책, 상품 가격, 초기 재고, 인당 제한
-- **purchases:** 주문, 주문 항목, 구매 요청 조정, 멱등한 요청 결과
-- **reservations:** 원자적 재고 점유, 만료, 반환, 확정, 제한 수량 계산
-- **payments:** 결제 시도, Mock PG 연동, 콜백, 재시도 가능 여부, 정합성 확인
+PaymentService.start는 주문 락 → 소유자 → 멱등키 → 활성 시도/기한 검사 → CREATED 저장을 하나의 트랜잭션으로 수행한다.
+Worker는 SKIP LOCKED로 다음 작업의 10초 lease를 획득하고 커밋한다.
+최대 4개 실행 슬롯에서 HTTP를 호출한다. PG 호출에는 DB 트랜잭션이 없다.
+attempt UUID를 PG 멱등키로 사용하므로, PG 성공 뒤 응답 유실/Worker 종료에도 같은 요청을 조회·재실행한다.
 
-모듈은 하나의 배포 단위와 DB를 공유하지만 각자의 비즈니스 규칙과 테이블을 소유합니다. 다른 모듈의 내부 저장소 코드를 직접 재사용하지 않고 애플리케이션 유스케이스가 모듈 간 작업을 조정합니다.
+결과 반영 순서는 주문 락 → 결제/점유 조회 → 상품 UUID 순 재고 락이다.
+성공이면 held→sold, 실패·기한 초과이면 held→available, 미확정이면 보유를 유지하고 1초 뒤 재확인한다.
+작업 lease 갱신은 주문 락을 함께 잡지 않는 별도 짧은 트랜잭션이다.
+만료 작업도 먼저 주문 락을 잡고, 결제 미진행 상태를 다시 확인한다.
 
-## 실행 책임
+## 모듈과 향후 변경
 
-- **API 프로세스:** 조회, 구매 요청, 결제 시도, Mock PG 콜백, 상태 확인 엔드포인트
-- **Worker 프로세스:** 점유 만료와 결제 결과 미확정 상태의 정합성 확인
-- **PostgreSQL:** 트랜잭션 정합성, 제약 조건, 영속 상태, 최초 동시성 제어 전략
-- **Mock PG:** 결정 가능한 결제 결과와 지연·중복 알림
+sales는 판매/재고 데이터, purchases는 주문/요청 조정, reservations는 점유/반환/확정,
+payments는 결제 시도/PG/결과 반영, admission은 Redis 부하 억제, worker는 스케줄링·lease를 소유한다.
+JPA entity를 HTTP 응답으로 내보내지 않고 record DTO로 변환한다. open-in-view=false다.
 
-로컬 환경에서도 이 경계를 컨테이너로 실행합니다. API 프레임워크와 작업 스케줄러는 문서화된 비즈니스 계약을 바꾸지 않는 범위에서 구현 단계에 선택합니다.
+Redis Lua가 실제 점유 원장을 소유하도록 바꾸는 것은 Repository 교체만으로 끝나지 않는다.
+reservations의 상태 저장과 purchases/payments의 커밋·보상·재조정 계약을 함께 변경해야 한다.
+현재 경계는 영향을 찾기 쉽게 나눈 것이며, 미래 기능을 위한 전략 인터페이스는 만들지 않았다.
 
-## 품질 검증 전략
-
-처리량을 최적화하기 전에 정합성을 증명합니다.
-
-- 상태 전이와 구매 제한 계산을 검증하는 단위 테스트
-- 전체 성공·실패 점유와 동시 요청을 검증하는 DB 통합 테스트
-- 구매·결제·만료·재시도·지연·중복 콜백을 검증하는 E2E 테스트
-- 요청·주문·결제 시도·사용자를 연결할 수 있는 구조화 로그
-- 점유·결제·만료·미확정 상태·지연시간·불변식 위반 메트릭
-- 실행 환경과 자원 사용량을 함께 기록하는 반복 가능한 부하 시나리오
-
-성능 목표는 동작하는 기준 구현을 측정한 뒤 정합니다. 과거 실험은 새 실험을 설계하는 참고 자료일 뿐, 현재 구현에서 재현하기 전에는 근거로 확정하지 않습니다.
-
-## 결정 기록
-
-- [ADR 0001: 기능 중심 모듈러 모놀리스](docs/decisions/0001-feature-oriented-modular-monolith.md)
-- [ADR 0002: PostgreSQL을 상태의 기준으로 사용](docs/decisions/0002-postgresql-as-source-of-truth.md)
-- [ADR 0003: 주문과 결제 시도 분리](docs/decisions/0003-separate-payment-attempts.md)
-
-## 의도적으로 미룬 내용
-
-- Redis 또는 큐 기반 진입·재고 제어
-- 마이크로서비스 분리
-- 실제 PG 연동과 결제사별 보안 계약
-- 영구적으로 결과를 알 수 없는 모든 결제의 자동 해결
-- 초기 프로세스 경계를 넘는 분산 추적
-- 운영 클라우드와 오토스케일링 설계
-
-초기 시스템이나 측정 결과에서 구체적인 필요가 확인될 때 이 항목들을 다시 논의합니다.
+새 구현의 결정은 [ADR 0004](docs/decisions/0004-java-baseline.md), 데이터·상태는 docs/architecture를 참고한다.

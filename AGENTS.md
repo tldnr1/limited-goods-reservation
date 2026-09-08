@@ -1,41 +1,16 @@
-# AGENTS.md
+# Limited Goods 작업 지침
 
-새 Limited Goods 프로젝트에서 코딩 에이전트가 처음 읽는 문서입니다.
+현재 main은 Java 21 / Spring Boot 3.5 / PostgreSQL 기반 새 구현이다.
+Python 및 당시 미커밋 실험 자료는 archive/python-fastapi-baseline에 보존했다.
+archive/java-spring-v3.2는 변경하지 않는다. 과거 구현의 결과를 새 구현의 측정값으로 인용하지 않는다.
 
-## 현재 상태
+먼저 PROJECT.md(계약), DESIGN.md(실행·트랜잭션), docs/learning.md(코드 읽기)를 읽는다.
+현재 검증 범위와 미완료 성능 실험은 docs/performance.md에 있다.
 
-```text
-phase: initial vertical slice implemented
-current_goal: validate the baseline and define the first measurable performance target
-implementation: functional local baseline
-language: Python 3.12
-framework: FastAPI, SQLAlchemy 2, Alembic
-persistence: PostgreSQL
-architecture: feature-oriented modular monolith
-legacy_reference: archive/java-spring-v3.2 and version tags
-```
-
-## 다음으로 읽을 문서
-
-```text
-프로젝트 목적이나 열려 있는 비즈니스 질문이 필요한가?
--> PROJECT.md
-
-설계 원칙이나 열려 있는 기술 질문이 필요한가?
--> DESIGN.md
-
-상태, 데이터 관계, 결정 근거가 필요한가?
--> docs/architecture 와 docs/decisions
-
-성능 관측이나 실험 계획이 필요한가?
--> docs/performance.md
-```
-
-## 작업 규칙
-
-- `PROJECT.md`와 `DESIGN.md`에서 확정하지 않은 항목을 암묵적인 요구사항으로 취급하지 않는다.
-- 구현 세부사항을 선택할 때 문서화된 비즈니스 흐름, 상태, 불변식, 실패 동작을 보존한다.
-- 보관된 Java/Spring 구현을 이식하거나 이어서 개발하지 않는다.
-- 새 결정에 비교 근거가 필요할 때만 과거 실험을 참고한다.
-- 변경을 최소화하고 되돌리기 비싼 결정은 구현 전에 기록한다.
-- 소유자와 목적이 명확할 때만 문서나 디렉터리를 추가한다.
+- 요청한 범위만 변경하고 비즈니스 불변식과 실패 동작을 보존한다.
+- DB는 Flyway로 변경한다. Hibernate ddl-auto는 validate를 유지한다.
+- DB 정합성 테스트는 실제 PostgreSQL의 limited_goods_test에서 실행한다.
+- perf 실행 중 dev/test를 동시에 실행하지 않는다. DB 이름만 나눠도 물리 자원은 공유된다.
+- Git 메타데이터나 Docker 접근이 sandbox에서 거부되면 정상적인 권한 상승을 사용한다.
+  ACL을 완화하거나 sandbox를 해제하지 않는다. 승인 후 같은 오류가 반복되면 중단하고 보고한다.
+- JDK를 찾지 못하면 Windows의 User/Machine JAVA_HOME도 확인한다. 설치된 JDK를 재설치하지 않는다.

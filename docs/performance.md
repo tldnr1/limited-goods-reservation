@@ -1,395 +1,88 @@
-# 성능 측정 가이드
+# 성능 실험 기준
 
-이 문서는 현재 관측 구성을 찾는 출발점이자, 첫 capacity 실험의 계획서다. 아직 측정하지 않은 숫자를 목표처럼 적지 않고, 실험 결과가 생기면 같은 문서의 결과 표와 해석을 갱신한다.
+현재는 Java의 정합성 테스트와 컨테이너 스모크를 검증하는 단계다.
+과거 Python 수치는 archive/python-fastapi-baseline에 보존했으며 Java 성능 수치로 재사용하지 않는다.
 
-## 먼저 구분할 것
+## 자원 예산
 
-- **Capacity 측정**은 재고 부족 같은 의도된 실패를 제거한 뒤, 현재 구성에서 처리량과 지연이 어디서 무너지기 시작하는지 찾는다.
-- **Workload 검증**은 그렇게 파악한 범위 안에서 오픈 직후 burst, 단일 재고 쏠림, 재시도처럼 실제 서비스에 가까운 요청 형태를 견디는지 확인한다.
+Ryzen 5600은 6코어/12논리 CPU, 호스트 RAM 16GB다. 제공된 Docker 정보는 12 CPU/7.715GiB였다.
+Compose cpu quota는 물리 코어 전용 할당이 아니다. localhost 결과를 같은 사양의 EC2 성능으로 환산하지 않는다.
 
-첫 실험은 `POST /purchases`의 단일 상품 신규 구매 성공 경로만 다룬다. 충분한 재고와 매 요청마다 다른 사용자·멱등키를 사용한다. 결제 API는 호출하지 않고 Worker는 중지한다. 따라서 이 결과는 결제까지 포함한 전체 서비스 capacity가 아니다.
+| 서비스 | CPU quota | 메모리 상한 | DB pool |
+|---|---:|---:|---:|
+| Nginx | 0.25 | 128MiB | — |
+| API 각 2개 | 각각 0.75 | 각각 768MiB | 각각 8 |
+| PostgreSQL | 1.5 | 1536MiB | — |
+| Redis | 0.25 | 256MiB | — |
+| Worker | 0.5 | 512MiB | 4 |
+| Mock PG | 0.25 | 512MiB | 2 |
+| Prometheus (선택) | 0.25 | 256MiB | — |
 
-## 값이 그래프가 되는 과정
+핵심 서비스 합계 4 CPU/3968MiB, Mock PG 포함 4.25 CPU/4480MiB다.
+선택 관측 도구와 부하 발생기는 남은 예산에서 실행하고 실제 CPU/메모리도 기록한다.
+JVM heap 상한은 컨테이너 메모리의 65%다. 나머지가 native/thread/direct memory를 모두 보장한다는 뜻은 아니다.
+API 하나와 둘을 비교할 때는 API 총 CPU=1.5, 총 메모리=1536MiB, 총 pool=16을 유지해야 한다.
+현재 Compose는 2개 구성이다. 단일 API 공정 비교용 설정/측정은 아직 하지 않았다.
 
-```text
-애플리케이션 코드
-  └─ Counter / Histogram / Gauge를 프로세스 메모리에 기록
-       └─ GET /metrics가 현재 누적값을 노출
-            └─ Prometheus가 1초마다 값을 가져와 시계열로 저장
-                 └─ Grafana가 PromQL로 증가율·분위수를 계산해 표시
+## 목표와 판정
 
-k6
-  └─ 목표 RPS로 HTTP 요청을 발생시키고 클라이언트 관점 결과를 별도로 요약
-```
-
-Counter와 Histogram은 `/metrics`에서 계속 증가하는 누적값이다. 그래서 Grafana는 Counter에 `rate(...[10s])`, Histogram bucket에 `rate`와 `histogram_quantile`을 적용한다. Gauge는 연결 풀의 현재 사용량처럼 그 시점의 값을 그대로 읽는다. 1초 scrape와 1초 dashboard refresh는 짧은 변화를 보기 위한 로컬 실험 설정이고, 그래프의 10초 구간은 지나친 흔들림을 줄이기 위한 첫 기본값이다.
-
-현재 연결 위치는 다음과 같다.
-
-- 계측 정의: [`src/limited_goods/metrics.py`](../src/limited_goods/metrics.py)
-- HTTP 계측: [`src/limited_goods/main.py`](../src/limited_goods/main.py)
-- 구매 구간 계측: [`src/limited_goods/purchases/service.py`](../src/limited_goods/purchases/service.py)
-- SQLAlchemy 풀 계측: [`src/limited_goods/db.py`](../src/limited_goods/db.py)
-- Prometheus 수집 설정: [`ops/prometheus.yml`](../ops/prometheus.yml)
-- Grafana datasource와 dashboard 연결: [`ops/grafana/provisioning`](../ops/grafana/provisioning)
-- dashboard 원본: [`ops/grafana/dashboards/purchase-capacity.json`](../ops/grafana/dashboards/purchase-capacity.json)
-- 실행 컨테이너 연결: [`compose.yaml`](../compose.yaml)
-- k6 예제: [`k6/capacity/purchase.js`](../k6/capacity/purchase.js)
-
-## 첫 실험에 사용하는 관측값
-
-| 계층 | metric / 유형 | 측정 위치 | 알 수 있는 것 | 이것만으로 모르는 것 | 이상 시 다음 관측 |
-|---|---|---|---|---|---|
-| 애플리케이션 | `limited_goods_http_requests_total` / Counter | HTTP middleware | 서버가 실제로 완료한 요청 수와 상태별 처리율 | k6가 시작하지 못한 요청, 내부 병목 위치 | k6 `dropped_iterations`, 구매 구간 지연 |
-| 애플리케이션 | `limited_goods_http_request_duration_seconds` / Histogram | HTTP middleware | API 전체 p50·p95·p99 지연 | DB, 직렬화, 네트워크 중 원인 | service total과 구간별 지연 비교 |
-| 애플리케이션 | `limited_goods_purchase_outcomes_total` / Counter | 구매 서비스 진입부터 종료까지 | `created`, `reused`, `rejected`, `conflict`, `error` 비율 | 거절의 세부 사유와 DB 정합성 | 응답 error code, 로그, 사후 재고 조회 |
-| 애플리케이션 | `limited_goods_purchase_duration_seconds` / Histogram | 구매 서비스 전체 | FastAPI 바깥 비용을 제외한 구매 로직 지연 | 느린 내부 구간 | 구간별 Histogram |
-| 애플리케이션 | `limited_goods_purchase_stage_duration_seconds` / Histogram | 연결 획득, 멱등 조회, 판매 조회, 재고 잠금 쿼리, 사용량 조회, commit 주위 | 어느 DB 구간의 시간이 함께 증가하는지 | `connection_checkout`의 pool 대기와 pre-ping 분리, `inventory_lock` 중 순수 lock wait와 쿼리 실행 시간의 분리 | PostgreSQL activity·lock 관측 |
-| SQLAlchemy | `limited_goods_db_pool_connections` / Gauge | engine pool의 `checked_in`, `checked_out` 현재값 | 연결 사용량과 고갈 징후 | checkout 대기시간, 아주 짧은 포화 | pool timeout/checkout 계측과 PostgreSQL connection 확인 |
-| SQLAlchemy | `limited_goods_db_pool_capacity` / Gauge | pool 설정 `10 + 20` | 현재 API 프로세스가 열 수 있는 최대 연결 수 | 그 크기가 적절한지 | DB 동시 연결과 CPU를 함께 비교 |
-| 애플리케이션 런타임 | `process_cpu_seconds_total`, `process_resident_memory_bytes` / Counter·Gauge | Prometheus Python client 기본 collector | API 프로세스 CPU 사용률과 RSS 변화 | 컨테이너 제한, PostgreSQL·host 자원 | `docker stats`, host/container exporter |
-| k6 | `http_reqs`, `http_req_duration`, `checks`, `dropped_iterations` / Counter·Trend·Rate·Counter | 부하 발생기 | 보낸 요청 수, 클라이언트 지연, 201 비율, 목표 도착률 누락 | 서버 내부 원인 | 같은 시간대 Grafana 지표 |
-
-`connection_checkout`은 첫 쿼리 전에 `Session.connection()`으로 연결을 얻는 전체 시간을 잰다. pool queue 대기가 주된 관심사지만 `pool_pre_ping`과 checkout 자체 비용도 포함한다. `inventory_lock`은 `SELECT ... FOR UPDATE` 호출 전체를 재므로 순수 잠금 대기시간만 뜻하지 않는다. 원인 진단 시 [`ops/performance/sample-postgres-waits.sql`](../ops/performance/sample-postgres-waits.sql)로 `pg_stat_activity`, `pg_blocking_pids`, 미획득 `pg_locks`를 실행 중에 함께 표본 수집한다.
-
-### 지금은 수집하지 않는 것
-
-- PostgreSQL의 activity, lock, query 통계는 Prometheus로 수집하지 않는다. 첫 그래프에서 의심 구간을 찾은 후 수동 SQL 또는 exporter 도입 여부를 결정한다.
-- Docker 전체와 host CPU·메모리는 dashboard에 넣지 않았다. 필요하면 우선 `docker stats`로 API, DB, Prometheus, Grafana를 구분해 본다.
-- Worker는 별도 프로세스라 현재 Worker 내부 Counter가 API의 `/metrics`에 나타나지 않는다. 첫 구매 capacity에서는 Worker 자체를 중지하므로 이 문제를 함께 해결하지 않는다.
-- Payment metric은 결제 API를 호출하지 않으므로 첫 실험의 판단 근거에서 제외한다.
-
-## Grafana에서 보는 여섯 패널
-
-Compose를 시작하면 `http://localhost:3000`의 `Limited Goods / Purchase Capacity` dashboard가 파일에서 자동으로 만들어진다.
-
-| 패널 | 눈으로 찾을 것 |
+| 항목 | 목표 |
 |---|---|
-| 처리량: 요청과 구매 결과 | 목표 RPS를 올려도 HTTP와 `created` 처리율이 같이 올라가는가. 둘 사이 간격이나 다른 outcome이 생기는가 |
-| HTTP 응답 시간 | RPS의 어느 단계부터 p95·p99가 p50과 크게 벌어지는가 |
-| 구매 내부 구간 응답 시간 | service total 상승과 함께 어느 DB 구간 p95가 먼저 올라가는가 |
-| SQLAlchemy 연결 풀 | `checked_out`이 capacity 30에 계속 붙어 있는가 |
-| API 프로세스 CPU | 처리량 정체 시 CPU core 사용량도 함께 포화되는가 |
-| API 프로세스 메모리 | 단계가 올라갈수록 회수되지 않는 상승이 있는가 |
+| 정합성 | 초과 판매/인당 우회/부분 점유/중복 확정 0건 |
+| 최초 점유 응답 | 99% ≤ 1초, 성공·재고 부족·429 별도 분포 |
+| 예상 밖 5xx/timeout/network error | 정상 시나리오 ≤ 0.1% |
+| 정상 PG + 충분한 수요 | 120초 내 판매 확정 ≥ 950/1000 |
+| 결제 접수 | 부하 중 p95 ≤ 1초, PG 완료 시간 별도 |
+| 반환 재고 재구매 가능 | 반환 가능 시점부터 ≤ 5초 |
+| 복구 | 부하 종료 30초 내 작업/락 대기 안정, 복구 가능한 Worker 작업 30초 내 처리 |
+| 자원 | 정상 부하에서 OOM/restart/DB checkout timeout 없음 |
+| 반복 | 대표 시나리오 3회 개별 결과, 생성기 dropped_iterations=0 |
 
-그래프 하나만으로 원인을 확정하지 않는다. 예를 들어 `checked_out=30`과 `idempotency_lookup` 상승이 같은 시각에 나타나면 pool 대기를 의심할 수 있지만, PostgreSQL 연결·activity를 확인하기 전에는 결론이 아니다.
+429는 오류와 분리해도 반드시 비율을 보고한다. 판매 수량/확정 시간 없이 빠른 거절만으로 통과시키지 않는다.
+영구 UNKNOWN과 의도적으로 중단한 PG에는 정상 판매 완료 목표를 적용하지 않으며 상태 정합성을 확인한다.
 
-## 첫 capacity 실험 예제
+## 실행 순서
 
-### 1. 고정할 조건
-
-- API 인스턴스 1개, SQLAlchemy pool `10 + 20`, PostgreSQL 1개
-- 애플리케이션 데이터는 전용 `limited_goods_perf` database 사용
-- 단일 상품, 수량 1, 충분한 재고, 요청마다 다른 사용자와 멱등키
-- Worker 중지, 결제 호출 없음
-- 본 측정 전 `10 RPS × 20초` warm-up과 15초 관측 분리 구간
-- 한 번의 run은 constant arrival rate 60초
-- run마다 k6 `setup()`이 새 SaleEvent와 SaleItem을 만든다
-
-Worker가 실행 중이면 60초 TTL이 지난 Reservation을 만지기 시작해 같은 DB에 별도 부하를 만든다. 따라서 첫 실험에서는 다음처럼 중지하고, 일반 기능 확인으로 돌아갈 때 다시 시작한다.
+1. dev/test를 중단한다. perf env로 한 번 기동하여 Flyway 적용 후 서비스를 멈춘다.
+2. 이전 결과를 저장하고 부하 발생기 종료 → reset-db.ps1 -Environment perf → perf env 기동.
+3. 별도 판매로 워밍업하고, 측정 판매를 새로 생성한다.
+4. 아래 최초 도착 부하를 실행한다. 3,000은 첫 10초 구간의 평균 최초 구매 시도 RPS이며 동시 사용자 수가 아니다.
+5. 부하 종료 뒤 Worker 정리 시간을 두고 ops/invariants.sql, 주문 상태, pool/락 대기, CPU/메모리를 함께 기록한다.
 
 ```powershell
-docker compose up -d --build
-docker compose stop worker
+docker compose --env-file ops/perf.env up -d
+docker compose --profile observe up -d prometheus
+docker run --rm --cpus 1.5 --memory 1g --mount "type=bind,source=$PWD/k6,target=/scripts,readonly" grafana/k6:0.54.0 run /scripts/purchase-spike.js
 ```
 
-### 2. 가장 작은 확인 실행
-
-로컬에 설치된 k6를 사용하는 PowerShell 예시다.
-
-```powershell
-$env:BASE_URL = "http://localhost:8000"
-$env:RATE = "10"
-$env:DURATION = "60s"
-$env:STOCK = "1000000"
-$env:PRE_ALLOCATED_VUS = "20"
-k6 run k6/capacity/purchase.js
-```
-
-macOS에서는 Docker Desktop과 k6가 준비되어 있으면 Compose 명령은 동일하고, 환경변수만 zsh/bash 문법으로 지정한다. k6는 Homebrew의 `brew install k6`로 설치할 수 있다.
-
-```bash
-export BASE_URL="http://localhost:8000"
-export RATE="10"
-export DURATION="60s"
-export STOCK="1000000"
-export PRE_ALLOCATED_VUS="20"
-k6 run k6/capacity/purchase.js
-```
-
-Apple Silicon에서도 Compose가 각 이미지의 ARM64 variant를 자동으로 선택한다. k6를 Docker 컨테이너로 실행하면 `localhost`는 API가 아니라 k6 컨테이너 자신을 가리킨다. 이때는 k6를 Compose network에 연결하고 `BASE_URL=http://api:8000`을 사용한다. 첫 학습 실행은 위의 macOS native k6 방식을 기준으로 한다.
-
-k6는 open model인 `constant-arrival-rate`로 응답이 느려져도 초당 시작할 iteration 수를 유지하려 한다. `dropped_iterations`가 0이 아니면 서버 capacity라고 결론 내리기 전에 `PRE_ALLOCATED_VUS`와 부하 발생기 CPU가 충분한지 먼저 확인한다. 기본 VU는 20으로 고정했다. RPS만큼 VU를 자동 생성하면 단순한 요청에서도 부하 발생기 메모리와 CPU를 불필요하게 사용하므로, 실제 지연과 dropped 여부를 보고 명시적으로 올린다.
-
-### 3. RPS를 올리는 방식
-
-처음에는 `10 → 20 → 40 → 80 ...`처럼 두 배씩 올려 마지막 정상 구간과 첫 이상 구간을 찾는다. 그 사이만 더 작은 간격으로 다시 측정한다. 숫자 자체는 장비 성능을 모르므로 예시이며, 아직 합격 p95나 목표 RPS를 정하지 않는다.
-
-다음 중 하나가 처음 나타나는 구간을 기록한다.
-
-- k6의 201 check 비율이 내려가거나 예상하지 않은 outcome이 생김
-- VU를 충분히 줬는데도 처리량이 목표 RPS를 따라가지 못함
-- p95·p99가 이전 단계보다 비선형적으로 증가함
-- DB pool 또는 API CPU가 지속적으로 포화됨
-
-각 run마다 아래를 한 줄로 남긴다.
-
-| 조건 | k6 실제 req/s | dropped | 201 비율 | HTTP p50/p95/p99 | 가장 느린 stage p95 | pool peak | CPU peak | 해석 |
-|---|---:|---:|---:|---|---|---:|---:|---|
-| 실행 전 | - | - | - | - | - | - | - | - |
-
-테스트가 끝나면 k6 setup 로그의 `sale_event_id`로 `GET /sales/{sale_id}`를 조회한다. Worker를 멈춘 성공 경로에서는 `available + held + sold = total`이고, 생성된 구매 수와 `held` 증가량이 같아야 한다. 성능 수치보다 이 정합성 확인이 먼저다.
-
-탐색 실행도 아래의 전용 database 초기화와 고정 warm-up을 거친다. 그래야 RPS가 다른 run끼리 누적 주문 수와 시작 상태가 달라지지 않는다.
-
-## 첫 smoke 실행 기록
-
-2026-09-05에 Windows 로컬 환경에서 `10 RPS × 60초` smoke를 실행했다. 이 실행의 목적은 한계를 찾는 것이 아니라, k6 요청부터 Prometheus 수집과 Grafana 표시, 사후 재고 검증까지 측정 경로가 이어지는지 확인하는 것이었다.
-
-### 실행 결과
-
-| 조건 | 구매 iteration/s | dropped | 201 비율 | HTTP avg / p95 / max | pool peak | API CPU peak | API RSS peak | 해석 |
-|---|---:|---:|---:|---|---:|---:|---:|---|
-| 10 RPS, 60초, Worker 중지 | 10.003 | 0 | 100% (601/601) | 17.34 / 20.23 / 71.11 ms | 1 | 0.122 core | 88.24 MiB | smoke 통과. 이 부하만으로 capacity 여유 폭이나 병목은 판단하지 않음 |
-
-k6의 전체 HTTP 요청 602건에는 `setup()`의 판매 생성 1건이 포함된다. 구매 자체는 601건이며, 종료 후 재고는 `available 999,399 + held 601 + sold 0 = total 1,000,000`이었다. Worker를 실행하지 않았으므로 구매 수와 held 증가량도 일치한다.
-
-Grafana의 10초 `rate()`와 Histogram 분위수는 시간에 따른 모양을 보는 값이다. 이 run처럼 새 label 시계열이 첫 요청과 함께 생기는 짧은 테스트에서는 Prometheus의 첫 scrape 전에 처리된 수가 구간 증가량에서 빠질 수 있다. 따라서 총 요청 수와 합격 여부는 k6 요약과 사후 데이터 검증을 기준으로 하고, Grafana는 처리량 유지·지연 변화·내부 구간의 동시 변화를 읽는 데 사용한다.
-
-이 smoke의 개별 산출물은 최종 capacity 비교 자료를 70·80 RPS 두 케이스로 정리하면서 제거했다. 위 결과는 측정 경로를 처음 검증한 이력으로만 남긴다.
-
-### Windows에서 같은 smoke를 직접 실행하는 순서
-
-현재 PC에는 native k6가 없어 공식 Docker image를 사용했다. 프로젝트 루트의 PowerShell에서 아래 순서로 실행한다.
-
-1. 구매 흐름에 필요한 컨테이너만 시작한다. Worker는 처음부터 제외한다.
-
-   ```powershell
-   docker compose up -d --build db migrate mock-pg api prometheus grafana
-   ```
-
-2. API와 관측 도구가 준비됐는지 확인한다.
-
-   ```powershell
-   Invoke-WebRequest -UseBasicParsing http://localhost:8000/health
-   Invoke-WebRequest -UseBasicParsing http://localhost:9090/-/ready
-   Invoke-RestMethod http://localhost:3000/api/health
-   ```
-
-3. Chrome에서 Grafana를 열고 테스트 전후 그래프를 본다.
-
-   ```powershell
-   Start-Process "C:\Program Files\Google\Chrome\Application\chrome.exe" `
-     "http://localhost:3000/d/purchase-capacity/purchase-capacity?orgId=1&from=now-5m&to=now"
-   ```
-
-4. 결과 폴더를 만든 뒤 k6를 Docker로 실행한다. 최초 smoke에서는 `host.docker.internal`을 사용했지만, 이후 탐색에서 Windows published-port 경로의 연결 오류가 관측됐다. 재실행할 때는 k6를 Compose network에 직접 연결해 같은 조건을 사용한다.
-
-   ```powershell
-   $runId = Get-Date -Format "yyyyMMdd-HHmmss"
-   $resultDir = Join-Path $PWD "artifacts/performance/$runId-smoke-r10"
-   New-Item -ItemType Directory -Path $resultDir | Out-Null
-   $testStart = Get-Date
-
-   docker run --rm `
-     --network limited-goods-next_default `
-     -e BASE_URL=http://api:8000 `
-     -e RATE=10 `
-     -e DURATION=60s `
-     -e STOCK=1000000 `
-     -e PRE_ALLOCATED_VUS=20 `
-     -v "${PWD}/k6:/scripts:ro" `
-     -v "${resultDir}:/results" `
-     grafana/k6:latest run `
-     --summary-export=/results/k6-summary.json `
-     /scripts/capacity/purchase.js 2>&1 |
-     Tee-Object -FilePath (Join-Path $resultDir "k6-output.log")
-
-   $testEnd = Get-Date
-   ```
-
-5. 출력에 찍힌 `sale_event_id`로 재고 합계를 확인한다.
-
-   ```powershell
-   $saleId = "출력된-sale_event_id"
-   Invoke-RestMethod "http://localhost:8000/sales/$saleId" |
-     ConvertTo-Json -Depth 5
-   ```
-
-6. 테스트 시작 10초 전과 종료 10초 후를 Unix millisecond로 바꿔 Grafana URL의 `from`, `to`에 넣는다. `now` 대신 절대시간을 쓰면 화면을 다시 열어도 관찰 구간이 움직이지 않는다.
-
-   ```powershell
-   $fromMs = ([DateTimeOffset]$testStart).AddSeconds(-10).ToUnixTimeMilliseconds()
-   $toMs = ([DateTimeOffset]$testEnd).AddSeconds(10).ToUnixTimeMilliseconds()
-   $fixedUrl = "http://localhost:3000/d/purchase-capacity/purchase-capacity?orgId=1&from=$fromMs&to=$toMs"
-   Start-Process "C:\Program Files\Google\Chrome\Application\chrome.exe" $fixedUrl
-   ```
-
-7. 눈으로 확인한 화면은 `Win + Shift + S`로 잘라 같은 결과 폴더에 `grafana-dashboard.png`로 저장하면 된다. 매번 같은 크기의 화면이 필요하면 이번 실행에서 사용한 Chrome headless 캡처 방식도 쓸 수 있다.
-
-   ```powershell
-   $chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-   $screenshot = Join-Path $resultDir "grafana-dashboard.png"
-   $captureProfile = Join-Path $env:TEMP "grafana-capture-$runId"
-
-   & $chrome `
-     --headless=new `
-     --disable-gpu `
-     --hide-scrollbars `
-     --window-size=1920,2200 `
-     --virtual-time-budget=15000 `
-     --user-data-dir=$captureProfile `
-     --screenshot=$screenshot `
-     $fixedUrl
-   ```
-
-첫 smoke는 측정 경로를 처음 검증한 근거라 `k6-summary.json`, 실행 로그, 메타데이터, 대표 Grafana PNG를 함께 보관한다. 이후 반복 run의 `k6-output.log`는 기본적으로 Git에서 제외하고, 결과 표·메타데이터·요약 JSON·대표 이미지 중 비교나 결정에 필요한 것만 커밋한다. 원문이 원인 분석의 근거인 실패 run만 로그를 예외로 보관한다.
-
-## 반복 capacity 실행 준비
-
-### 전용 database 만들기와 되돌리기
-
-성능 실험은 일반 로컬 데이터와 분리한 `limited_goods_perf`를 사용한다. 같은 PostgreSQL 컨테이너를 사용하되 database를 나누는 첫 단계 구성이다. `ops/performance/performance.env`를 함께 넘기면 API와 migration이 이 database를 바라본다.
-
-처음 한 번은 database를 만들고 migration을 적용한다. PowerShell에서는 SQL 파일을 표준 입력으로 전달한다.
-
-```powershell
-docker compose --env-file ops/performance/performance.env up -d db
-
-Get-Content ops/performance/create-database.sql -Raw |
-  docker compose --env-file ops/performance/performance.env exec -T db `
-  psql -U limited_goods -d postgres
-
-docker compose --env-file ops/performance/performance.env run --rm migrate
-```
-
-각 warm-up과 본 측정 묶음을 시작하기 전에는 애플리케이션 테이블만 비운다. SQL 자체가 현재 database 이름을 검사하므로 `limited_goods_perf`가 아니면 중단한다. PostgreSQL volume과 Alembic schema는 유지된다.
-
-```powershell
-Get-Content ops/performance/reset-database.sql -Raw |
-  docker compose --env-file ops/performance/performance.env exec -T db `
-  psql -U limited_goods -d limited_goods_perf
-```
-
-`docker compose down -v`는 routine 초기화로 사용하지 않는다. 전체 volume을 삭제하고 DB까지 cold 상태로 돌리므로 측정 조건이 달라지고 일반 로컬 데이터도 잃을 수 있다.
-
-macOS의 zsh/bash에서는 같은 파일을 입력 redirect로 전달한다.
-
-```bash
-docker compose --env-file ops/performance/performance.env exec -T db \
-  psql -U limited_goods -d postgres < ops/performance/create-database.sql
-
-docker compose --env-file ops/performance/performance.env exec -T db \
-  psql -U limited_goods -d limited_goods_perf < ops/performance/reset-database.sql
-```
-
-### warm-up과 본 측정 분리
-
-초기화 후 Worker를 제외한 서비스를 performance 설정으로 시작한다.
-
-```powershell
-docker compose --env-file ops/performance/performance.env up -d --build `
-  db migrate mock-pg api prometheus grafana
-```
-
-warm-up은 같은 구매 스크립트를 별도 k6 process로 20초 실행한다. 이 결과는 버리고, 종료 후 15초를 기다려 Grafana의 10초 rate 구간과 본 측정이 겹치지 않게 한다. warm-up도 매번 같은 조건으로 실행하므로 본 측정은 동일한 소량의 선행 데이터가 있는 상태에서 시작한다.
-
-```powershell
-docker run --rm --name limited-goods-k6-warmup `
-  --network limited-goods-next_default `
-  -e BASE_URL=http://api:8000 `
-  -e PHASE=warmup `
-  -e RATE=10 `
-  -e DURATION=20s `
-  -e STOCK=1000000 `
-  -e PRE_ALLOCATED_VUS=20 `
-  -v "${PWD}/k6:/scripts:ro" `
-  grafana/k6:latest run /scripts/capacity/purchase.js
-
-Start-Sleep -Seconds 15
-```
-
-그다음 `PHASE=measurement`로 본 측정을 실행한다. warm-up과 본 측정을 별도 process로 실행하므로 k6 summary가 섞이지 않는다. 각 묶음의 시작 전에는 database reset부터 다시 수행한다.
-
-```powershell
-$runId = Get-Date -Format "yyyyMMdd-HHmmss"
-$resultDir = Join-Path $PWD "artifacts/performance/$runId-capacity-r10"
-New-Item -ItemType Directory -Path $resultDir | Out-Null
-
-docker run --rm --name limited-goods-k6-capacity `
-  --network limited-goods-next_default `
-  -e BASE_URL=http://api:8000 `
-  -e PHASE=measurement `
-  -e RATE=10 `
-  -e DURATION=60s `
-  -e STOCK=1000000 `
-  -e PRE_ALLOCATED_VUS=20 `
-  -v "${PWD}/k6:/scripts:ro" `
-  -v "${resultDir}:/results" `
-  grafana/k6:latest run `
-  --summary-export=/results/k6-summary.json `
-  /scripts/capacity/purchase.js
-```
-
-### k6가 먼저 한계에 닿는지 확인
-
-현재 k6도 Docker Desktop 안에서 API·DB와 CPU를 공유한다. 단순 HTTP 한 건인 현재 스크립트는 낮은 RPS에서 부담이 작았지만, RPS와 VU를 크게 올리면 k6가 먼저 CPU나 메모리를 사용할 수 있다. 응답 본문은 구매 성공 여부에 필요하지 않아 `discardResponseBodies`로 버리도록 설정했다.
-
-본 측정 k6 컨테이너에는 `limited-goods-k6-capacity`처럼 고정 이름을 붙이고, 다른 터미널에서 함께 관찰한다.
-
-```powershell
-docker stats limited-goods-k6-capacity `
-  limited-goods-next-api-1 `
-  limited-goods-next-db-1
-```
-
-- k6 CPU가 높고 host CPU가 포화됐는데 API·DB와 pool은 여유가 있으면 generator 한계를 의심한다.
-- API·DB 또는 pool이 포화되고 k6에 여유가 있으면 서비스 한계를 의심한다.
-- `dropped_iterations`는 VU 부족이나 generator 지연과 서비스 응답 지연 양쪽에서 생길 수 있으므로 이것만으로 서버 병목을 결론 내리지 않는다.
-- 경계 구간은 k6를 다른 장비에서 다시 실행해 같은 처리량과 지연 형태가 나오는지 확인한다.
-
-한 host에서 찾은 첫 이상 구간은 탐색 결과다. 포트폴리오의 비교 근거로 채택할 때는 같은 RPS를 반복하고 k6·API·DB·host 자원을 함께 기록한다.
-
-## 현재 capacity 비교 기록
-
-2026-09-05 Windows 로컬 환경에서 `POST /purchases`의 단일 상품 신규 구매 성공 경로를 다시 측정했다. 매 run 전에 API를 재시작하고 `limited_goods_perf`를 초기화한 뒤 `10 RPS × 20초` warm-up, 15초 분리, 60초 본 측정을 적용했다. 재고는 1,000,000개, VU는 200개였으며 Worker와 결제 흐름은 제외했다. k6는 Compose network에서 `http://api:8000`을 직접 호출했다.
-
-사전 수동 실행에서는 70 RPS가 정상이라고 관찰했지만, 산출물을 남기기 위한 재실행에서는 같은 결과가 재현되지 않았다. 첫 재실행은 이전 부하의 `idle in transaction` 연결 30개가 남아 있어 폐기했다. 이후 API 재시작과 DB 초기화로 잔류 transaction이 없음을 확인하고 다시 실행했지만 70 RPS도 포화됐다. 아래에는 이 격리 재실행만 기록한다.
-
-| 목표 RPS | 실제 구매/s | dropped | 구매 성공 check | HTTP avg / p95 / max | 결과 |
-|---:|---:|---:|---:|---:|---|
-| 70 | 9.012 | 3,497 | 77.34% (488/631) | 16.49 / 60.00 / 60.00초 | 포화, 70 RPS 정상 재현 실패 |
-| 80 | 5.584 | 4,335 | 63.43% (248/391) | 25.61 / 60.00 / 60.00초 | 포화 |
-
-70 RPS는 약 9초, 80 RPS는 약 5초 만에 200 VU를 모두 사용했다. 두 run 모두 SQLAlchemy pool capacity 30에 도달했고 API 로그에서 30초 connection checkout timeout이 발생했다. 과부하 중에는 `/metrics` scrape도 대부분 응답하지 못해 Grafana 선이 초반 이후 끊겼다. 따라서 PNG는 정상 추세 그래프가 아니라 관측 경로도 함께 포화됐다는 증거로 읽어야 한다.
-
-k6 프로세스 종료 코드는 두 run 모두 0이지만 현재 스크립트에는 threshold가 없으므로 통과를 뜻하지 않는다. 합격 여부는 `dropped_iterations`, 구매 check, 목표 대비 실제 처리량으로 판단한다. 현재 자료로는 70 RPS를 정상 하한으로 확정할 수 없으며, 이전 수동 실행과 이번 격리 실행이 달라진 원인을 먼저 확인해야 한다.
-
-- [70 RPS 실행 자료](../artifacts/performance/rps-70-overload)
-- [80 RPS 실행 자료](../artifacts/performance/rps-80-overload)
-
-## 실행 환경을 언제 분리할까
-
-첫 학습에서는 한 host에 API·DB·Prometheus·Grafana를 두어도 된다. 이 결과는 "현재 로컬 구성 전체"의 capacity이며 각 컨테이너가 host 자원을 나누어 쓴다는 한계도 함께 기록한다.
-
-비교 가능한 baseline을 만들 때는 최소한 k6를 다른 장비로 옮긴다. `BASE_URL`만 대상 장비 주소로 바꾸면 같은 스크립트를 쓸 수 있다. 더 엄격한 측정에서는 Prometheus와 Grafana도 관측 장비로 옮기되, 애플리케이션의 계측 비용과 `/metrics` scrape 비용은 대상에 남는다. 관측 오염을 완전히 없애는 것이 아니라, 부하 생성·시계열 저장·dashboard 조회가 대상 CPU를 뺏지 않도록 경계를 나누는 것이다.
-
-## Capacity 다음의 workload 계획
-
-Capacity 결과로 정상 범위와 병목 후보를 설명할 수 있게 된 뒤, 스크립트를 한꺼번에 늘리지 않고 다음 순서로 한 변수씩 바꾼다.
-
-1. **오픈 직후 burst**: 정상 범위 안의 총 요청을 첫 5초에 집중시켜 1초 scrape 그래프에서 회복 시간을 본다.
-2. **hot item과 분산 item 비교**: 같은 RPS를 한 Inventory 행과 여러 Inventory 행에 각각 보내 `inventory_lock` 차이를 본다.
-3. **멱등 재시도 혼합**: 같은 요청 재전송을 섞어 신규 구매 capacity와 멱등 조회 비용을 분리한다.
-4. **품절 이후 실패 집중**: 성공 처리량이 아니라 빠르고 일관된 거절과 재고 불변식을 검증한다.
-5. **다중 상품 구매**: 잠그는 행 수와 원자적 실패가 지연에 미치는 영향을 확인한다.
-
-Worker 만료와 결제 시도는 별도의 흐름이다. 구매 capacity와 섞기 전에 각각의 고정 workload와 관측 방식을 설계한다. 그래야 수치가 나빠졌을 때 어느 흐름 때문인지 설명할 수 있다.
-
-## 참고한 도구 동작
-
-- [k6 constant-arrival-rate](https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/constant-arrival-rate/)
-- [k6 arrival-rate VU allocation](https://grafana.com/docs/k6/latest/using-k6/scenarios/concepts/arrival-rate-vu-allocation/)
-- [macOS k6 설치](https://grafana.com/docs/k6/latest/set-up/install-k6/)
-- [Grafana provisioning](https://grafana.com/docs/grafana/latest/administration/provisioning/)
-- [Prometheus scrape configuration](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)
+k6/purchase-spike.js는 최초 시도 3,000 RPS×10초 + 400 RPS×50초와 성공 구매의 결제 접수만 포함한다.
+이 스크립트의 HTTP RPS에는 결제 요청이 추가된다. 최대 VU에 막히면 dropped_iterations로 실험 무효를 표시한다.
+이 최초 부하 스크립트를 전체 비즈니스 합격 시험으로 부르지 않는다.
+
+## 남은 성능 실험
+
+- 시드 고정의 정상 backoff+jitter/최대 5회 과도 재시도, 구매 포기/반환 재고 재구매를 포함한 120초 workload.
+- 기준선 vs Redis gate의 실제 처리량·락 대기·DB 쿼리/요청 비용.
+- 총 자원 고정 API 1개/2개 비교, 포화점과 결제 접수 지연.
+- 컨테이너 강제 종료, Redis/PG 장애 상태에서 재기동 복구 시간 측정.
+- 생성기 자체 한계 검증과 대표 조건 3회 반복.
+
+자동 테스트에서 Clock과 lease를 이용한 복구 논리는 검증하지만 실제 컨테이너 장애 시간 측정을 대신하지 않는다.
+현재 수치는 목표이며 달성 측정값을 아직 기록하지 않았다.
+
+## 2026-09-08 실행 기록
+
+- JDK 21: Gradle test/bootJar 성공. PostgreSQL 계약 테스트 18개 + Redis 테스트 4개, 실패 0.
+- 준비된 전체 컨테이너에서 gate 비활성 스모크: SUCCESS/LOST_RESPONSE/DELAYED_SUCCESS 모두 CONFIRMED.
+  판매 a5deaf5f-aefe-4657-bc8b-2ece0e5529a0의 최종 sold=3, held=0, available=0.
+- 테스트 DB reset: Flyway 이력 2개 보존, 기존 dev 주문 3개 보존 확인.
+- k6 inspect 성공. 실제 3,000 RPS 부하 실행 및 성능 합격 판정은 수행하지 않음.
+- docker inspect로 표의 CPU/memory 제한 적용, 각 컨테이너 restart=0 / OOMKilled=false 확인.
+- 최초 PowerShell 준비 확인은 localhost/2초 요청 제한에서 실패했고 127.0.0.1/5초로 수정 후 통과.
+- 최종 빌드 + gate 활성화 + 전체 재기동에서는 Mock PG의 늦은 기동으로 첫 SUCCESS가 30초 안에 확정되지 않아 스모크가 중단됨.
+  주문 58253073-1d6a-4451-9e2d-4d363d5a0dbe는 이후 Worker 재확인으로 CONFIRMED/SUCCEEDED가 됨.
+  이 실행에서 남은 시나리오와 소진 후 멱등 재조회 검사는 도달하지 않았으므로 통과로 간주하지 않음.
+- 마지막 dev DB 검사: CONFIRMED 4개, SUCCEEDED 4개, ops/invariants.sql 위반 0행.
+
+사용자의 반복 오류 시 중단 요청에 따라 기동 준비 조건의 추가 수정/스모크 재실행은 멈췄다.
+다음 실행 전 API뿐 아니라 Mock PG의 준비 상태도 기다리는 기동 순서를 검토해야 한다.

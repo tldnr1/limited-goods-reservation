@@ -7,5 +7,6 @@ ADR은 되돌리기 비싸거나 시스템 구조와 품질에 큰 영향을 주
 | [0001](0001-feature-oriented-modular-monolith.md) | 승인 | 기능 중심 모듈러 모놀리스로 시작한다. |
 | [0002](0002-postgresql-as-source-of-truth.md) | 승인 | PostgreSQL을 영속 상태의 기준으로 사용한다. |
 | [0003](0003-separate-payment-attempts.md) | 승인 | 주문과 결제 시도 기록을 분리한다. |
+| [0004](0004-java-baseline.md) | 승인 | Java 새 구현, DB 기반 결제 작업, 선택적 Redis admission. 0001의 Python 선택을 대체한다. |
 
 결정이 바뀌면 기존 기록을 삭제하거나 다시 쓰지 않고 `Superseded`로 표시한 뒤 대체 ADR을 연결합니다.
