@@ -73,6 +73,10 @@ perf DB 최초 마이그레이션은 docker compose --env-file ops/perf.env up -
 
 ## 문서
 
+읽기 전용 준비 확인: `pwsh -NoProfile -File ./ops/performance.ps1`.
+perf 초기화·기동과 단일 실험 기록은 같은 스크립트의 `Prepare` / `Run`으로 분리했다.
+`Run`은 RPS를 명시해야 하며 실제 부하를 발생시킨다. 자세한 사용법은 아래 가이드를 따른다.
+
 - [비즈니스 계약](PROJECT.md), [인프라·트랜잭션 설계](DESIGN.md)
 - [FastAPI 경험에서 Spring 코드 읽기](docs/learning.md)
 - [자원 예산·성능 목표·검증 범위](docs/performance.md)

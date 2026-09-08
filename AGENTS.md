@@ -6,6 +6,8 @@ archive/java-spring-v3.2는 변경하지 않는다. 과거 구현의 결과를 �
 
 먼저 PROJECT.md(계약), DESIGN.md(실행·트랜잭션), docs/learning.md(코드 읽기)를 읽는다.
 현재 검증 범위와 미완료 성능 실험은 docs/performance.md에 있다.
+공통 실행 진입점은 ops/performance.ps1이다. 기본 Check는 읽기 전용이며,
+Prepare는 perf 데이터 초기화, Run은 실제 부하를 포함한다. 부하 실행 요청 없이 Run을 사용하지 않는다.
 
 - 요청한 범위만 변경하고 비즈니스 불변식과 실패 동작을 보존한다.
 - DB는 Flyway로 변경한다. Hibernate ddl-auto는 validate를 유지한다.

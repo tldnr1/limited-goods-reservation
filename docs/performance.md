@@ -41,23 +41,12 @@ API 하나와 둘을 비교할 때는 API 총 CPU=1.5, 총 메모리=1536MiB, �
 429는 오류와 분리해도 반드시 비율을 보고한다. 판매 수량/확정 시간 없이 빠른 거절만으로 통과시키지 않는다.
 영구 UNKNOWN과 의도적으로 중단한 PG에는 정상 판매 완료 목표를 적용하지 않으며 상태 정합성을 확인한다.
 
-## 실행 순서
+## 실행 방법
 
-1. dev/test를 중단한다. perf env로 한 번 기동하여 Flyway 적용 후 서비스를 멈춘다.
-2. 이전 결과를 저장하고 부하 발생기 종료 → reset-db.ps1 -Environment perf → perf env 기동.
-3. 별도 판매로 워밍업하고, 측정 판매를 새로 생성한다.
-4. 아래 최초 도착 부하를 실행한다. 3,000은 첫 10초 구간의 평균 최초 구매 시도 RPS이며 동시 사용자 수가 아니다.
-5. 부하 종료 뒤 Worker 정리 시간을 두고 ops/invariants.sql, 주문 상태, pool/락 대기, CPU/메모리를 함께 기록한다.
-
-```powershell
-docker compose --env-file ops/perf.env up -d --wait --wait-timeout 240
-docker compose --profile observe up -d prometheus
-docker run --rm --cpus 1.5 --memory 1g --mount "type=bind,source=$PWD/k6,target=/scripts,readonly" grafana/k6:0.54.0 run /scripts/purchase-spike.js
-```
-
-k6/purchase-spike.js는 최초 시도 3,000 RPS×10초 + 400 RPS×50초와 성공 구매의 결제 접수만 포함한다.
-이 스크립트의 HTTP RPS에는 결제 요청이 추가된다. 최대 VU에 막히면 dropped_iterations로 실험 무효를 표시한다.
-이 최초 부하 스크립트를 전체 비즈니스 합격 시험으로 부르지 않는다.
+공통 절차는 ops/performance.ps1로 통합했다. 명령과 결과 파일 설명은
+[Git Bash 실행 가이드](load-test-guide.md)를 따른다.
+현재 purchase-spike는 최초 구매 시도와 성공 점유의 결제 접수만 포함하며,
+전체 비즈니스 합격 시험이나 자동 RPS 상승 실험은 아니다.
 
 ## 남은 성능 실험
 
@@ -100,3 +89,13 @@ k6/purchase-spike.js는 최초 시도 3,000 RPS×10초 + 400 RPS×50초와 성�
 
 다음 단계 안내는 [Git Bash 부하테스트 가이드](load-test-guide.md)에 있다.
 현재 스크립트의 최초 도착 부하와 아직 미구현인 재시도·재구매 시나리오를 구분하여 읽는다.
+
+## 실행 자동화 준비 확인 (2026-09-09)
+
+ops/performance.ps1의 Check / Prepare / Run으로 공통 절차를 통합했다.
+기본 Check는 현재 환경을 변경하지 않는다. Run은 명시한 RPS로 실험 한 번만 수행하도록 작성했다.
+PowerShell 문법 검사와 Git Bash에서 Check를 실행해 ready를 확인했다.
+PostgreSQL·Redis·앱 4개는 healthy, Nginx는 running이며 Nginx 경유 읽기 API 응답이 정상이다.
+이번에는 Prepare/Run, 초기화, 구매·결제 스모크, 기능 테스트 재실행, 부하 측정을 하지 않았다.
+따라서 실제 부하 발생부터 결과 수집까지의 자동화 경로는 아직 실행 검증 전이다.
+다음 단계는 낮은 고정 요청량 실험 한 번으로 생성기·수집 유효성을 확인하는 것이다.

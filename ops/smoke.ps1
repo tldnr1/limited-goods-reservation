@@ -1,29 +1,7 @@
+#requires -Version 7.0
 param([string]$BaseUrl = 'http://127.0.0.1:8080')
 $ErrorActionPreference = 'Stop'
-# Refuse to start purchases until this local Compose stack is fully ready.
-# This does not start/restart containers or extend payment confirmation deadlines.
-Push-Location (Split-Path $PSScriptRoot -Parent)
-try {
-    foreach ($service in @('mock-pg','api1','api2','worker')) {
-        $containerId = docker compose ps -q $service
-        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($containerId)) {
-            throw "$service 컨테이너가 없습니다. 먼저 docker compose up -d --wait --wait-timeout 240을 실행하세요."
-        }
-        $health = docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' $containerId
-        if ($LASTEXITCODE -ne 0 -or $health -ne 'healthy') {
-            throw "$service 준비 상태가 healthy가 아닙니다: $health. 구매 요청은 보내지 않았습니다."
-        }
-    }
-} finally { Pop-Location }
-$ready = $false
-for ($i=0; $i -lt 30; $i++) {
-    try { Invoke-RestMethod "$BaseUrl/api/sales/00000000-0000-0000-0000-000000000000" -TimeoutSec 5 | Out-Null }
-    catch {
-        if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 404) { $ready=$true; break }
-    }
-    Start-Sleep -Seconds 2
-}
-if (-not $ready) { throw 'API 준비 시간 초과' }
+& (Join-Path $PSScriptRoot 'check-health.ps1') -BaseUrl $BaseUrl | Out-Null
 $saleInput = @{
     name = 'java-smoke'
     opensAt = [DateTime]::UtcNow.AddMinutes(-1).ToString('o')

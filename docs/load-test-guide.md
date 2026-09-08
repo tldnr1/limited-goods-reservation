@@ -1,133 +1,97 @@
-# 다음 단계 준비와 부하테스트 가이드 — Git Bash
+# 부하테스트 실행 가이드 — Git Bash
 
-현재는 기능을 이해하고 검증하는 단계다. 이 문서 작성 과정에서는 부하테스트를 실행하지 않았다.
-아래 **3번부터는 나중에 직접 측정을 시작할 때** 사용하는 절차다.
+이번 변경은 실행 절차 자동화와 health 확인까지다. 실제 부하·성능 측정은 아직 하지 않았다.
 
-## 1. 지금 만들어진 것
+## 현재 준비된 것
 
-- Nginx → API 2개 → PostgreSQL, 별도 Worker와 Mock PG. 모두 로컬 Compose로 실행한다.
-- 여러 상품의 원자적 점유, 인당 제한, 멱등 구매, 결제 접수/확정, 만료/반환.
-- DB에 결제 작업을 남기고 Worker가 처리한다. HTTP 202는 접수이며 CONFIRMED가 결제 완료다.
-- Redis gate를 켜면 동시 구매 진입 수를 제한하고 소진 결과를 1초 캐싱한다. 실제 재고 원장은 DB다.
-- PostgreSQL 하나의 dev/test/perf DB, 환경별 Redis 키, Flyway와 초기화 스크립트.
-- PostgreSQL·Redis 기능 테스트 22개, 3건짜리 스모크, k6 최초 도착 부하 스크립트, 선택적 Prometheus.
+Java/Spring 구매·점유·결제·만료, API 2개/Nginx/Worker/Mock PG,
+PostgreSQL의 dev/test/perf DB, Redis gate, 기능 테스트 22개가 있다.
+공통 실행은 `ops/performance.ps1`, 요청 패턴은 `k6/purchase-spike.js`가 담당한다.
+코드 읽기는 [learning.md](learning.md), 자원·합격 기준은 [performance.md](performance.md)를 본다.
 
-코드 읽기: [learning.md](learning.md). 목표와 자원 예산: [performance.md](performance.md).
-재시도 폭주·구매 포기·반환 재고 재구매를 포함한 전체 시나리오, API 1개/2개 공정 비교,
-자동 성능 보고서는 아직 완성되지 않았다.
+## 1. 지금 가능한 읽기 전용 확인
 
-## 2. 부하 없이 현재 버전 확인하기
-
-Git Bash에서 저장소로 이동한다. JDK 21, Docker Desktop, Git Bash, PowerShell 7(`pwsh`)이 필요하다.
-기존 관리 스크립트가 PowerShell이므로 Git Bash에서 pwsh로 호출한다.
+Git Bash에서 JDK 21, Docker Desktop, PowerShell 7(`pwsh`)을 사용할 수 있어야 한다.
 
 ```bash
 cd /d/Code/limited-goods-reservation
-java -version
-docker compose version
-pwsh --version
-
-docker compose up -d --wait postgres redis
-./gradlew.bat --no-daemon test bootJar
-ADMISSION_ENABLED=true docker compose up -d --build --wait --wait-timeout 240
-pwsh -NoProfile -File ./ops/smoke.ps1
+pwsh -NoProfile -File ./ops/performance.ps1
 ```
 
-명령 하나가 실패하면 다음 명령으로 넘어가지 않고 그 출력을 확인한다.
-test는 test DB를 초기화한다. perf 측정과 동시에 실행하지 않는다.
-Mock PG → API/Worker → Nginx가 준비된 뒤 시작하므로 느린 최초 JVM 기동은 결제 대기와 분리된다.
-스모크는 새 dev 판매의 3건을 정상/응답 유실/지연 결제로 확정하고, 소진 후 거절과 멱등 재조회까지 확인한다.
-이는 기능 확인이며 처리량이나 지연시간 목표의 합격 증거가 아니다.
+기본값은 `-Action Check`다. Compose 문법, 7개 서비스 상태, Nginx를 경유한 판매 조회 응답을 확인한다.
+기동/초기화/구매/결제/k6는 실행하지 않는다. 기존 dev 또는 perf 환경 모두 확인할 수 있다.
+서비스가 꺼져 있으면 알려주고 종료한다. health가 ready여도 성능 측정 전체가 검증된 것은 아니다.
 
-## 3. 나중에 무엇을 측정할까
+## 2. 환경 준비와 실험은 명시적으로 구분
 
-먼저 **동일 자원에서 gate OFF/ON**만 비교한다. 한 번에 서버 수와 pool까지 함께 바꾸지 않는다.
-`k6/purchase-spike.js`는 1,000개 판매를 생성하고 첫 10초 3,000 RPS,
-다음 50초 400 RPS의 최초 구매 시도를 보낸다. 성공한 점유는 SUCCESS 결제를 접수한다.
-구매 요청 RPS와 결제를 포함한 전체 HTTP RPS는 다르다.
+| Action | 동작 | 데이터와 부하 |
+|---|---|---|
+| Check | 현재 서비스와 API 읽기 확인 | 변경 없음 |
+| Prepare | JAR 빌드, 이미지 빌드, perf 마이그레이션·초기화, 서비스·Prometheus 기동, 준비 확인 | perf 데이터 삭제, 부하 없음 |
+| Run | Prepare 후 선택한 실험 한 번 실행, 결과 저장, 종료 | perf 데이터 삭제 + 실제 부하 |
 
-확인할 항목은 다음과 같다.
+Prepare/Run 전에 다른 부하 발생기와 로컬 테스트를 종료하고, 이전 결과를 보존한다.
+같은 Compose 프로젝트를 perf로 전환하므로 dev 앱은 중단되지만 dev DB와 기존 볼륨은 유지한다.
+goods-k6가 이미 실행 중이면 중단한다. 별도 이름으로 실행한 도구까지 자동 탐지하지는 않는다.
+원래 셸의 DB/gate 환경 변수는 명령이 끝나면 복원한다. 기동한 컨테이너는 perf 상태로 남는다.
 
-- 목표 요청량을 실제로 보냈는가: dropped_iterations, 실제 요청 수, 생성기 자원.
-- 무엇을 반환했는가: 점유 성공/409/429/예상 밖 오류의 수와 각 지연시간.
-- 결제가 끝났는가: 202 접수 수, CONFIRMED 수, 잔여 held/UNKNOWN, 최종 재고 불변식.
-- 어디서 기다렸는가: API/DB/Worker CPU·메모리, DB 락 대기, Hikari 대기.
-
-현재 k6의 지연 threshold는 전체 HTTP 집계이며 결제 접수 전용 p95 검사를 포함하지 않는다.
-409도 코드별로 세분하지 않는다. 기본 요약만으로 전체 목표 합격을 판정하지 않는다.
-태그별 분석이 필요하면 아래 raw.json을 사용한다. 반환 재고 재구매/재시도 부하는 별도 시나리오 보완이 필요하다.
-
-## 4. 측정용 환경 준비 — 아직 실행하지 않아도 됨
-
-이후 명령들은 같은 Git Bash 창에서 순서대로 실행한다.
-이전 부하 발생기와 테스트를 종료하고 결과를 저장한 다음 초기화한다.
-perf.env의 gate 기본값은 true지만 아래 export가 우선한다.
+환경만 준비하고 멈추려면:
 
 ```bash
-MODE=baseline
-export ADMISSION_ENABLED=false
-# 비교 실행 때는 MODE=gate, ADMISSION_ENABLED=true로 바꾼다.
-
-docker compose --profile observe stop
-# 최초 perf DB 마이그레이션 적용. 기존 볼륨은 유지한다.
-docker compose --env-file ops/perf.env up -d --wait --wait-timeout 240
-pwsh -NoProfile -File ./ops/reset-db.ps1 -Environment perf
-docker compose --env-file ops/perf.env up -d --wait --wait-timeout 240
-docker compose --env-file ops/perf.env --profile observe up -d prometheus
-pwsh -NoProfile -File ./ops/smoke.ps1
+pwsh -NoProfile -File ./ops/performance.ps1 -Action Prepare -Mode baseline
 ```
 
-초기화는 API/Worker/Mock PG를 먼저 멈추고 perf 테이블과 goods:perf: 키만 지운다.
-Flyway 이력, dev 데이터, 볼륨은 유지한다. down -v는 초기화 명령으로 사용하지 않는다.
-스모크가 만든 판매는 측정 판매와 다르므로 나중에 전체 DB 판매량을 측정 판매량으로 혼동하지 않는다.
-이 소량 호출만으로 JVM이 충분히 워밍업됐다고 간주하지 말고, 본 측정 전 워밍업 조건도 정한다.
+baseline은 Redis gate OFF, gate는 ON이다. CPU·메모리·pool 구성은 같다.
+Run은 재현성을 위해 준비·초기화를 다시 수행하므로 Prepare를 먼저 실행할 필요는 없다.
+자동 구매 워밍업은 포함하지 않는다. 첫 실험은 실행·수집 확인이며, 비교 측정 전 워밍업 조건을 별도로 정해야 한다.
 
-## 5. 사용자가 측정을 시작할 때만 실행
+## 3. 나중에 실제 부하를 승인한 뒤 사용할 명령
 
-다음 블록이 실제 부하를 발생시킨다. RPS를 바꾸면 목표 시나리오와 다른 실험임을 기록한다.
-Git Bash가 컨테이너 경로를 Windows 경로로 변환하지 않도록 MSYS_NO_PATHCONV를 사용한다.
+다음은 **부하를 발생시키는** 예시다. 이번 작업에서는 실행하지 않았다.
 
 ```bash
-RUN_DIR="artifacts/performance/$(date +%Y%m%d-%H%M%S)-$MODE"
-mkdir -p "$RUN_DIR"
-K6_DIR="$(cygpath -m "$PWD/k6")"
-OUT_DIR="$(cygpath -m "$PWD/$RUN_DIR")"
-git rev-parse HEAD > "$RUN_DIR/commit.txt"
-docker compose --env-file ops/perf.env config > "$RUN_DIR/compose.yaml"
+# 낮은 요청량에서 실행·수집 절차를 확인하는 예시. 비즈니스 목표 수치가 아니다.
+pwsh -NoProfile -File ./ops/performance.ps1 -Action Run -Mode baseline -OpeningRps 10 -TailRps 10
 
-MSYS_NO_PATHCONV=1 docker run --rm --name goods-k6 \
-  --cpus 1.5 --memory 1g \
-  --mount "type=bind,source=$K6_DIR,target=/scripts,readonly" \
-  --mount "type=bind,source=$OUT_DIR,target=/results" \
-  -e OPENING_RPS=3000 -e TAIL_RPS=400 \
-  grafana/k6:0.54.0 run \
-  --summary-export=/results/summary.json --out json=/results/raw.json \
-  /scripts/purchase-spike.js 2>&1 | tee "$RUN_DIR/k6.log"
-K6_EXIT=${PIPESTATUS[0]}
-echo "$K6_EXIT" > "$RUN_DIR/exit-code.txt"
+# 목표 도착 부하 예시. 이전 결과를 확인한 뒤 별도로 실행한다.
+pwsh -NoProfile -File ./ops/performance.ps1 -Action Run -Mode gate -OpeningRps 3000 -TailRps 400
 ```
 
-raw.json은 커질 수 있고 생성기 I/O에도 영향을 준다. 비교할 때 같은 수집 조건을 사용한다.
-테스트 중 다른 Git Bash 창의 `docker stats`와 http://localhost:9090의 Prometheus를 확인한다.
-현재 Prometheus는 JVM/HTTP/Hikari 등 앱 메트릭을 수집한다. PostgreSQL 락 통계는 SQL로 별도 확인해야 한다.
+RPS를 생략한 Run은 거절한다. 자동 증가·반복·후속 개선은 하지 않는다.
+현재 시나리오는 재고 1,000개를 생성하고 첫 10초 OpeningRps, 다음 50초 TailRps의 최초 구매를 보낸다.
+성공 점유의 결제 접수도 추가하므로 전체 HTTP RPS는 구매 RPS보다 높다.
+다른 요청 행동은 별도 k6 파일로 추가하고 스크립트의 Scenario 허용 목록을 확장한다.
+지금은 purchase-spike 하나만 지원한다. 이 패턴의 RPS 변경만으로 모든 시나리오를 대신하지 않는다.
 
-## 6. 측정 후 읽는 순서
+## 4. 자동 저장되는 결과
 
-Worker가 남은 작업을 처리하도록 기다린 뒤, 상태와 불변식을 저장한다.
-아래 30초는 우선 관찰 시점일 뿐 모든 결제가 끝났다는 보장은 아니다.
+결과는 `artifacts/performance/시각-mode-scenario/`에 모인다.
 
-```bash
-sleep 30
-docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U goods \
-  -d limited_goods_perf < ops/invariants.sql > "$RUN_DIR/db-check.txt"
-docker compose logs --no-color > "$RUN_DIR/services.log"
-docker compose ps -a > "$RUN_DIR/containers.txt"
-```
+| 파일 | 용도 |
+|---|---|
+| run.json, commit.txt, git-status.txt, working-tree.patch, jar-hash.json | 실행 조건·코드 식별·완료/실패 상태 |
+| compose.yaml, scenario.js | 실행 설정과 시나리오 복사 |
+| k6.log, exit-code.txt, summary.json, raw.json | 생성 요청량·지연·결과 태그·실패 근거 |
+| before/after-containers.txt, resources.jsonl | 전후 상태와 자원 스냅샷 |
+| before/after-db.txt, inventory.txt | 불변식·주문·결제 집계, 판매별 재고 |
+| prometheus.json | 실행 구간 앱/JVM/HTTP/Hikari 시계열 |
+| services.log, error.txt(실패 시) | 서비스 로그·중단 이유 |
 
-먼저 종료 코드와 dropped_iterations를 확인한다. 요청을 덜 보냈다면 목표 부하를 버텼다고 할 수 없다.
-불변식 쿼리의 첫 결과는 0행이어야 한다. 뒤의 주문/결제 집계에는 워밍업 판매도 포함된다.
-k6 로그의 Measured sale id로 측정 판매를 구분하고, 해당 판매의 확정 수량과 남은 점유를 확인한다.
-실패가 남았다면 이유를 확인한 뒤 초기화한다. raw 기록은 의도적으로 Git에서 제외돼 있다.
+성공한 k6 종료 후 30초 뒤 최종 상태를 저장한다. 실패하면 기다리지 않고 가능한 진단 자료를 저장한 뒤 종료한다.
+수집 중 실패해도 이미 저장한 파일은 유지한다. 모든 실패에서 모든 파일이 생기는 것은 아니다.
+`collected`는 수집 완료이며 비즈니스 합격이 아니다. raw.json은 크기가 클 수 있어 Git에서 제외한다.
+자원 스냅샷은 순간값이다. PostgreSQL 락 대기 시계열과 부하 발생기 자체의 자원 시계열은 아직 수집하지 않는다.
 
-빠른 429/409만 많아진 것은 판매 흐름의 개선과 다르다. 같은 자원과 요청 조건에서 결과를 비교하고,
-차이를 설명할 수 있을 때 다음 대안을 고른다. 전체 비즈니스 합격 판정과 대표 3회 반복은 그 이후 단계다.
+## 5. 결과를 보고 다음 단계 결정
+
+먼저 종료 코드·dropped_iterations로 목표 요청을 실제로 보냈는지 확인한다.
+그 뒤 성공/409/429/오류, 지연, CONFIRMED/held/UNKNOWN과 측정 판매의 재고를 함께 본다.
+DB 불변식 쿼리 첫 결과는 0행이어야 한다. 위반 여부를 사람이 확인하며 자동 합격 판정은 하지 않는다.
+
+현재 k6 threshold는 전체 HTTP 지연 기준이고 결제 접수 p95 전용 판정은 없다.
+빠른 거절만으로 개선을 주장하지 않는다. 낮은 요청량 실험이 유효하면 DB 기준선의 요청량을 한 단계씩 올리고,
+병목 근거가 생긴 뒤 같은 조건의 gate OFF/ON을 비교한다.
+생성기가 막히거나 수집이 불완전하면 서버 최적화보다 측정 조건을 먼저 정리한다.
+
+재시도 폭주·구매 포기·반환 재고 재구매, 장애 주입, API 1개/2개 공정 비교는 후속 실험이다.
+기존 세 건짜리 기능 스모크는 `pwsh -NoProfile -File ./ops/smoke.ps1`로 별도 실행할 수 있다.
