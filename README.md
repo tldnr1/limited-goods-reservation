@@ -16,13 +16,13 @@ JDK 21 및 Docker Desktop이 필요하다. Gradle은 Wrapper가 내려받는다.
 ```powershell
 docker compose up -d postgres redis
 .\gradlew.bat --no-daemon test bootJar
-docker compose up -d --build
+docker compose up -d --build --wait --wait-timeout 240
 .\ops\smoke.ps1
 ```
 
-접속 주소는 http://localhost:8080이다. smoke 스크립트는 API 준비를 기다린다.
-현재 전체 재기동에서는 저 CPU 할당의 Mock PG가 더 늦게 기동하여 30초 결제 확인 대기를 넘을 수 있다.
-API 준비 확인에 Mock PG 준비가 포함되지는 않는다. 이 제한과 확인 결과는 docs/performance.md에 기록했다.
+접속 주소는 http://localhost:8080이다. Compose는 Mock PG의 Spring readiness를 확인한 뒤 API·Worker를 시작한다.
+Nginx는 API 두 개와 Worker가 healthy일 때 시작한다. smoke 스크립트도 이 네 프로세스의 health를 먼저 검사한다.
+기동 대기와 결제 확인 대기는 별개이며, 결제 확인 제한 30초와 비즈니스 점유 기한은 그대로다.
 통합 테스트는 실제 PostgreSQL의 limited_goods_test와 Redis의 테스트 namespace만 사용한다.
 test 실행 시 해당 테스트 DB는 각 테스트 전에 초기화된다. perf 실행과 동시에 테스트하지 않는다.
 
@@ -30,7 +30,7 @@ Redis gate는 기본값 false로 DB 기준선부터 확인한다. 활성화 예:
 
 ```powershell
 $env:ADMISSION_ENABLED='true'
-docker compose up -d
+docker compose up -d --wait --wait-timeout 240
 docker compose restart nginx
 Remove-Item Env:ADMISSION_ENABLED
 ```
@@ -67,7 +67,7 @@ Mock PG receipt는 해당 DB에 있으므로 DB 초기화와 함께 초기화된
 
 스크립트는 이 프로젝트의 API/Worker/Mock PG를 먼저 멈추고, 대상 DB 확인 후 명시된 테이블만 초기화한다.
 Flyway 이력, PostgreSQL 볼륨, 다른 프로젝트는 보존한다. 실행 뒤 서비스는 중단 상태다.
-perf DB 최초 마이그레이션은 docker compose --env-file ops/perf.env up -d로 기동하여 적용한다.
+perf DB 최초 마이그레이션은 docker compose --env-file ops/perf.env up -d --wait --wait-timeout 240으로 기동하여 적용한다.
 그 뒤 측정 전 reset-db.ps1 -Environment perf를 실행하고 같은 env-file로 다시 기동한다.
 측정 결과를 먼저 저장하고 부하 발생기를 끝낸 뒤 초기화한다.
 
@@ -76,3 +76,4 @@ perf DB 최초 마이그레이션은 docker compose --env-file ops/perf.env up -
 - [비즈니스 계약](PROJECT.md), [인프라·트랜잭션 설계](DESIGN.md)
 - [FastAPI 경험에서 Spring 코드 읽기](docs/learning.md)
 - [자원 예산·성능 목표·검증 범위](docs/performance.md)
+- [Git Bash에서 기능 확인과 향후 부하테스트 준비](docs/load-test-guide.md)

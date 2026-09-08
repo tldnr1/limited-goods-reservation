@@ -50,7 +50,7 @@ API 하나와 둘을 비교할 때는 API 총 CPU=1.5, 총 메모리=1536MiB, �
 5. 부하 종료 뒤 Worker 정리 시간을 두고 ops/invariants.sql, 주문 상태, pool/락 대기, CPU/메모리를 함께 기록한다.
 
 ```powershell
-docker compose --env-file ops/perf.env up -d
+docker compose --env-file ops/perf.env up -d --wait --wait-timeout 240
 docker compose --profile observe up -d prometheus
 docker run --rm --cpus 1.5 --memory 1g --mount "type=bind,source=$PWD/k6,target=/scripts,readonly" grafana/k6:0.54.0 run /scripts/purchase-spike.js
 ```
@@ -86,3 +86,17 @@ k6/purchase-spike.js는 최초 시도 3,000 RPS×10초 + 400 RPS×50초와 성�
 
 사용자의 반복 오류 시 중단 요청에 따라 기동 준비 조건의 추가 수정/스모크 재실행은 멈췄다.
 다음 실행 전 API뿐 아니라 Mock PG의 준비 상태도 기다리는 기동 순서를 검토해야 한다.
+
+## 기동 오류 수정 후 기능 재검증 (2026-09-08)
+
+- Mock PG → API 2개·Worker → Nginx 순서에 Spring readiness / Compose health 조건을 적용했다.
+- smoke는 네 앱의 health를 먼저 검사한다. 기동 대기와 결제 처리 대기를 분리했고 결제 확인 30초, 점유/유예 기한은 변경하지 않았다.
+- Git Bash에서 test/bootJar 성공: 기능 테스트 22개, 실패 0.
+- 앱 컨테이너를 모두 정지한 뒤 Redis gate 활성 상태로 재기동하고, --wait 완료 직후 스모크를 실행했다.
+- 판매 20baf25d-11d3-45f2-bead-7e71ce6b78e7: 정상/응답 유실/지연 결제 모두 CONFIRMED,
+  sold=3 / held=0 / available=0. 소진 후 신규 구매 거절과 기존 구매 멱등 재조회도 통과했다.
+- 위의 기동 시 스모크 중단 문제는 이번 확인에서 재현되지 않았다. 운영 중 PG 장애의 모든 경우를 검증했다는 뜻은 아니다.
+- 이번 작업에서는 k6 실행, RPS 증가 실험, 실제 성능 측정을 하지 않았다.
+
+다음 단계 안내는 [Git Bash 부하테스트 가이드](load-test-guide.md)에 있다.
+현재 스크립트의 최초 도착 부하와 아직 미구현인 재시도·재구매 시나리오를 구분하여 읽는다.

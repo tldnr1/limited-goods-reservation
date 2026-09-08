@@ -25,6 +25,11 @@ flowchart LR
 외부 노출은 localhost:8080의 Nginx뿐이며 PostgreSQL·Redis 개발 포트도 localhost에만 바인딩한다.
 판매 등록과 테스트 사용자 헤더는 공개 서비스용 인증이 아니다.
 
+기동 순서는 PostgreSQL·Redis → Mock PG readiness → API 2개·Worker readiness → Nginx다.
+Spring Boot의 readiness probe와 Compose service_healthy 조건으로 프로세스 시작과 요청 처리 준비를 구분한다.
+이 조건은 초기 기동을 조정한다. 실행 도중 PG 장애가 나면 기존 UNKNOWN/재확인 정책을 사용하며,
+Compose가 의존 서비스를 자동 중단하거나 비즈니스 기한을 연장하는 것은 아니다.
+
 ## 구매 트랜잭션
 
 PurchaseController의 @Valid가 JSON DTO를 검사한다.
