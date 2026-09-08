@@ -156,10 +156,7 @@ k6의 전체 HTTP 요청 602건에는 `setup()`의 판매 생성 1건이 포함�
 
 Grafana의 10초 `rate()`와 Histogram 분위수는 시간에 따른 모양을 보는 값이다. 이 run처럼 새 label 시계열이 첫 요청과 함께 생기는 짧은 테스트에서는 Prometheus의 첫 scrape 전에 처리된 수가 구간 증가량에서 빠질 수 있다. 따라서 총 요청 수와 합격 여부는 k6 요약과 사후 데이터 검증을 기준으로 하고, Grafana는 처리량 유지·지연 변화·내부 구간의 동시 변화를 읽는 데 사용한다.
 
-- [실행 메타데이터와 환경](../artifacts/performance/20260905-084524-smoke-r10/run-metadata.json)
-- [k6 요약](../artifacts/performance/20260905-084524-smoke-r10/k6-summary.json)
-- [k6 전체 출력](../artifacts/performance/20260905-084524-smoke-r10/k6-output.log)
-- [고정 시간대 Grafana 화면](../artifacts/performance/20260905-084524-smoke-r10/grafana-dashboard.png)
+이 smoke의 개별 산출물은 최종 capacity 비교 자료를 70·80 RPS 두 케이스로 정리하면서 제거했다. 위 결과는 측정 경로를 처음 검증한 이력으로만 남긴다.
 
 ### Windows에서 같은 smoke를 직접 실행하는 순서
 
@@ -353,35 +350,23 @@ docker stats limited-goods-k6-capacity `
 
 한 host에서 찾은 첫 이상 구간은 탐색 결과다. 포트폴리오의 비교 근거로 채택할 때는 같은 RPS를 반복하고 k6·API·DB·host 자원을 함께 기록한다.
 
-## 첫 capacity 탐색 결과
+## 현재 capacity 비교 기록
 
-2026-09-05 Windows 로컬 환경에서 `POST /purchases`의 단일 상품 신규 구매 성공 경로를 측정했다. 매 run 전에 `limited_goods_perf`를 초기화하고 `10 RPS × 20초` warm-up, 15초 분리, 60초 본 측정을 적용했다. 재고는 1,000,000개, VU는 100개였으며 Worker와 결제 흐름은 제외했다.
+2026-09-05 Windows 로컬 환경에서 `POST /purchases`의 단일 상품 신규 구매 성공 경로를 다시 측정했다. 매 run 전에 API를 재시작하고 `limited_goods_perf`를 초기화한 뒤 `10 RPS × 20초` warm-up, 15초 분리, 60초 본 측정을 적용했다. 재고는 1,000,000개, VU는 200개였으며 Worker와 결제 흐름은 제외했다. k6는 Compose network에서 `http://api:8000`을 직접 호출했다.
 
-게임·Discord·게임 launcher는 실행 중이지 않았다. Wallpaper Engine과 Riot Vanguard tray는 백그라운드에 남아 있었다. Docker Desktop에는 12 logical CPU와 약 7.7 GiB 메모리가 할당돼 있었고 Codex, ChatGPT, Chrome, NVIDIA Broadcast도 실행 중이었으므로 결과는 이 로컬 구성 전체의 값이다.
+사전 수동 실행에서는 70 RPS가 정상이라고 관찰했지만, 산출물을 남기기 위한 재실행에서는 같은 결과가 재현되지 않았다. 첫 재실행은 이전 부하의 `idle in transaction` 연결 30개가 남아 있어 폐기했다. 이후 API 재시작과 DB 초기화로 잔류 transaction이 없음을 확인하고 다시 실행했지만 70 RPS도 포화됐다. 아래에는 이 격리 재실행만 기록한다.
 
-초기 탐색에서는 k6가 `host.docker.internal:8000`을 통해 Windows published port로 접근했다. 55~60 RPS에서 30초 부근의 연결 timeout이 반복돼 이 경로의 결과는 capacity 판단에서 제외했다. 공식 결과는 k6를 `limited-goods-next_default`에 연결하고 `http://api:8000`으로 호출해 Windows port proxy를 우회한 run만 사용한다.
+| 목표 RPS | 실제 구매/s | dropped | 구매 성공 check | HTTP avg / p95 / max | 결과 |
+|---:|---:|---:|---:|---:|---|
+| 70 | 9.012 | 3,497 | 77.34% (488/631) | 16.49 / 60.00 / 60.00초 | 포화, 70 RPS 정상 재현 실패 |
+| 80 | 5.584 | 4,335 | 63.43% (248/391) | 25.61 / 60.00 / 60.00초 | 포화 |
 
-| 목표 RPS | 반복 | 실제 구매/s | dropped | HTTP 실패 | k6 HTTP p95 / max | pool peak | k6 CPU 평균 | 결과 |
-|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| 50 | 1 | 49.995 | 0 | 0 | 18.91 / 80.11 ms | 2 | 5.61% | 정상 |
-| 55 | 1 | 54.942 | 0 | 0 | 31.24 / 158.52 ms | 5 | 6.70% | 정상 |
-| 55 | 2 | 54.977 | 0 | 0 | 61.62 / 306.65 ms | 4 | 6.52% | 정상, tail 변동 있음 |
-| 55 | 3 | 54.994 | 0 | 0 | 20.87 / 176.12 ms | 2 | 6.12% | 정상 |
-| 60 | 1 | 59.124 | 12 | 0 | 1,793.66 / 3,143.63 ms | 30 | 6.70% | 포화 |
+70 RPS는 약 9초, 80 RPS는 약 5초 만에 200 VU를 모두 사용했다. 두 run 모두 SQLAlchemy pool capacity 30에 도달했고 API 로그에서 30초 connection checkout timeout이 발생했다. 과부하 중에는 `/metrics` scrape도 대부분 응답하지 못해 Grafana 선이 초반 이후 끊겼다. 따라서 PNG는 정상 추세 그래프가 아니라 관측 경로도 함께 포화됐다는 증거로 읽어야 한다.
 
-55 RPS는 세 번 모두 실패와 dropped 없이 목표 처리량을 유지했다. 세 run의 실제 처리량 평균은 54.971 RPS이고 p95 평균은 37.91 ms, 범위는 20.87~61.62 ms다. 모든 run에서 `available + held + sold = 1,000,000`과 `held = 성공 구매 수`가 유지됐다.
+k6 프로세스 종료 코드는 두 run 모두 0이지만 현재 스크립트에는 threshold가 없으므로 통과를 뜻하지 않는다. 합격 여부는 `dropped_iterations`, 구매 check, 목표 대비 실제 처리량으로 판단한다. 현재 자료로는 70 RPS를 정상 하한으로 확정할 수 없으며, 이전 수동 실행과 이번 격리 실행이 달라진 원인을 먼저 확인해야 한다.
 
-60 RPS에서는 전송된 요청 3,589건은 모두 201이었지만, 12개 iteration을 시작하지 못했고 실제 처리량도 목표에 미달했다. p95는 1.79초로 비선형 상승했고 SQLAlchemy `checked_out`은 capacity 30에 도달했다. 같은 구간에서 Prometheus 기준 `idempotency_lookup` p95 최대 1.78초와 `inventory_lock` p95 최대 1.63초가 함께 나타났다. 앞 구간의 잠금 대기로 연결 점유 시간이 길어지고, 다음 요청의 connection 획득까지 밀리는 연쇄를 우선 의심할 수 있다. 다만 stage 계측만으로 순수 PostgreSQL lock wait를 확정할 수는 없으므로 개선안을 고르기 전 `pg_stat_activity`와 `pg_locks` 관측이 필요하다.
-
-k6 CPU 평균은 경계 구간에서도 약 6~7%였고 host CPU도 지속 포화되지 않았다. API와 PostgreSQL 로그에서도 오류는 발견되지 않았다. 따라서 이번 60 RPS 이상 징후는 부하 발생기 CPU 한계나 서버 오류보다는 서비스 내부 대기와 연결 풀 포화로 보는 편이 타당하다. 60 RPS 첫 회차가 중단 조건을 이미 충족했으므로 같은 과부하를 세 번 반복하지 않았고, 마지막 정상 후보인 55 RPS만 세 번 확인했다.
-
-이번 결과는 하나의 hot Inventory 행을 비관적 lock으로 처리하는 로컬 단일 API 구성의 범위다. 보편적인 서비스 capacity를 55 RPS라고 단정하지 않고, **반복 확인된 정상 하한은 55 RPS, 첫 불안정 구간은 60 RPS**라고 기록한다.
-
-- [실험 전체 요약](../artifacts/performance/20260905-capacity-sweep/sweep-summary.json)
-- [55 RPS 대표 Grafana 화면](../artifacts/performance/20260905-capacity-sweep/grafana-direct-rps55-representative.png)
-- [60 RPS 포화 Grafana 화면](../artifacts/performance/20260905-capacity-sweep/grafana-direct-rps60-saturation.png)
-- [직접 network run 전체 Grafana 화면](../artifacts/performance/20260905-capacity-sweep/grafana-direct-overview.png)
-- 각 run의 k6·Prometheus·자원·재고 결과: [`artifacts/performance/20260905-capacity-sweep`](../artifacts/performance/20260905-capacity-sweep)
+- [70 RPS 실행 자료](../artifacts/performance/rps-70-overload)
+- [80 RPS 실행 자료](../artifacts/performance/rps-80-overload)
 
 ## 실행 환경을 언제 분리할까
 

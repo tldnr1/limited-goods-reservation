@@ -1,0 +1,35 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+     execution: local
+        script: /scripts/v2/stock-strategy-baseline.js
+        output: Prometheus remote write (http://prometheus:9090/api/v1/write)
+
+     scenarios: (100.00%) 1 scenario, 10 max VUs, 2m30s max duration (incl. graceful stop):
+              * stock_strategy_baseline: 10 iterations shared among 10 VUs (maxDuration: 2m0s, gracefulStop: 30s)
+
+v2 stock strategy baseline
+run_id=20260616-132824-naive-rdb-warmup
+stock_strategy=naive-rdb
+product_id=1
+users=10
+iterations=10
+repeat=0
+initial_stock=100
+http_reqs=11
+http_req_failed_rate=0
+http_req_duration_p50_ms=456.992262
+http_req_duration_p95_ms=466.89963650000004
+http_req_duration_p99_ms=467.0543849
+successful_purchases=10
+sold_out_responses=0
+lock_timeout_responses=0
+unexpected_responses=0
+Run the DB verification query to calculate oversell_count.
+
+running (0m00.5s), 00/10 VUs, 10 complete and 0 interrupted iterations
+stock_strategy_baseline ✓ [ 100% ] 10 VUs  0m00.5s/2m0s  10/10 shared iters

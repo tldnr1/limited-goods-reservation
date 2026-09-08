@@ -1,0 +1,11 @@
+{
+  "rate_rps": 70,
+  "duration": "60s",
+  "pre_allocated_vus": 200,
+  "stock": 1000000,
+  "measurement_started_at": "2026-09-05T22:44:09.3247379+09:00",
+  "measurement_finished_at": "2026-09-05T22:45:20.4827172+09:00",
+  "grafana_from_ms": 1788615844324,
+  "grafana_to_ms": 1788615930482,
+  "docker_exit_code": 0
+}

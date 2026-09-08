@@ -9,3 +9,5 @@ dist/
 build/
 *.egg-info/
 artifacts/performance/**/k6-output.log
+!artifacts/performance/rps-70-overload/k6-output.log
+!artifacts/performance/rps-80-overload/k6-output.log

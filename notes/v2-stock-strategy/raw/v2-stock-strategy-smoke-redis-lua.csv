@@ -1,0 +1,2 @@
+"run_id","strategy","users","repeat","initial_stock","http_reqs","http_failed_rate","http_p50_ms","http_p95_ms","http_p99_ms","successful_purchases","sold_out_responses","lock_timeout_responses","unexpected_responses","db_initial_quantity","db_sold_quantity","db_order_count","redis_available","stock_decision_count","oversell_count","decision_order_gap"
+"20260616-163545-redis-lua-u10-r1","redis-lua","10","1","100","11","0","17.496534","17.9718835","18.1627495","10","0","0","0","100","0","10","90","10","0","0"
