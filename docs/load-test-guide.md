@@ -43,7 +43,9 @@ pwsh -NoProfile -File ./ops/performance.ps1 -Action Prepare -Mode baseline
 
 baseline은 Redis gate OFF, gate는 ON이다. CPU·메모리·pool 구성은 같다.
 Run은 재현성을 위해 준비·초기화를 다시 수행하므로 Prepare를 먼저 실행할 필요는 없다.
-자동 구매 워밍업은 포함하지 않는다. 첫 실험은 실행·수집 확인이며, 비교 측정 전 워밍업 조건을 별도로 정해야 한다.
+Run은 별도 판매에서 10 RPS·30초 워밍업을 수행하고 300건 결제 확정을 확인한 뒤 본 측정을 시작한다.
+워밍업 오류·요청 누락·미확정 주문이 남으면 본 측정을 실행하지 않는다.
+고정 워밍업 조건을 맞춘 것이며 JVM 성능이 완전히 안정화됐다는 보장은 아니다.
 
 ## 3. 나중에 실제 부하를 승인한 뒤 사용할 명령
 
@@ -72,6 +74,7 @@ RPS를 생략한 Run은 거절한다. 자동 증가·반복·후속 개선은 �
 | run.json, commit.txt, git-status.txt, working-tree.patch, jar-hash.json | 실행 조건·코드 식별·완료/실패 상태 |
 | compose.yaml, scenario.js | 실행 설정과 시나리오 복사 |
 | k6.log, exit-code.txt, summary.json, raw.json | 생성 요청량·지연·결과 태그·실패 근거 |
+| warmup.js, warmup.log, warmup-summary.json | 본 측정과 분리된 워밍업 조건·결과 |
 | before/after-containers.txt, resources.jsonl | 전후 상태와 자원 스냅샷 |
 | before/after-db.txt, inventory.txt | 불변식·주문·결제 집계, 판매별 재고 |
 | prometheus.json | 실행 구간 앱/JVM/HTTP/Hikari 시계열 |
