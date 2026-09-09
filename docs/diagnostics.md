@@ -55,3 +55,16 @@ transaction_entry에서 실패하면 재고 락 단계에 도달하지 않은 �
 단계 로그는 구매 경로에 추가했다. Worker/결제의 개별 Java 단계와 SQL별 실행 시간 전부를 측정하는 것은 아니다.
 DB 표본에서 이 경로가 blocker로 확인되면 필요한 구간을 추가 계측한다.
 첫 실패 자료는 artifacts/performance/20260909-011321-469-baseline-purchase-spike/review.md에 보존한다.
+
+## API 배정 변경
+
+계측 보강 커밋 fa3103f는 기존 round-robin을 유지한다. 다음 커밋에서 `random two least_conn`만 별도 적용했다.
+일반 least_conn도 동률이면 round-robin을 쓰므로, 요청이 겹치지 않는 낮은 부하에서 구매→결제의 반복 배정이 남을 수 있다.
+random two는 후보 선택을 무작위화한 뒤 활성 연결 수로 비교한다. API 두 대에서는 둘을 비교하지만
+고정된 요청 순서에 의존하는 배정을 줄이려는 목적이 있다. 작은 표본의 균등 분포를 보장하지 않는다.
+Nginx의 연결 수는 DB 풀/쿼리 비용을 의미하지 않는다. DB hot-row 직렬화도 남는다.
+
+근거: [nginx least_conn/random 공식 문서](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#random).
+nginx 1.28 이미지에서 -t 구문 검증을 수행하며, 실제 구매/결제 분포 및 500 감소 효과는 아직 측정하지 않았다.
+AdmissionGate, 풀·스레드·타임아웃, 워밍업 패턴, 구매 트랜잭션의 비즈니스 실행 순서는 유지한다.
+전후 효과를 분리하려면 같은 관측 조건의 fa3103f와 이후 커밋을 비교한다. 과거 미계측 실행과 직접 성능 향상을 주장하지 않는다.

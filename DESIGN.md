@@ -22,6 +22,8 @@ flowchart LR
 
 동일 JAR를 API 2개, Worker, Mock PG에 사용한다. Mock PG의 영속 테이블도 로컬 PostgreSQL에 있다.
 이는 프로세스 장애 실험용이며 외부 PG의 물리적 독립성을 재현하지는 않는다.
+Nginx는 random two least_conn으로 요청을 분배한다. 순차 구매→결제와 고정 라운드로빈의 정렬을 피하고
+활성 연결이 적은 API를 선택하려는 변경이다. 요청 종류별 균등 분포나 DB 락 경합 해소를 보장하지 않는다.
 외부 노출은 localhost:8080의 Nginx뿐이며 PostgreSQL·Redis 개발 포트도 localhost에만 바인딩한다.
 판매 등록과 테스트 사용자 헤더는 공개 서비스용 인증이 아니다.
 
