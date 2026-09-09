@@ -76,6 +76,7 @@ random two는 후보 선택을 무작위화한 뒤 활성 연결 수로 비교�
 Nginx의 연결 수는 DB 풀/쿼리 비용을 의미하지 않는다. DB hot-row 직렬화도 남는다.
 
 근거: [nginx least_conn/random 공식 문서](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#random).
-nginx 1.28 이미지에서 -t 구문 검증을 수행하며, 실제 구매/결제 분포 및 500 감소 효과는 아직 측정하지 않았다.
+변경 당시 nginx 1.28 이미지에서 -t 구문 검증을 수행했다. 후속 사용자 실행의 분포와 결과는
+[실험 기록](../artifacts/performance/README.md)에 보존하며 배정 변경 하나의 인과 효과로 단정하지 않는다.
 AdmissionGate, 풀·스레드·타임아웃, 워밍업 패턴, 구매 트랜잭션의 비즈니스 실행 순서는 유지한다.
 전후 효과를 분리하려면 같은 관측 조건의 fa3103f와 이후 커밋을 비교한다. 과거 미계측 실행과 직접 성능 향상을 주장하지 않는다.

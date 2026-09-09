@@ -1,0 +1,26 @@
+{
+  "source": "raw.json (kept locally; excluded from Git) and summary.json",
+  "rawSha256": "2CBD428E5FB9D95060EE93D18CE0D664310EF9301A69CFB312BC4F32981765BF",
+  "quantileMethod": "Linear interpolation at index (N-1)*0.99 in sorted purchase http_req_duration samples",
+  "purchaseCount": 602,
+  "purchaseP95Ms": 14.642074599999997,
+  "purchaseP99Ms": 17.758599959999998,
+  "purchaseMaxMs": 64.67676,
+  "paymentAcceptP95Ms": 9.594784849999998,
+  "httpStatusCounts": [
+    {
+      "Name": "http://host.docker.internal:8080/api/sales 201",
+      "Count": 1
+    },
+    {
+      "Name": "payment_accept 202",
+      "Count": 602
+    },
+    {
+      "Name": "purchase 201",
+      "Count": 602
+    }
+  ],
+  "droppedIterations": 0,
+  "unexpectedErrorRate": 0
+}

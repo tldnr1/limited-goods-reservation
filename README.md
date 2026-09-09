@@ -80,4 +80,5 @@ perf 초기화·기동과 단일 실험 기록은 같은 스크립트의 `Prepar
 - [비즈니스 계약](PROJECT.md), [인프라·트랜잭션 설계](DESIGN.md)
 - [FastAPI 경험에서 Spring 코드 읽기](docs/learning.md)
 - [자원 예산·성능 목표·검증 범위](docs/performance.md)
+- [Java 성능 실험 결과와 분석](artifacts/performance/README.md)
 - [Git Bash에서 기능 확인과 향후 부하테스트 준비](docs/load-test-guide.md)

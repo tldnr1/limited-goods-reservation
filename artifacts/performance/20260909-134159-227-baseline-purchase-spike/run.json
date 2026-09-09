@@ -1,0 +1,12 @@
+{
+  "status": "failed",
+  "mode": "baseline",
+  "scenario": "purchase-spike",
+  "openingRps": 10,
+  "tailRps": 10,
+  "warmupRps": 10,
+  "warmupSeconds": 30,
+  "diagnostics": true,
+  "prometheusScrapeSeconds": 1,
+  "startedAt": "2026-09-09T13:41:59.1577676+09:00"
+}

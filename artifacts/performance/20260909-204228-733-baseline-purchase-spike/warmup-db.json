@@ -1,0 +1,9 @@
+{
+  "orders": 301,
+  "confirmedOrders": 301,
+  "attempts": 301,
+  "succeededAttempts": 301,
+  "confirmedReservations": 301,
+  "inventoryViolations": 0,
+  "userLimitViolations": 0
+}

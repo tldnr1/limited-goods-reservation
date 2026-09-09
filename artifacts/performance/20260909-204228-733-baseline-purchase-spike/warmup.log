@@ -1,0 +1,133 @@
+
+         /\      Grafana   /?얄?  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ?얄? 
+  /          \   |   (  |  (??  |
+ / __________ \  |_|\_\  \_____/ 
+
+     execution: local
+        script: /scripts/warmup.js
+        output: json (/results/warmup-raw.json)
+
+     scenarios: (100.00%) 1 scenario, 20 max VUs, 1m0s max duration (incl. graceful stop):
+              * warmup: 10.00 iterations/s for 30s (maxVUs: 20, exec: purchase, gracefulStop: 30s)
+
+
+Run      [ 100% ] setup()
+warmup   [   0% ]
+
+running (0m02.0s), 06/20 VUs, 0 complete and 0 interrupted iterations
+warmup   [   2% ] 06/20 VUs  00.6s/30s  10.00 iters/s
+
+running (0m03.0s), 05/20 VUs, 11 complete and 0 interrupted iterations
+warmup   [   5% ] 05/20 VUs  01.6s/30s  10.00 iters/s
+
+running (0m04.0s), 13/20 VUs, 13 complete and 0 interrupted iterations
+warmup   [   9% ] 13/20 VUs  02.6s/30s  10.00 iters/s
+
+running (0m05.0s), 02/20 VUs, 34 complete and 0 interrupted iterations
+warmup   [  12% ] 02/20 VUs  03.6s/30s  10.00 iters/s
+
+running (0m06.0s), 00/20 VUs, 46 complete and 0 interrupted iterations
+warmup   [  15% ] 00/20 VUs  04.6s/30s  10.00 iters/s
+
+running (0m07.0s), 00/20 VUs, 56 complete and 0 interrupted iterations
+warmup   [  19% ] 00/20 VUs  05.6s/30s  10.00 iters/s
+
+running (0m08.0s), 00/20 VUs, 66 complete and 0 interrupted iterations
+warmup   [  22% ] 00/20 VUs  06.6s/30s  10.00 iters/s
+
+running (0m09.0s), 00/20 VUs, 76 complete and 0 interrupted iterations
+warmup   [  25% ] 00/20 VUs  07.6s/30s  10.00 iters/s
+
+running (0m10.0s), 01/20 VUs, 85 complete and 0 interrupted iterations
+warmup   [  29% ] 01/20 VUs  08.6s/30s  10.00 iters/s
+
+running (0m11.0s), 00/20 VUs, 96 complete and 0 interrupted iterations
+warmup   [  32% ] 00/20 VUs  09.6s/30s  10.00 iters/s
+
+running (0m12.0s), 00/20 VUs, 106 complete and 0 interrupted iterations
+warmup   [  35% ] 00/20 VUs  10.6s/30s  10.00 iters/s
+
+running (0m13.0s), 00/20 VUs, 116 complete and 0 interrupted iterations
+warmup   [  39% ] 00/20 VUs  11.6s/30s  10.00 iters/s
+
+running (0m14.0s), 00/20 VUs, 126 complete and 0 interrupted iterations
+warmup   [  42% ] 00/20 VUs  12.6s/30s  10.00 iters/s
+
+running (0m15.0s), 00/20 VUs, 136 complete and 0 interrupted iterations
+warmup   [  45% ] 00/20 VUs  13.6s/30s  10.00 iters/s
+
+running (0m16.0s), 00/20 VUs, 146 complete and 0 interrupted iterations
+warmup   [  49% ] 00/20 VUs  14.6s/30s  10.00 iters/s
+
+running (0m17.0s), 00/20 VUs, 156 complete and 0 interrupted iterations
+warmup   [  52% ] 00/20 VUs  15.6s/30s  10.00 iters/s
+
+running (0m18.0s), 00/20 VUs, 166 complete and 0 interrupted iterations
+warmup   [  55% ] 00/20 VUs  16.6s/30s  10.00 iters/s
+
+running (0m19.0s), 00/20 VUs, 176 complete and 0 interrupted iterations
+warmup   [  59% ] 00/20 VUs  17.6s/30s  10.00 iters/s
+
+running (0m20.0s), 00/20 VUs, 186 complete and 0 interrupted iterations
+warmup   [  62% ] 00/20 VUs  18.6s/30s  10.00 iters/s
+
+running (0m21.0s), 00/20 VUs, 196 complete and 0 interrupted iterations
+warmup   [  65% ] 00/20 VUs  19.6s/30s  10.00 iters/s
+
+running (0m22.0s), 00/20 VUs, 206 complete and 0 interrupted iterations
+warmup   [  69% ] 00/20 VUs  20.6s/30s  10.00 iters/s
+
+running (0m23.0s), 00/20 VUs, 216 complete and 0 interrupted iterations
+warmup   [  72% ] 00/20 VUs  21.6s/30s  10.00 iters/s
+
+running (0m24.0s), 00/20 VUs, 226 complete and 0 interrupted iterations
+warmup   [  75% ] 00/20 VUs  22.6s/30s  10.00 iters/s
+
+running (0m25.0s), 00/20 VUs, 236 complete and 0 interrupted iterations
+warmup   [  79% ] 00/20 VUs  23.6s/30s  10.00 iters/s
+
+running (0m26.0s), 00/20 VUs, 246 complete and 0 interrupted iterations
+warmup   [  82% ] 00/20 VUs  24.6s/30s  10.00 iters/s
+
+running (0m27.0s), 00/20 VUs, 256 complete and 0 interrupted iterations
+warmup   [  85% ] 00/20 VUs  25.6s/30s  10.00 iters/s
+
+running (0m28.0s), 00/20 VUs, 266 complete and 0 interrupted iterations
+warmup   [  89% ] 00/20 VUs  26.6s/30s  10.00 iters/s
+
+running (0m29.0s), 00/20 VUs, 276 complete and 0 interrupted iterations
+warmup   [  92% ] 00/20 VUs  27.6s/30s  10.00 iters/s
+
+running (0m30.0s), 00/20 VUs, 286 complete and 0 interrupted iterations
+warmup   [  95% ] 00/20 VUs  28.6s/30s  10.00 iters/s
+
+running (0m31.0s), 00/20 VUs, 296 complete and 0 interrupted iterations
+warmup   [  99% ] 00/20 VUs  29.6s/30s  10.00 iters/s
+time="2026-09-09T11:46:22Z" level=info msg="Measured sale id: f310328e-7139-4616-8a36-b110b660a995" source=console
+
+     accepted_latency...............: avg=89.86ms  min=10.15ms med=15.6ms   max=2.37s    p(90)=104.56ms p(95)=473.58ms
+     data_received..................: 204 kB 6.5 kB/s
+     data_sent......................: 182 kB 5.8 kB/s
+   ??dropped_iterations.............: 0      0/s
+     http_req_blocked...............: avg=86.87쨉s  min=2.77쨉s  med=5.08쨉s   max=5.9ms    p(90)=7.46쨉s   p(95)=9.82쨉s  
+     http_req_connecting............: avg=70.98쨉s  min=0s      med=0s       max=3.13ms   p(90)=0s       p(95)=0s      
+     http_req_duration..............: avg=56ms     min=7.03ms  med=12.59ms  max=2.37s    p(90)=79.57ms  p(95)=109.42ms
+       { expected_response:true }...: avg=56ms     min=7.03ms  med=12.59ms  max=2.37s    p(90)=79.57ms  p(95)=109.42ms
+     http_req_failed................: 0.00%  0 out of 603
+     http_req_receiving.............: avg=474.01쨉s min=41.92쨉s med=149.69쨉s max=83.27ms  p(90)=422.99쨉s p(95)=507.24쨉s
+     http_req_sending...............: avg=47.94쨉s  min=14.06쨉s med=44.43쨉s  max=298.21쨉s p(90)=64.94쨉s  p(95)=92.94쨉s 
+     http_req_tls_handshaking.......: avg=0s       min=0s      med=0s       max=0s       p(90)=0s       p(95)=0s      
+     http_req_waiting...............: avg=55.47ms  min=6.92ms  med=12.28ms  max=2.37s    p(90)=78.94ms  p(95)=109.08ms
+     http_reqs......................: 603    19.181643/s
+     iteration_duration.............: avg=108.19ms min=17.85ms med=26.66ms  max=2.57s    p(90)=119.49ms p(95)=573.86ms
+     iterations.....................: 301    9.574916/s
+     purchase_outcomes..............: 301    9.574916/s
+   ??unexpected_errors..............: 0.00%  0 out of 602
+     vus............................: 0      min=0        max=13
+     vus_max........................: 20     min=20       max=20
+
+
+running (0m31.4s), 00/20 VUs, 301 complete and 0 interrupted iterations
+warmup ??[ 100% ] 00/20 VUs  30s  10.00 iters/s

@@ -1,0 +1,4 @@
+ sale_id | total | available | held | sold 
+---------+-------+-----------+------+------
+(0 rows)
+

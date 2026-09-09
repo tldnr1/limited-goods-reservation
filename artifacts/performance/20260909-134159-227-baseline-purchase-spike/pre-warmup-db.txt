@@ -1,0 +1,12 @@
+ id | total | available | held | sold 
+----+-------+-----------+------+------
+(0 rows)
+
+ status | count 
+--------+-------
+(0 rows)
+
+ status | count 
+--------+-------
+(0 rows)
+

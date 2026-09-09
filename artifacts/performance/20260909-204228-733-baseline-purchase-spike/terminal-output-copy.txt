@@ -1,0 +1,515 @@
+ tldnr@HOME2  D:  Code  limited-goods-reservation  main 
+❯ pwsh -NoProfile -File ./ops/performance.ps1 \
+  -Action Run \
+  -Mode baseline \
+  -OpeningRps 10 \
+  -TailRps 10 \
+  -Diagnostics
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.10.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+
+BUILD SUCCESSFUL in 10s
+4 actionable tasks: 4 up-to-date
+#1 [internal] load local bake definitions
+#1 reading from stdin 979B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 185B 0.0s done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/eclipse-temurin:21-jre
+#3 DONE 1.4s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 93B 0.0s done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 107B done
+#5 DONE 0.0s
+
+#6 [1/3] FROM docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037
+#6 resolve docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037 0.0s done
+#6 DONE 0.0s
+
+#7 [2/3] WORKDIR /app
+#7 CACHED
+
+#8 [3/3] COPY build/libs/limited-goods.jar app.jar
+#8 CACHED
+
+#9 exporting to image
+#9 exporting layers done
+#9 exporting manifest sha256:af30cda112b81cdb192e4020faae8e7f73f128f9cdfafc2e49f561c92e19cbb9 done
+#9 exporting config sha256:26efd4b7a76e5c926791043286d435b806419e6b01aaf2839f7d922948984034 done
+#9 exporting attestation manifest sha256:b38ed93f97758972e9f0da33ea845b5c7ae74c4551576b399169f13da55c698f 0.0s done
+#9 exporting manifest list sha256:98dfa5569b693bd8997b8919ced443cf82ceecc674360f191d74c10c6869a215 0.0s done
+#9 naming to docker.io/library/limited-goods-java:local
+#9 naming to docker.io/library/limited-goods-java:local done
+#9 unpacking to docker.io/library/limited-goods-java:local 0.0s done
+#9 DONE 0.1s
+
+#10 resolving provenance for metadata file
+#10 DONE 0.0s
+[+] build 1/1
+ ✔ Image limited-goods-java:local Built                                                           2.0s
+[+] stop 8/8
+ ✔ Container limited-goods-java-nginx-1      Stopped                                              0.0s
+ ✔ Container limited-goods-java-prometheus-1 Stopped                                              0.0s
+ ✔ Container limited-goods-java-worker-1     Stopped                                              0.0s
+ ✔ Container limited-goods-java-api2-1       Stopped                                              0.0s
+ ✔ Container limited-goods-java-api1-1       Stopped                                              0.0s
+ ✔ Container limited-goods-java-mock-pg-1    Stopped                                              0.0s
+ ✔ Container limited-goods-java-redis-1      Stopped                                              0.0s
+ ✔ Container limited-goods-java-postgres-1   Stopped                                              0.0s
+[+] up 8/8
+ ✔ Container limited-goods-java-mock-pg-1    Healthy                                             91.4s
+ ✔ Container limited-goods-java-worker-1     Healthy                                             91.3s
+ ✔ Container limited-goods-java-api2-1       Healthy                                             91.3s
+ ✔ Container limited-goods-java-api1-1       Healthy                                             91.3s
+ ✔ Container limited-goods-java-redis-1      Healthy                                             91.0s
+ ✔ Container limited-goods-java-postgres-1   Healthy                                             91.0s
+ ✔ Container limited-goods-java-prometheus-1 Healthy                                             91.0s
+ ✔ Container limited-goods-java-nginx-1      Healthy                                              0.7s
+[+] stop 5/5
+ ✔ Container limited-goods-java-nginx-1   Stopped                                                 0.4s
+ ✔ Container limited-goods-java-api2-1    Stopped                                                 0.4s
+ ✔ Container limited-goods-java-worker-1  Stopped                                                 0.5s
+ ✔ Container limited-goods-java-api1-1    Stopped                                                 0.5s
+ ✔ Container limited-goods-java-mock-pg-1 Stopped                                                 0.6s
+BEGIN
+TRUNCATE TABLE
+COMMIT
+limited_goods_perf 및 goods:perf: 초기화 완료. Flyway 이력과 볼륨은 보존했습니다.
+서비스는 중단 상태입니다. dev: docker compose up -d / perf: docker compose --env-file ops/perf.env up -d
+[+] up 8/8
+ ✔ Container limited-goods-java-prometheus-1 Healthy                                             82.7s
+ ✔ Container limited-goods-java-redis-1      Healthy                                             82.7s
+ ✔ Container limited-goods-java-postgres-1   Healthy                                             82.7s
+ ✔ Container limited-goods-java-mock-pg-1    Healthy                                             82.1s
+ ✔ Container limited-goods-java-api1-1       Healthy                                             32.5s
+ ✔ Container limited-goods-java-api2-1       Healthy                                             32.5s
+ ✔ Container limited-goods-java-worker-1     Healthy                                             32.5s
+ ✔ Container limited-goods-java-nginx-1      Healthy                                              0.7s
+워밍업: 별도 판매, 10 RPS × 30초
+                ]
+         /\      Grafana   /?얄?
+    /\  /  \     |\  __   /  /
+   /  \/    \    | |/ /  /   ?얄?
+  /          \   |   (  |  (??  |
+ / __________ \  |_|\_\  \_____/
+
+     execution: local
+        script: /scripts/warmup.js
+        output: json (/results/warmup-raw.json)
+
+     scenarios: (100.00%) 1 scenario, 20 max VUs, 1m0s max duration (incl. graceful stop):
+              * warmup: 10.00 iterations/s for 30s (maxVUs: 20, exec: purchase, gracefulStop: 30s)
+
+
+Run      [ 100% ] setup()
+warmup   [   0% ]
+
+running (0m02.0s), 06/20 VUs, 0 complete and 0 interrupted iterations
+warmup   [   2% ] 06/20 VUs  00.6s/30s  10.00 iters/s
+
+running (0m03.0s), 05/20 VUs, 11 complete and 0 interrupted iterations
+warmup   [   5% ] 05/20 VUs  01.6s/30s  10.00 iters/s
+
+running (0m04.0s), 13/20 VUs, 13 complete and 0 interrupted iterations
+warmup   [   9% ] 13/20 VUs  02.6s/30s  10.00 iters/s
+
+running (0m05.0s), 02/20 VUs, 34 complete and 0 interrupted iterations
+warmup   [  12% ] 02/20 VUs  03.6s/30s  10.00 iters/s
+
+running (0m06.0s), 00/20 VUs, 46 complete and 0 interrupted iterations
+warmup   [  15% ] 00/20 VUs  04.6s/30s  10.00 iters/s
+
+running (0m07.0s), 00/20 VUs, 56 complete and 0 interrupted iterations
+warmup   [  19% ] 00/20 VUs  05.6s/30s  10.00 iters/s
+
+running (0m08.0s), 00/20 VUs, 66 complete and 0 interrupted iterations
+warmup   [  22% ] 00/20 VUs  06.6s/30s  10.00 iters/s
+
+running (0m09.0s), 00/20 VUs, 76 complete and 0 interrupted iterations
+warmup   [  25% ] 00/20 VUs  07.6s/30s  10.00 iters/s
+
+running (0m10.0s), 01/20 VUs, 85 complete and 0 interrupted iterations
+warmup   [  29% ] 01/20 VUs  08.6s/30s  10.00 iters/s
+
+running (0m11.0s), 00/20 VUs, 96 complete and 0 interrupted iterations
+warmup   [  32% ] 00/20 VUs  09.6s/30s  10.00 iters/s
+
+running (0m12.0s), 00/20 VUs, 106 complete and 0 interrupted iterations
+warmup   [  35% ] 00/20 VUs  10.6s/30s  10.00 iters/s
+
+running (0m13.0s), 00/20 VUs, 116 complete and 0 interrupted iterations
+warmup   [  39% ] 00/20 VUs  11.6s/30s  10.00 iters/s
+
+running (0m14.0s), 00/20 VUs, 126 complete and 0 interrupted iterations
+warmup   [  42% ] 00/20 VUs  12.6s/30s  10.00 iters/s
+
+running (0m15.0s), 00/20 VUs, 136 complete and 0 interrupted iterations
+warmup   [  45% ] 00/20 VUs  13.6s/30s  10.00 iters/s
+
+running (0m16.0s), 00/20 VUs, 146 complete and 0 interrupted iterations
+warmup   [  49% ] 00/20 VUs  14.6s/30s  10.00 iters/s
+
+running (0m17.0s), 00/20 VUs, 156 complete and 0 interrupted iterations
+warmup   [  52% ] 00/20 VUs  15.6s/30s  10.00 iters/s
+
+running (0m18.0s), 00/20 VUs, 166 complete and 0 interrupted iterations
+warmup   [  55% ] 00/20 VUs  16.6s/30s  10.00 iters/s
+
+running (0m19.0s), 00/20 VUs, 176 complete and 0 interrupted iterations
+warmup   [  59% ] 00/20 VUs  17.6s/30s  10.00 iters/s
+
+running (0m20.0s), 00/20 VUs, 186 complete and 0 interrupted iterations
+warmup   [  62% ] 00/20 VUs  18.6s/30s  10.00 iters/s
+
+running (0m21.0s), 00/20 VUs, 196 complete and 0 interrupted iterations
+warmup   [  65% ] 00/20 VUs  19.6s/30s  10.00 iters/s
+
+running (0m22.0s), 00/20 VUs, 206 complete and 0 interrupted iterations
+warmup   [  69% ] 00/20 VUs  20.6s/30s  10.00 iters/s
+
+running (0m23.0s), 00/20 VUs, 216 complete and 0 interrupted iterations
+warmup   [  72% ] 00/20 VUs  21.6s/30s  10.00 iters/s
+
+running (0m24.0s), 00/20 VUs, 226 complete and 0 interrupted iterations
+warmup   [  75% ] 00/20 VUs  22.6s/30s  10.00 iters/s
+
+running (0m25.0s), 00/20 VUs, 236 complete and 0 interrupted iterations
+warmup   [  79% ] 00/20 VUs  23.6s/30s  10.00 iters/s
+
+running (0m26.0s), 00/20 VUs, 246 complete and 0 interrupted iterations
+warmup   [  82% ] 00/20 VUs  24.6s/30s  10.00 iters/s
+
+running (0m27.0s), 00/20 VUs, 256 complete and 0 interrupted iterations
+warmup   [  85% ] 00/20 VUs  25.6s/30s  10.00 iters/s
+
+running (0m28.0s), 00/20 VUs, 266 complete and 0 interrupted iterations
+warmup   [  89% ] 00/20 VUs  26.6s/30s  10.00 iters/s
+
+running (0m29.0s), 00/20 VUs, 276 complete and 0 interrupted iterations
+warmup   [  92% ] 00/20 VUs  27.6s/30s  10.00 iters/s
+
+running (0m30.0s), 00/20 VUs, 286 complete and 0 interrupted iterations
+warmup   [  95% ] 00/20 VUs  28.6s/30s  10.00 iters/s
+
+running (0m31.0s), 00/20 VUs, 296 complete and 0 interrupted iterations
+warmup   [  99% ] 00/20 VUs  29.6s/30s  10.00 iters/s
+time="2026-09-09T11:46:22Z" level=info msg="Measured sale id: f310328e-7139-4616-8a36-b110b660a995" source=console
+
+     accepted_latency...............: avg=89.86ms  min=10.15ms med=15.6ms   max=2.37s    p(90)=104.56ms p(95)=473.58ms
+     data_received..................: 204 kB 6.5 kB/s
+     data_sent......................: 182 kB 5.8 kB/s
+   ??dropped_iterations.............: 0      0/s
+     http_req_blocked...............: avg=86.87쨉s  min=2.77쨉s  med=5.08쨉s   max=5.9ms    p(90)=7.46쨉s   p(95)=9.82쨉s
+     http_req_connecting............: avg=70.98쨉s  min=0s      med=0s       max=3.13ms   p(90)=0s       p(95)=0s
+     http_req_duration..............: avg=56ms     min=7.03ms  med=12.59ms  max=2.37s    p(90)=79.57ms  p(95)=109.42ms
+       { expected_response:true }...: avg=56ms     min=7.03ms  med=12.59ms  max=2.37s    p(90)=79.57ms  p(95)=109.42ms
+     http_req_failed................: 0.00%  0 out of 603
+     http_req_receiving.............: avg=474.01쨉s min=41.92쨉s med=149.69쨉s max=83.27ms  p(90)=422.99쨉s p(95)=507.24쨉s
+     http_req_sending...............: avg=47.94쨉s  min=14.06쨉s med=44.43쨉s  max=298.21쨉s p(90)=64.94쨉s  p(95)=92.94쨉s
+     http_req_tls_handshaking.......: avg=0s       min=0s      med=0s       max=0s       p(90)=0s       p(95)=0s
+     http_req_waiting...............: avg=55.47ms  min=6.92ms  med=12.28ms  max=2.37s    p(90)=78.94ms  p(95)=109.08ms
+     http_reqs......................: 603    19.181643/s
+     iteration_duration.............: avg=108.19ms min=17.85ms med=26.66ms  max=2.57s    p(90)=119.49ms p(95)=573.86ms
+     iterations.....................: 301    9.574916/s
+     purchase_outcomes..............: 301    9.574916/s
+   ??unexpected_errors..............: 0.00%  0 out of 602
+     vus............................: 0      min=0        max=13
+     vus_max........................: 20     min=20       max=20
+
+
+running (0m31.4s), 00/20 VUs, 301 complete and 0 interrupted iterations
+warmup ??[ 100% ] 00/20 VUs  30s  10.00 iters/s
+워밍업 통과: 실제 성공 구매 301건 모두 확정, 거절 0건, 정합성/Hikari 정상. 초기 지연은 합격 기준에서 제외.
+실제 부하 시작: baseline / 10 RPS 10초 → 10 RPS 50초
+
+         /\      Grafana   /?얄?
+    /\  /  \     |\  __   /  /
+   /  \/    \    | |/ /  /   ?얄?
+  /          \   |   (  |  (??  |
+ / __________ \  |_|\_\  \_____/
+
+     execution: local
+        script: /scripts/purchase-spike.js
+        output: json (/results/raw.json)
+
+     scenarios: (100.00%) 2 scenarios, 768 max VUs, 1m30s max duration (incl. graceful stop):
+              * opening: 10.00 iterations/s for 10s (maxVUs: 64-512, exec: purchase, gracefulStop: 30s)
+              * tail: 10.00 iterations/s for 50s (maxVUs: 32-256, exec: purchase, startTime: 10s, gracefulStop: 30s)
+
+
+running (0m01.0s), 000/096 VUs, 10 complete and 0 interrupted iterations
+opening   [  10% ] 000/064 VUs  01.0s/10s  10.00 iters/s
+tail    ??[   0% ] waiting      09.0s
+
+running (0m02.0s), 000/096 VUs, 20 complete and 0 interrupted iterations
+opening   [  20% ] 000/064 VUs  02.0s/10s  10.00 iters/s
+tail    ??[   0% ] waiting      08.0s
+
+running (0m03.0s), 000/096 VUs, 30 complete and 0 interrupted iterations
+opening   [  30% ] 000/064 VUs  03.0s/10s  10.00 iters/s
+tail    ??[   0% ] waiting      07.0s
+
+running (0m04.0s), 000/096 VUs, 40 complete and 0 interrupted iterations
+opening   [  40% ] 000/064 VUs  04.0s/10s  10.00 iters/s
+tail    ??[   0% ] waiting      06.0s
+
+running (0m05.0s), 000/096 VUs, 50 complete and 0 interrupted iterations
+opening   [  50% ] 000/064 VUs  05.0s/10s  10.00 iters/s
+tail    ??[   0% ] waiting      05.0s
+
+running (0m06.0s), 000/096 VUs, 60 complete and 0 interrupted iterations
+opening   [  60% ] 000/064 VUs  06.0s/10s  10.00 iters/s
+tail    ??[   0% ] waiting      04.0s
+
+running (0m07.0s), 000/096 VUs, 70 complete and 0 interrupted iterations
+opening   [  70% ] 000/064 VUs  07.0s/10s  10.00 iters/s
+tail    ??[   0% ] waiting      03.0s
+
+running (0m08.0s), 000/096 VUs, 80 complete and 0 interrupted iterations
+opening   [  80% ] 000/064 VUs  08.0s/10s  10.00 iters/s
+tail    ??[   0% ] waiting      02.0s
+
+running (0m09.0s), 000/096 VUs, 90 complete and 0 interrupted iterations
+opening   [  90% ] 000/064 VUs  09.0s/10s  10.00 iters/s
+tail    ??[   0% ] waiting      01.0s
+
+running (0m10.0s), 000/096 VUs, 100 complete and 0 interrupted iterations
+opening   [ 100% ] 000/064 VUs  10.0s/10s  10.00 iters/s
+tail    ??[   0% ] waiting      00.0s
+
+running (0m11.0s), 000/096 VUs, 111 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [   2% ] 000/032 VUs  01.0s/50s  10.00 iters/s
+
+running (0m12.0s), 000/096 VUs, 121 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [   4% ] 000/032 VUs  02.0s/50s  10.00 iters/s
+
+running (0m13.0s), 000/096 VUs, 131 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [   6% ] 000/032 VUs  03.0s/50s  10.00 iters/s
+
+running (0m14.0s), 000/096 VUs, 141 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [   8% ] 000/032 VUs  04.0s/50s  10.00 iters/s
+
+running (0m15.0s), 000/096 VUs, 151 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  10% ] 000/032 VUs  05.0s/50s  10.00 iters/s
+
+running (0m16.0s), 000/096 VUs, 161 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  12% ] 000/032 VUs  06.0s/50s  10.00 iters/s
+
+running (0m17.0s), 000/096 VUs, 171 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  14% ] 000/032 VUs  07.0s/50s  10.00 iters/s
+
+running (0m18.0s), 000/096 VUs, 181 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  16% ] 000/032 VUs  08.0s/50s  10.00 iters/s
+
+running (0m19.0s), 000/096 VUs, 191 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  18% ] 000/032 VUs  09.0s/50s  10.00 iters/s
+
+running (0m20.0s), 000/096 VUs, 201 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  20% ] 000/032 VUs  10.0s/50s  10.00 iters/s
+
+running (0m21.0s), 000/096 VUs, 211 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  22% ] 000/032 VUs  11.0s/50s  10.00 iters/s
+
+running (0m22.0s), 000/096 VUs, 221 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  24% ] 000/032 VUs  12.0s/50s  10.00 iters/s
+
+running (0m23.0s), 000/096 VUs, 231 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  26% ] 000/032 VUs  13.0s/50s  10.00 iters/s
+
+running (0m24.0s), 000/096 VUs, 241 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  28% ] 000/032 VUs  14.0s/50s  10.00 iters/s
+
+running (0m25.0s), 000/096 VUs, 251 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  30% ] 000/032 VUs  15.0s/50s  10.00 iters/s
+
+running (0m26.0s), 000/096 VUs, 261 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  32% ] 000/032 VUs  16.0s/50s  10.00 iters/s
+
+running (0m27.0s), 000/096 VUs, 271 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  34% ] 000/032 VUs  17.0s/50s  10.00 iters/s
+
+running (0m28.0s), 000/096 VUs, 281 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  36% ] 000/032 VUs  18.0s/50s  10.00 iters/s
+
+running (0m29.0s), 000/096 VUs, 291 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  38% ] 000/032 VUs  19.0s/50s  10.00 iters/s
+
+running (0m30.0s), 000/096 VUs, 301 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  40% ] 000/032 VUs  20.0s/50s  10.00 iters/s
+
+running (0m31.0s), 000/096 VUs, 311 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  42% ] 000/032 VUs  21.0s/50s  10.00 iters/s
+
+running (0m32.0s), 000/096 VUs, 321 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  44% ] 000/032 VUs  22.0s/50s  10.00 iters/s
+
+running (0m33.0s), 000/096 VUs, 331 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  46% ] 000/032 VUs  23.0s/50s  10.00 iters/s
+
+running (0m34.0s), 000/096 VUs, 341 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  48% ] 000/032 VUs  24.0s/50s  10.00 iters/s
+
+running (0m35.0s), 000/096 VUs, 351 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  50% ] 000/032 VUs  25.0s/50s  10.00 iters/s
+
+running (0m36.0s), 000/096 VUs, 361 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  52% ] 000/032 VUs  26.0s/50s  10.00 iters/s
+
+running (0m37.0s), 000/096 VUs, 371 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  54% ] 000/032 VUs  27.0s/50s  10.00 iters/s
+
+running (0m38.0s), 000/096 VUs, 381 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  56% ] 000/032 VUs  28.0s/50s  10.00 iters/s
+
+running (0m39.0s), 000/096 VUs, 391 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  58% ] 000/032 VUs  29.0s/50s  10.00 iters/s
+
+running (0m40.0s), 000/096 VUs, 401 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  60% ] 000/032 VUs  30.0s/50s  10.00 iters/s
+
+running (0m41.0s), 000/096 VUs, 411 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  62% ] 000/032 VUs  31.0s/50s  10.00 iters/s
+
+running (0m42.0s), 000/096 VUs, 421 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  64% ] 000/032 VUs  32.0s/50s  10.00 iters/s
+
+running (0m43.0s), 000/096 VUs, 431 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  66% ] 000/032 VUs  33.0s/50s  10.00 iters/s
+
+running (0m44.0s), 000/096 VUs, 441 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  68% ] 000/032 VUs  34.0s/50s  10.00 iters/s
+
+running (0m45.0s), 000/096 VUs, 451 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  70% ] 000/032 VUs  35.0s/50s  10.00 iters/s
+
+running (0m46.0s), 000/096 VUs, 461 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  72% ] 000/032 VUs  36.0s/50s  10.00 iters/s
+
+running (0m47.0s), 000/096 VUs, 471 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  74% ] 000/032 VUs  37.0s/50s  10.00 iters/s
+
+running (0m48.0s), 000/096 VUs, 481 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  76% ] 000/032 VUs  38.0s/50s  10.00 iters/s
+
+running (0m49.0s), 000/096 VUs, 491 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  78% ] 000/032 VUs  39.0s/50s  10.00 iters/s
+
+running (0m50.0s), 000/096 VUs, 501 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  80% ] 000/032 VUs  40.0s/50s  10.00 iters/s
+
+running (0m51.0s), 000/096 VUs, 511 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  82% ] 000/032 VUs  41.0s/50s  10.00 iters/s
+
+running (0m52.0s), 000/096 VUs, 521 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  84% ] 000/032 VUs  42.0s/50s  10.00 iters/s
+
+running (0m53.0s), 000/096 VUs, 531 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  86% ] 000/032 VUs  43.0s/50s  10.00 iters/s
+
+running (0m54.0s), 000/096 VUs, 541 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  88% ] 000/032 VUs  44.0s/50s  10.00 iters/s
+
+running (0m55.0s), 000/096 VUs, 551 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  90% ] 000/032 VUs  45.0s/50s  10.00 iters/s
+
+running (0m56.0s), 000/096 VUs, 561 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  92% ] 000/032 VUs  46.0s/50s  10.00 iters/s
+
+running (0m57.0s), 000/096 VUs, 571 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  94% ] 000/032 VUs  47.0s/50s  10.00 iters/s
+
+running (0m58.0s), 000/096 VUs, 581 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  96% ] 000/032 VUs  48.0s/50s  10.00 iters/s
+
+running (0m59.0s), 000/096 VUs, 591 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [  98% ] 000/032 VUs  49.0s/50s  10.00 iters/s
+
+running (1m00.0s), 000/096 VUs, 601 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s        10.00 iters/s
+tail      [ 100% ] 000/032 VUs  50.0s/50s  10.00 iters/s
+time="2026-09-09T11:47:28Z" level=info msg="Measured sale id: e975f357-943c-4518-aac6-60efd803bf10" source=console
+
+     accepted_latency...............: avg=11.52ms  min=8.48ms  med=11.02ms  max=64.67ms  p(90)=13.42ms  p(95)=14.64ms
+     data_received..................: 408 kB 6.8 kB/s
+     data_sent......................: 362 kB 6.0 kB/s
+   ??dropped_iterations.............: 0      0/s
+     http_req_blocked...............: avg=165.17쨉s min=2.56쨉s  med=5.22쨉s   max=12.35ms  p(90)=8.28쨉s   p(95)=1.75ms
+     http_req_connecting............: avg=149.16쨉s min=0s      med=0s       max=12.21ms  p(90)=0s       p(95)=1.63ms
+     http_req_duration..............: avg=9.54ms   min=5.73ms  med=9.44ms   max=64.67ms  p(90)=12.33ms  p(95)=13.51ms
+       { expected_response:true }...: avg=9.54ms   min=5.73ms  med=9.44ms   max=64.67ms  p(90)=12.33ms  p(95)=13.51ms
+     ??{ name:payment_accept }......: avg=7.57ms   min=5.73ms  med=7.26ms   max=49.72ms  p(90)=8.76ms   p(95)=9.59ms
+     ??{ name:purchase }............: avg=11.52ms  min=8.48ms  med=11.02ms  max=64.67ms  p(90)=13.42ms  p(95)=14.64ms
+     http_req_failed................: 0.00%  0 out of 1205
+     http_req_receiving.............: avg=157.41쨉s min=71.33쨉s med=124.62쨉s max=939.99쨉s p(90)=283.03쨉s p(95)=357.21쨉s
+     http_req_sending...............: avg=48.69쨉s  min=14.29쨉s med=44.33쨉s  max=375.15쨉s p(90)=70.33쨉s  p(95)=119.74쨉s
+     http_req_tls_handshaking.......: avg=0s       min=0s      med=0s       max=0s       p(90)=0s       p(95)=0s
+     http_req_waiting...............: avg=9.34ms   min=5.54ms  med=9.27ms   max=64.08ms  p(90)=12.06ms  p(95)=13.26ms
+     http_reqs......................: 1205   20.073271/s
+     iteration_duration.............: avg=19.91ms  min=14.98ms med=19.19ms  max=76.69ms  p(90)=23.82ms  p(95)=25.54ms
+     iterations.....................: 602    10.028306/s
+     purchase_outcomes..............: 602    10.028306/s
+   ??unexpected_errors..............: 0.00%  0 out of 1204
+     vus............................: 0      min=0         max=0
+     vus_max........................: 96     min=96        max=96
+
+
+running (1m00.0s), 000/096 VUs, 602 complete and 0 interrupted iterations
+opening ??[ 100% ] 000/064 VUs  10s  10.00 iters/s
+tail    ??[ 100% ] 000/032 VUs  50s  10.00 iters/s
+기록 완료: D:\Code\limited-goods-reservation\artifacts\performance\20260909-204228-733-baseline-purchase-spike (목표 합격 여부는 별도 판단)

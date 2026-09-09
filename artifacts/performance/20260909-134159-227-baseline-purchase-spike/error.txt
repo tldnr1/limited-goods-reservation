@@ -1,0 +1,7 @@
+Exception: D:\Code\limited-goods-reservation\ops\performance.ps1:170
+Line |
+ 170 |  … warmupComplete) { throw "워밍업 주문 확정 불완전: $counts. 본 측정은 실행하지 않았습니다." }
+     |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~에서
+     | 워밍업 주문 확정 불완전: 301/301. 본 측정은 실행하지 않았습니다.
+
+

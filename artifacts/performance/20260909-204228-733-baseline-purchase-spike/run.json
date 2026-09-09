@@ -1,0 +1,13 @@
+{
+  "status": "collected",
+  "mode": "baseline",
+  "scenario": "purchase-spike",
+  "openingRps": 10,
+  "tailRps": 10,
+  "warmupRps": 10,
+  "warmupSeconds": 30,
+  "diagnostics": true,
+  "prometheusScrapeSeconds": 1,
+  "startedAt": "2026-09-09T20:42:28.6116494+09:00",
+  "completedAt": "2026-09-09T11:48:04.0159302+00:00"
+}

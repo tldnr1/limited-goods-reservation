@@ -1,0 +1,234 @@
+[
+  {
+    "Name": "/limited-goods-java-api1-1",
+    "Networks": {
+      "limited-goods-java_default": {
+        "IPAMConfig": null,
+        "Links": null,
+        "Aliases": [
+          "limited-goods-java-api1-1",
+          "api1"
+        ],
+        "DriverOpts": null,
+        "GwPriority": 0,
+        "NetworkID": "95a077c4ef1a587ebadda67d03c521f0db48a935bf1b4e1dd575822f91141b16",
+        "EndpointID": "f28561b564e373f0312cfa259d8d1cdcabd849ce0992d4ea723ceb759ba302b6",
+        "Gateway": "172.20.0.1",
+        "IPAddress": "172.20.0.8",
+        "MacAddress": "72:8f:03:b4:77:3f",
+        "IPPrefixLen": 16,
+        "IPv6Gateway": "",
+        "GlobalIPv6Address": "",
+        "GlobalIPv6PrefixLen": 0,
+        "DNSNames": [
+          "limited-goods-java-api1-1",
+          "api1",
+          "3f5ad6a46c5f"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "/limited-goods-java-api2-1",
+    "Networks": {
+      "limited-goods-java_default": {
+        "IPAMConfig": null,
+        "Links": null,
+        "Aliases": [
+          "limited-goods-java-api2-1",
+          "api2"
+        ],
+        "DriverOpts": null,
+        "GwPriority": 0,
+        "NetworkID": "95a077c4ef1a587ebadda67d03c521f0db48a935bf1b4e1dd575822f91141b16",
+        "EndpointID": "f0802d36f2682eb5dd946a4418aeb40485606d438f1aea6c480e248500771b12",
+        "Gateway": "172.20.0.1",
+        "IPAddress": "172.20.0.6",
+        "MacAddress": "1a:b3:59:cb:f4:a2",
+        "IPPrefixLen": 16,
+        "IPv6Gateway": "",
+        "GlobalIPv6Address": "",
+        "GlobalIPv6PrefixLen": 0,
+        "DNSNames": [
+          "limited-goods-java-api2-1",
+          "api2",
+          "69f1ee7a28f3"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "/limited-goods-java-mock-pg-1",
+    "Networks": {
+      "limited-goods-java_default": {
+        "IPAMConfig": null,
+        "Links": null,
+        "Aliases": [
+          "limited-goods-java-mock-pg-1",
+          "mock-pg"
+        ],
+        "DriverOpts": null,
+        "GwPriority": 0,
+        "NetworkID": "95a077c4ef1a587ebadda67d03c521f0db48a935bf1b4e1dd575822f91141b16",
+        "EndpointID": "92a20f763abefe7de14d53581fa0bbffaab8acda1c2c972887611bdbf06dd225",
+        "Gateway": "172.20.0.1",
+        "IPAddress": "172.20.0.5",
+        "MacAddress": "a6:de:44:94:02:2b",
+        "IPPrefixLen": 16,
+        "IPv6Gateway": "",
+        "GlobalIPv6Address": "",
+        "GlobalIPv6PrefixLen": 0,
+        "DNSNames": [
+          "limited-goods-java-mock-pg-1",
+          "mock-pg",
+          "c3687e014455"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "/limited-goods-java-nginx-1",
+    "Networks": {
+      "limited-goods-java_default": {
+        "IPAMConfig": null,
+        "Links": null,
+        "Aliases": [
+          "limited-goods-java-nginx-1",
+          "nginx"
+        ],
+        "DriverOpts": null,
+        "GwPriority": 0,
+        "NetworkID": "95a077c4ef1a587ebadda67d03c521f0db48a935bf1b4e1dd575822f91141b16",
+        "EndpointID": "27c19e31f5f2e9fade7f9bde5885d2c59adf5a6a0f1b84f6757c7c6fac260aaf",
+        "Gateway": "172.20.0.1",
+        "IPAddress": "172.20.0.9",
+        "MacAddress": "b2:36:a0:4e:03:e0",
+        "IPPrefixLen": 16,
+        "IPv6Gateway": "",
+        "GlobalIPv6Address": "",
+        "GlobalIPv6PrefixLen": 0,
+        "DNSNames": [
+          "limited-goods-java-nginx-1",
+          "nginx",
+          "3d00ee640fb7"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "/limited-goods-java-postgres-1",
+    "Networks": {
+      "limited-goods-java_default": {
+        "IPAMConfig": null,
+        "Links": null,
+        "Aliases": [
+          "limited-goods-java-postgres-1",
+          "postgres"
+        ],
+        "DriverOpts": null,
+        "GwPriority": 0,
+        "NetworkID": "95a077c4ef1a587ebadda67d03c521f0db48a935bf1b4e1dd575822f91141b16",
+        "EndpointID": "3a230943a8e1e61ddabe26616911a9cb1b3a40cca50fd62cd5756ba9f75ec45b",
+        "Gateway": "172.20.0.1",
+        "IPAddress": "172.20.0.3",
+        "MacAddress": "22:e1:28:3e:e0:6d",
+        "IPPrefixLen": 16,
+        "IPv6Gateway": "",
+        "GlobalIPv6Address": "",
+        "GlobalIPv6PrefixLen": 0,
+        "DNSNames": [
+          "limited-goods-java-postgres-1",
+          "postgres",
+          "4a32757db1f5"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "/limited-goods-java-prometheus-1",
+    "Networks": {
+      "limited-goods-java_default": {
+        "IPAMConfig": null,
+        "Links": null,
+        "Aliases": [
+          "limited-goods-java-prometheus-1",
+          "prometheus"
+        ],
+        "DriverOpts": null,
+        "GwPriority": 0,
+        "NetworkID": "95a077c4ef1a587ebadda67d03c521f0db48a935bf1b4e1dd575822f91141b16",
+        "EndpointID": "7f21c014ec37752b0a2eac4ae10244ac9b663d74973aba35f1d0330795c5f36b",
+        "Gateway": "172.20.0.1",
+        "IPAddress": "172.20.0.2",
+        "MacAddress": "86:40:a4:de:b4:7b",
+        "IPPrefixLen": 16,
+        "IPv6Gateway": "",
+        "GlobalIPv6Address": "",
+        "GlobalIPv6PrefixLen": 0,
+        "DNSNames": [
+          "limited-goods-java-prometheus-1",
+          "prometheus",
+          "fa8845112f6f"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "/limited-goods-java-redis-1",
+    "Networks": {
+      "limited-goods-java_default": {
+        "IPAMConfig": null,
+        "Links": null,
+        "Aliases": [
+          "limited-goods-java-redis-1",
+          "redis"
+        ],
+        "DriverOpts": null,
+        "GwPriority": 0,
+        "NetworkID": "95a077c4ef1a587ebadda67d03c521f0db48a935bf1b4e1dd575822f91141b16",
+        "EndpointID": "9d04ec49ba4c7d9b910e39ef2223d2819c2b7c6b507cc4777b212f4fdb2c2e3a",
+        "Gateway": "172.20.0.1",
+        "IPAddress": "172.20.0.4",
+        "MacAddress": "9a:13:4e:80:db:bc",
+        "IPPrefixLen": 16,
+        "IPv6Gateway": "",
+        "GlobalIPv6Address": "",
+        "GlobalIPv6PrefixLen": 0,
+        "DNSNames": [
+          "limited-goods-java-redis-1",
+          "redis",
+          "8c4f17bccf8c"
+        ]
+      }
+    }
+  },
+  {
+    "Name": "/limited-goods-java-worker-1",
+    "Networks": {
+      "limited-goods-java_default": {
+        "IPAMConfig": null,
+        "Links": null,
+        "Aliases": [
+          "limited-goods-java-worker-1",
+          "worker"
+        ],
+        "DriverOpts": null,
+        "GwPriority": 0,
+        "NetworkID": "95a077c4ef1a587ebadda67d03c521f0db48a935bf1b4e1dd575822f91141b16",
+        "EndpointID": "5b69ef9f91b92563d9279ec18aec215dae9e914fbb82acbaa27c0d3235fae4e4",
+        "Gateway": "172.20.0.1",
+        "IPAddress": "172.20.0.7",
+        "MacAddress": "9e:ce:e2:d8:34:44",
+        "IPPrefixLen": 16,
+        "IPv6Gateway": "",
+        "GlobalIPv6Address": "",
+        "GlobalIPv6PrefixLen": 0,
+        "DNSNames": [
+          "limited-goods-java-worker-1",
+          "worker",
+          "76693a76facf"
+        ]
+      }
+    }
+  }
+]
