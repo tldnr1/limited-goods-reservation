@@ -1,0 +1,163 @@
+{
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {}
+    },
+    "metrics": {
+        "purchase_rejections": {
+            "passes": 0,
+            "fails": 300,
+            "value": 0
+        },
+        "http_req_connecting": {
+            "min": 0,
+            "med": 0,
+            "max": 9.582303,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0.0717975557404326
+        },
+        "purchase_outcomes": {
+            "count": 300,
+            "rate": 9.67944532925328
+        },
+        "iterations": {
+            "count": 300,
+            "rate": 9.67944532925328
+        },
+        "data_sent": {
+            "rate": 5858.387491077255,
+            "count": 181572
+        },
+        "vus_max": {
+            "value": 20,
+            "min": 20,
+            "max": 20
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 601,
+            "value": 0
+        },
+        "http_req_blocked": {
+            "p(90)": 0.006803,
+            "p(95)": 0.01587,
+            "avg": 0.08488686189683853,
+            "min": 0.002225,
+            "med": 0.00497,
+            "max": 9.791853
+        },
+        "vus": {
+            "value": 1,
+            "min": 1,
+            "max": 7
+        },
+        "accepted_latency": {
+            "min": 10.949957,
+            "med": 13.787027,
+            "max": 2373.57018,
+            "p(90)": 30.752478200000006,
+            "p(95)": 177.33417490000005,
+            "avg": 60.09845846666661
+        },
+        "http_req_duration{expected_response:true}": {
+            "p(90)": 21.425097,
+            "p(95)": 84.718941,
+            "avg": 38.24461017138106,
+            "min": 6.629658,
+            "med": 12.114775,
+            "max": 2373.57018
+        },
+        "unexpected_errors": {
+            "passes": 0,
+            "fails": 600,
+            "thresholds": {
+                "rate==0": false
+            },
+            "value": 0
+        },
+        "http_reqs": {
+            "count": 601,
+            "rate": 19.391155476270736
+        },
+        "http_req_waiting": {
+            "p(95)": 84.127602,
+            "avg": 37.73602232279529,
+            "min": 6.405611,
+            "med": 11.884927,
+            "max": 2373.259716,
+            "p(90)": 20.873392
+        },
+        "data_received": {
+            "count": 203533,
+            "rate": 6566.955153996359
+        },
+        "http_req_duration": {
+            "max": 2373.57018,
+            "p(90)": 21.425097,
+            "p(95)": 84.718941,
+            "avg": 38.24461017138106,
+            "min": 6.629658,
+            "med": 12.114775
+        },
+        "dropped_iterations": {
+            "count": 0,
+            "rate": 0,
+            "thresholds": {
+                "count==0": false
+            }
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "http_req_receiving": {
+            "p(95)": 0.492352,
+            "avg": 0.4650245856905159,
+            "min": 0.044254,
+            "med": 0.158293,
+            "max": 76.847604,
+            "p(90)": 0.423949
+        },
+        "http_req_sending": {
+            "avg": 0.04356326289517467,
+            "min": 0.013496,
+            "med": 0.042211,
+            "max": 0.397131,
+            "p(90)": 0.056368,
+            "p(95)": 0.068681
+        },
+        "iteration_duration": {
+            "avg": 73.96874211333335,
+            "min": 18.189061,
+            "med": 23.530073,
+            "max": 2386.981365,
+            "p(90)": 44.09734170000006,
+            "p(95)": 266.42979675
+        }
+    },
+    "setup_data": {
+        "id": "94375ac4-8937-4650-9e72-fb7f3bd74b6a",
+        "items": [
+            {
+                "held": 0,
+                "id": "cf44bd7f-4687-4ab6-a502-242ca6a3d831",
+                "name": "goods",
+                "perUserLimit": 1,
+                "price": 10000,
+                "sold": 0,
+                "total": 1000,
+                "available": 1000
+            }
+        ],
+        "name": "spike-1788963130741",
+        "opensAt": "2026-09-09T14:12:00.741Z"
+    }
+}

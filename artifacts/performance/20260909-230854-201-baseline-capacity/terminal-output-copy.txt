@@ -1,0 +1,456 @@
+ tldnr@HOME2  D:  Code  limited-goods-reservation  main 
+❯ pwsh -NoProfile -File ./ops/performance.ps1 -Action Run -Mode baseline -Scenario capacity -Rps 40 -S
+tock 10000 -DurationSeconds 60
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.10.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+
+BUILD SUCCESSFUL in 8s
+4 actionable tasks: 4 up-to-date
+#1 [internal] load local bake definitions
+#1 reading from stdin 979B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 185B done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/eclipse-temurin:21-jre
+#3 DONE 1.0s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 93B done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 107B done
+#5 DONE 0.0s
+
+#6 [1/3] FROM docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037
+#6 resolve docker.io/library/eclipse-temurin:21-jre@sha256:7a65df4b22d2de92d4e04056e884f3b9122d70b21e2847fd66084278bd0ce037 0.0s done
+#6 DONE 0.0s
+
+#7 [2/3] WORKDIR /app
+#7 CACHED
+
+#8 [3/3] COPY build/libs/limited-goods.jar app.jar
+#8 CACHED
+
+#9 exporting to image
+#9 exporting layers done
+#9 exporting manifest sha256:af30cda112b81cdb192e4020faae8e7f73f128f9cdfafc2e49f561c92e19cbb9 done
+#9 exporting config sha256:26efd4b7a76e5c926791043286d435b806419e6b01aaf2839f7d922948984034 done
+#9 exporting attestation manifest sha256:0ff33a81f7189a6cc406a6fef488fc81818a55e606ff794ef2fba8d18870c389 0.0s done
+#9 exporting manifest list sha256:334c22547024e3ec1a91477df68717817eb9b8833cef3a5aa75a2603f72b2d32 0.0s done
+#9 naming to docker.io/library/limited-goods-java:local
+#9 naming to docker.io/library/limited-goods-java:local done
+#9 unpacking to docker.io/library/limited-goods-java:local done
+#9 DONE 0.1s
+
+#10 resolving provenance for metadata file
+#10 DONE 0.0s
+[+] build 1/1
+ ✔ Image limited-goods-java:local Built                                                           1.7s
+[+] stop 8/8
+ ✔ Container limited-goods-java-prometheus-1 Stopped                                              0.4s
+ ✔ Container limited-goods-java-nginx-1      Stopped                                              0.5s
+ ✔ Container limited-goods-java-api1-1       Stopped                                              0.5s
+ ✔ Container limited-goods-java-api2-1       Stopped                                              0.5s
+ ✔ Container limited-goods-java-worker-1     Stopped                                              0.6s
+ ✔ Container limited-goods-java-mock-pg-1    Stopped                                              0.8s
+ ✔ Container limited-goods-java-postgres-1   Stopped                                              0.5s
+ ✔ Container limited-goods-java-redis-1      Stopped                                              0.4s
+[+] up 8/8
+ ✔ Container limited-goods-java-mock-pg-1    Healthy                                             86.9s
+ ✔ Container limited-goods-java-api1-1       Healthy                                             86.8s
+ ✔ Container limited-goods-java-api2-1       Healthy                                             86.8s
+ ✔ Container limited-goods-java-worker-1     Healthy                                             86.8s
+ ✔ Container limited-goods-java-redis-1      Healthy                                             86.5s
+ ✔ Container limited-goods-java-postgres-1   Healthy                                             86.5s
+ ✔ Container limited-goods-java-prometheus-1 Healthy                                             86.5s
+ ✔ Container limited-goods-java-nginx-1      Healthy                                              0.7s
+[+] stop 5/5
+ ✔ Container limited-goods-java-nginx-1   Stopped                                                 0.3s
+ ✔ Container limited-goods-java-api1-1    Stopped                                                 0.5s
+ ✔ Container limited-goods-java-api2-1    Stopped                                                 0.4s
+ ✔ Container limited-goods-java-worker-1  Stopped                                                 0.6s
+ ✔ Container limited-goods-java-mock-pg-1 Stopped                                                 0.7s
+BEGIN
+TRUNCATE TABLE
+COMMIT
+limited_goods_perf 및 goods:perf: 초기화 완료. Flyway 이력과 볼륨은 보존했습니다.
+서비스는 중단 상태입니다. dev: docker compose up -d / perf: docker compose --env-file ops/perf.env up -d
+[+] up 8/8
+ ✔ Container limited-goods-java-prometheus-1 Healthy                                             83.7s
+ ✔ Container limited-goods-java-redis-1      Healthy                                             83.7s
+ ✔ Container limited-goods-java-postgres-1   Healthy                                             83.7s
+ ✔ Container limited-goods-java-mock-pg-1    Healthy                                             83.1s
+ ✔ Container limited-goods-java-api2-1       Healthy                                             28.4s
+ ✔ Container limited-goods-java-api1-1       Healthy                                             28.4s
+ ✔ Container limited-goods-java-worker-1     Healthy                                             28.4s
+ ✔ Container limited-goods-java-nginx-1      Healthy                                              0.7s
+워밍업: 별도 판매, 10 RPS × 30초
+                ]
+         /\      Grafana   /?얄?
+    /\  /  \     |\  __   /  /
+   /  \/    \    | |/ /  /   ?얄?
+  /          \   |   (  |  (??  |
+ / __________ \  |_|\_\  \_____/
+
+     execution: local
+        script: /scripts/warmup.js
+        output: json (/results/warmup-raw.json)
+
+     scenarios: (100.00%) 1 scenario, 20 max VUs, 1m0s max duration (incl. graceful stop):
+              * warmup: 10.00 iterations/s for 30s (maxVUs: 20, exec: purchase, gracefulStop: 30s)
+
+
+running (0m01.0s), 01/20 VUs, 0 complete and 0 interrupted iterations
+warmup   [   0% ] 01/20 VUs  00.0s/30s  10.00 iters/s
+
+running (0m02.0s), 07/20 VUs, 4 complete and 0 interrupted iterations
+warmup   [   3% ] 07/20 VUs  01.0s/30s  10.00 iters/s
+
+running (0m03.0s), 06/20 VUs, 15 complete and 0 interrupted iterations
+warmup   [   7% ] 06/20 VUs  02.0s/30s  10.00 iters/s
+
+running (0m04.0s), 01/20 VUs, 29 complete and 0 interrupted iterations
+warmup   [  10% ] 01/20 VUs  03.0s/30s  10.00 iters/s
+
+running (0m05.0s), 00/20 VUs, 40 complete and 0 interrupted iterations
+warmup   [  13% ] 00/20 VUs  04.0s/30s  10.00 iters/s
+
+running (0m06.0s), 01/20 VUs, 50 complete and 0 interrupted iterations
+warmup   [  17% ] 01/20 VUs  05.0s/30s  10.00 iters/s
+
+running (0m07.0s), 01/20 VUs, 60 complete and 0 interrupted iterations
+warmup   [  20% ] 01/20 VUs  06.0s/30s  10.00 iters/s
+
+running (0m08.0s), 00/20 VUs, 70 complete and 0 interrupted iterations
+warmup   [  23% ] 00/20 VUs  07.0s/30s  10.00 iters/s
+
+running (0m09.0s), 01/20 VUs, 80 complete and 0 interrupted iterations
+warmup   [  27% ] 01/20 VUs  08.0s/30s  10.00 iters/s
+
+running (0m10.0s), 01/20 VUs, 90 complete and 0 interrupted iterations
+warmup   [  30% ] 01/20 VUs  09.0s/30s  10.00 iters/s
+
+running (0m11.0s), 01/20 VUs, 100 complete and 0 interrupted iterations
+warmup   [  33% ] 01/20 VUs  10.0s/30s  10.00 iters/s
+
+running (0m12.0s), 01/20 VUs, 110 complete and 0 interrupted iterations
+warmup   [  37% ] 01/20 VUs  11.0s/30s  10.00 iters/s
+
+running (0m13.0s), 01/20 VUs, 120 complete and 0 interrupted iterations
+warmup   [  40% ] 01/20 VUs  12.0s/30s  10.00 iters/s
+
+running (0m14.0s), 01/20 VUs, 130 complete and 0 interrupted iterations
+warmup   [  43% ] 01/20 VUs  13.0s/30s  10.00 iters/s
+
+running (0m15.0s), 00/20 VUs, 140 complete and 0 interrupted iterations
+warmup   [  47% ] 00/20 VUs  14.0s/30s  10.00 iters/s
+
+running (0m16.0s), 01/20 VUs, 150 complete and 0 interrupted iterations
+warmup   [  50% ] 01/20 VUs  15.0s/30s  10.00 iters/s
+
+running (0m17.0s), 00/20 VUs, 160 complete and 0 interrupted iterations
+warmup   [  53% ] 00/20 VUs  16.0s/30s  10.00 iters/s
+
+running (0m18.0s), 01/20 VUs, 170 complete and 0 interrupted iterations
+warmup   [  57% ] 01/20 VUs  17.0s/30s  10.00 iters/s
+
+running (0m19.0s), 01/20 VUs, 180 complete and 0 interrupted iterations
+warmup   [  60% ] 01/20 VUs  18.0s/30s  10.00 iters/s
+
+running (0m20.0s), 01/20 VUs, 190 complete and 0 interrupted iterations
+warmup   [  63% ] 01/20 VUs  19.0s/30s  10.00 iters/s
+
+running (0m21.0s), 01/20 VUs, 200 complete and 0 interrupted iterations
+warmup   [  67% ] 01/20 VUs  20.0s/30s  10.00 iters/s
+
+running (0m22.0s), 01/20 VUs, 210 complete and 0 interrupted iterations
+warmup   [  70% ] 01/20 VUs  21.0s/30s  10.00 iters/s
+
+running (0m23.0s), 01/20 VUs, 220 complete and 0 interrupted iterations
+warmup   [  73% ] 01/20 VUs  22.0s/30s  10.00 iters/s
+
+running (0m24.0s), 00/20 VUs, 230 complete and 0 interrupted iterations
+warmup   [  77% ] 00/20 VUs  23.0s/30s  10.00 iters/s
+
+running (0m25.0s), 01/20 VUs, 240 complete and 0 interrupted iterations
+warmup   [  80% ] 01/20 VUs  24.0s/30s  10.00 iters/s
+
+running (0m26.0s), 01/20 VUs, 250 complete and 0 interrupted iterations
+warmup   [  83% ] 01/20 VUs  25.0s/30s  10.00 iters/s
+
+running (0m27.0s), 01/20 VUs, 260 complete and 0 interrupted iterations
+warmup   [  87% ] 01/20 VUs  26.0s/30s  10.00 iters/s
+
+running (0m28.0s), 01/20 VUs, 270 complete and 0 interrupted iterations
+warmup   [  90% ] 01/20 VUs  27.0s/30s  10.00 iters/s
+
+running (0m29.0s), 01/20 VUs, 280 complete and 0 interrupted iterations
+warmup   [  93% ] 01/20 VUs  28.0s/30s  10.00 iters/s
+
+running (0m30.0s), 01/20 VUs, 290 complete and 0 interrupted iterations
+warmup   [  97% ] 01/20 VUs  29.0s/30s  10.00 iters/s
+
+running (0m31.0s), 00/20 VUs, 300 complete and 0 interrupted iterations
+warmup ??[ 100% ] 00/20 VUs  30s  10.00 iters/s
+time="2026-09-09T14:12:41Z" level=info msg="Measured sale id: 94375ac4-8937-4650-9e72-fb7f3bd74b6a" source=console
+
+     accepted_latency...............: avg=60.09ms  min=10.94ms med=13.78ms  max=2.37s    p(90)=30.75ms  p(95)=177.33ms
+     data_received..................: 204 kB 6.6 kB/s
+     data_sent......................: 182 kB 5.9 kB/s
+   ??dropped_iterations.............: 0      0/s
+     http_req_blocked...............: avg=84.88쨉s  min=2.22쨉s  med=4.97쨉s   max=9.79ms   p(90)=6.8쨉s    p(95)=15.87쨉s
+     http_req_connecting............: avg=71.79쨉s  min=0s      med=0s       max=9.58ms   p(90)=0s       p(95)=0s
+     http_req_duration..............: avg=38.24ms  min=6.62ms  med=12.11ms  max=2.37s    p(90)=21.42ms  p(95)=84.71ms
+       { expected_response:true }...: avg=38.24ms  min=6.62ms  med=12.11ms  max=2.37s    p(90)=21.42ms  p(95)=84.71ms
+     http_req_failed................: 0.00%  0 out of 601
+     http_req_receiving.............: avg=465.02쨉s min=44.25쨉s med=158.29쨉s max=76.84ms  p(90)=423.94쨉s p(95)=492.35쨉s
+     http_req_sending...............: avg=43.56쨉s  min=13.49쨉s med=42.21쨉s  max=397.13쨉s p(90)=56.36쨉s  p(95)=68.68쨉s
+     http_req_tls_handshaking.......: avg=0s       min=0s      med=0s       max=0s       p(90)=0s       p(95)=0s
+     http_req_waiting...............: avg=37.73ms  min=6.4ms   med=11.88ms  max=2.37s    p(90)=20.87ms  p(95)=84.12ms
+     http_reqs......................: 601    19.391155/s
+     iteration_duration.............: avg=73.96ms  min=18.18ms med=23.53ms  max=2.38s    p(90)=44.09ms  p(95)=266.42ms
+     iterations.....................: 300    9.679445/s
+     purchase_outcomes..............: 300    9.679445/s
+     purchase_rejections............: 0.00%  0 out of 300
+   ??unexpected_errors..............: 0.00%  0 out of 600
+     vus............................: 1      min=1        max=7
+     vus_max........................: 20     min=20       max=20
+
+
+running (0m31.0s), 00/20 VUs, 300 complete and 0 interrupted iterations
+warmup ??[ 100% ] 00/20 VUs  30s  10.00 iters/s
+워밍업 통과: 실제 성공 구매 300건 모두 확정, 거절 0건, 정합성/Hikari 정상. 초기 지연은 합격 기준에서 제외.
+실제 부하 시작: baseline / capacity 40 RPS × 60 초, 재고 10000
+
+         /\      Grafana   /?얄?
+    /\  /  \     |\  __   /  /
+   /  \/    \    | |/ /  /   ?얄?
+  /          \   |   (  |  (??  |
+ / __________ \  |_|\_\  \_____/
+
+     execution: local
+        script: /scripts/capacity.js
+        output: json (/results/raw.json)
+
+     scenarios: (100.00%) 1 scenario, 512 max VUs, 1m30s max duration (incl. graceful stop):
+              * capacity: 40.00 iterations/s for 1m0s (maxVUs: 64-512, exec: purchase, gracefulStop: 30s)
+
+
+running (0m01.0s), 001/064 VUs, 38 complete and 0 interrupted iterations
+capacity   [   2% ] 001/064 VUs  0m01.0s/1m0s  40.00 iters/s
+
+running (0m02.0s), 002/064 VUs, 77 complete and 0 interrupted iterations
+capacity   [   3% ] 002/064 VUs  0m02.0s/1m0s  40.00 iters/s
+
+running (0m03.0s), 000/064 VUs, 119 complete and 0 interrupted iterations
+capacity   [   5% ] 000/064 VUs  0m03.0s/1m0s  40.00 iters/s
+
+running (0m04.0s), 000/064 VUs, 159 complete and 0 interrupted iterations
+capacity   [   7% ] 000/064 VUs  0m04.0s/1m0s  40.00 iters/s
+
+running (0m05.0s), 002/064 VUs, 197 complete and 0 interrupted iterations
+capacity   [   8% ] 002/064 VUs  0m05.0s/1m0s  40.00 iters/s
+
+running (0m06.0s), 001/064 VUs, 238 complete and 0 interrupted iterations
+capacity   [  10% ] 001/064 VUs  0m06.0s/1m0s  40.00 iters/s
+
+running (0m07.0s), 001/064 VUs, 278 complete and 0 interrupted iterations
+capacity   [  12% ] 001/064 VUs  0m07.0s/1m0s  40.00 iters/s
+
+running (0m08.0s), 001/064 VUs, 318 complete and 0 interrupted iterations
+capacity   [  13% ] 001/064 VUs  0m08.0s/1m0s  40.00 iters/s
+
+running (0m09.0s), 005/064 VUs, 354 complete and 0 interrupted iterations
+capacity   [  15% ] 005/064 VUs  0m09.0s/1m0s  40.00 iters/s
+
+running (0m10.0s), 002/064 VUs, 397 complete and 0 interrupted iterations
+capacity   [  17% ] 002/064 VUs  0m10.0s/1m0s  40.00 iters/s
+
+running (0m11.0s), 001/064 VUs, 438 complete and 0 interrupted iterations
+capacity   [  18% ] 001/064 VUs  0m11.0s/1m0s  40.00 iters/s
+
+running (0m12.0s), 000/064 VUs, 479 complete and 0 interrupted iterations
+capacity   [  20% ] 000/064 VUs  0m12.0s/1m0s  40.00 iters/s
+
+running (0m13.0s), 000/064 VUs, 519 complete and 0 interrupted iterations
+capacity   [  22% ] 000/064 VUs  0m13.0s/1m0s  40.00 iters/s
+
+running (0m14.0s), 000/064 VUs, 559 complete and 0 interrupted iterations
+capacity   [  23% ] 000/064 VUs  0m14.0s/1m0s  40.00 iters/s
+
+running (0m15.0s), 000/064 VUs, 599 complete and 0 interrupted iterations
+capacity   [  25% ] 000/064 VUs  0m15.0s/1m0s  40.00 iters/s
+
+running (0m16.0s), 000/064 VUs, 639 complete and 0 interrupted iterations
+capacity   [  27% ] 000/064 VUs  0m16.0s/1m0s  40.00 iters/s
+
+running (0m17.0s), 000/064 VUs, 679 complete and 0 interrupted iterations
+capacity   [  28% ] 000/064 VUs  0m17.0s/1m0s  40.00 iters/s
+
+running (0m18.0s), 001/064 VUs, 718 complete and 0 interrupted iterations
+capacity   [  30% ] 001/064 VUs  0m18.0s/1m0s  40.00 iters/s
+
+running (0m19.0s), 000/064 VUs, 759 complete and 0 interrupted iterations
+capacity   [  32% ] 000/064 VUs  0m19.0s/1m0s  40.00 iters/s
+
+running (0m20.0s), 001/064 VUs, 798 complete and 0 interrupted iterations
+capacity   [  33% ] 001/064 VUs  0m20.0s/1m0s  40.00 iters/s
+
+running (0m21.0s), 000/064 VUs, 839 complete and 0 interrupted iterations
+capacity   [  35% ] 000/064 VUs  0m21.0s/1m0s  40.00 iters/s
+
+running (0m22.0s), 000/064 VUs, 879 complete and 0 interrupted iterations
+capacity   [  37% ] 000/064 VUs  0m22.0s/1m0s  40.00 iters/s
+
+running (0m23.0s), 000/064 VUs, 919 complete and 0 interrupted iterations
+capacity   [  38% ] 000/064 VUs  0m23.0s/1m0s  40.00 iters/s
+
+running (0m24.0s), 000/064 VUs, 959 complete and 0 interrupted iterations
+capacity   [  40% ] 000/064 VUs  0m24.0s/1m0s  40.00 iters/s
+
+running (0m25.0s), 000/064 VUs, 999 complete and 0 interrupted iterations
+capacity   [  42% ] 000/064 VUs  0m25.0s/1m0s  40.00 iters/s
+
+running (0m26.0s), 000/064 VUs, 1039 complete and 0 interrupted iterations
+capacity   [  43% ] 000/064 VUs  0m26.0s/1m0s  40.00 iters/s
+
+running (0m27.0s), 000/064 VUs, 1079 complete and 0 interrupted iterations
+capacity   [  45% ] 000/064 VUs  0m27.0s/1m0s  40.00 iters/s
+
+running (0m28.0s), 000/064 VUs, 1119 complete and 0 interrupted iterations
+capacity   [  47% ] 000/064 VUs  0m28.0s/1m0s  40.00 iters/s
+
+running (0m29.0s), 002/064 VUs, 1157 complete and 0 interrupted iterations
+capacity   [  48% ] 002/064 VUs  0m29.0s/1m0s  40.00 iters/s
+
+running (0m30.0s), 000/064 VUs, 1199 complete and 0 interrupted iterations
+capacity   [  50% ] 000/064 VUs  0m30.0s/1m0s  40.00 iters/s
+
+running (0m31.0s), 001/064 VUs, 1238 complete and 0 interrupted iterations
+capacity   [  52% ] 001/064 VUs  0m31.0s/1m0s  40.00 iters/s
+
+running (0m32.0s), 000/064 VUs, 1279 complete and 0 interrupted iterations
+capacity   [  53% ] 000/064 VUs  0m32.0s/1m0s  40.00 iters/s
+
+running (0m33.0s), 001/064 VUs, 1318 complete and 0 interrupted iterations
+capacity   [  55% ] 001/064 VUs  0m33.0s/1m0s  40.00 iters/s
+
+running (0m34.0s), 000/064 VUs, 1359 complete and 0 interrupted iterations
+capacity   [  57% ] 000/064 VUs  0m34.0s/1m0s  40.00 iters/s
+
+running (0m35.0s), 000/064 VUs, 1399 complete and 0 interrupted iterations
+capacity   [  58% ] 000/064 VUs  0m35.0s/1m0s  40.00 iters/s
+
+running (0m36.0s), 000/064 VUs, 1439 complete and 0 interrupted iterations
+capacity   [  60% ] 000/064 VUs  0m36.0s/1m0s  40.00 iters/s
+
+running (0m37.0s), 000/064 VUs, 1479 complete and 0 interrupted iterations
+capacity   [  62% ] 000/064 VUs  0m37.0s/1m0s  40.00 iters/s
+
+running (0m38.0s), 000/064 VUs, 1519 complete and 0 interrupted iterations
+capacity   [  63% ] 000/064 VUs  0m38.0s/1m0s  40.00 iters/s
+
+running (0m39.0s), 000/064 VUs, 1559 complete and 0 interrupted iterations
+capacity   [  65% ] 000/064 VUs  0m39.0s/1m0s  40.00 iters/s
+
+running (0m40.0s), 000/064 VUs, 1599 complete and 0 interrupted iterations
+capacity   [  67% ] 000/064 VUs  0m40.0s/1m0s  40.00 iters/s
+
+running (0m41.0s), 000/064 VUs, 1639 complete and 0 interrupted iterations
+capacity   [  68% ] 000/064 VUs  0m41.0s/1m0s  40.00 iters/s
+
+running (0m42.0s), 000/064 VUs, 1679 complete and 0 interrupted iterations
+capacity   [  70% ] 000/064 VUs  0m42.0s/1m0s  40.00 iters/s
+
+running (0m43.0s), 000/064 VUs, 1719 complete and 0 interrupted iterations
+capacity   [  72% ] 000/064 VUs  0m43.0s/1m0s  40.00 iters/s
+
+running (0m44.0s), 000/064 VUs, 1759 complete and 0 interrupted iterations
+capacity   [  73% ] 000/064 VUs  0m44.0s/1m0s  40.00 iters/s
+
+running (0m45.0s), 000/064 VUs, 1799 complete and 0 interrupted iterations
+capacity   [  75% ] 000/064 VUs  0m45.0s/1m0s  40.00 iters/s
+
+running (0m46.0s), 000/064 VUs, 1839 complete and 0 interrupted iterations
+capacity   [  77% ] 000/064 VUs  0m46.0s/1m0s  40.00 iters/s
+
+running (0m47.0s), 000/064 VUs, 1879 complete and 0 interrupted iterations
+capacity   [  78% ] 000/064 VUs  0m47.0s/1m0s  40.00 iters/s
+
+running (0m48.0s), 000/064 VUs, 1919 complete and 0 interrupted iterations
+capacity   [  80% ] 000/064 VUs  0m48.0s/1m0s  40.00 iters/s
+
+running (0m49.0s), 001/064 VUs, 1958 complete and 0 interrupted iterations
+capacity   [  82% ] 001/064 VUs  0m49.0s/1m0s  40.00 iters/s
+
+running (0m50.0s), 000/064 VUs, 1999 complete and 0 interrupted iterations
+capacity   [  83% ] 000/064 VUs  0m50.0s/1m0s  40.00 iters/s
+
+running (0m51.0s), 000/064 VUs, 2039 complete and 0 interrupted iterations
+capacity   [  85% ] 000/064 VUs  0m51.0s/1m0s  40.00 iters/s
+
+running (0m52.0s), 000/064 VUs, 2079 complete and 0 interrupted iterations
+capacity   [  87% ] 000/064 VUs  0m52.0s/1m0s  40.00 iters/s
+
+running (0m53.0s), 000/064 VUs, 2119 complete and 0 interrupted iterations
+capacity   [  88% ] 000/064 VUs  0m53.0s/1m0s  40.00 iters/s
+
+running (0m54.0s), 000/064 VUs, 2159 complete and 0 interrupted iterations
+capacity   [  90% ] 000/064 VUs  0m54.0s/1m0s  40.00 iters/s
+
+running (0m55.0s), 000/064 VUs, 2199 complete and 0 interrupted iterations
+capacity   [  92% ] 000/064 VUs  0m55.0s/1m0s  40.00 iters/s
+
+running (0m56.0s), 000/064 VUs, 2239 complete and 0 interrupted iterations
+capacity   [  93% ] 000/064 VUs  0m56.0s/1m0s  40.00 iters/s
+
+running (0m57.0s), 000/064 VUs, 2279 complete and 0 interrupted iterations
+capacity   [  95% ] 000/064 VUs  0m57.0s/1m0s  40.00 iters/s
+
+running (0m58.0s), 000/064 VUs, 2319 complete and 0 interrupted iterations
+capacity   [  97% ] 000/064 VUs  0m58.0s/1m0s  40.00 iters/s
+
+running (0m59.0s), 000/064 VUs, 2359 complete and 0 interrupted iterations
+capacity   [  98% ] 000/064 VUs  0m59.0s/1m0s  40.00 iters/s
+
+running (1m00.0s), 000/064 VUs, 2399 complete and 0 interrupted iterations
+capacity   [ 100% ] 000/064 VUs  1m00.0s/1m0s  40.00 iters/s
+time="2026-09-09T14:13:49Z" level=info msg="Measured sale id: 2d89286c-821d-466f-b6fe-1ac65683b125" source=console
+
+     accepted_latency...............: avg=11.55ms  min=6.45ms  med=8.55ms  max=122.84ms p(90)=13.82ms p(95)=23.78ms
+     data_received..................: 1.6 MB 27 kB/s
+     data_sent......................: 1.5 MB 24 kB/s
+   ??dropped_iterations.............: 0      0/s
+     http_req_blocked...............: avg=40.47쨉s  min=2.25쨉s  med=4.76쨉s  max=29.74ms  p(90)=6.78쨉s  p(95)=8.04쨉s
+     http_req_connecting............: avg=32.93쨉s  min=0s      med=0s      max=29.58ms  p(90)=0s      p(95)=0s
+     http_req_duration..............: avg=9.25ms   min=4.69ms  med=7.52ms  max=122.84ms p(90)=11.24ms p(95)=15.31ms
+       { expected_response:true }...: avg=9.25ms   min=4.69ms  med=7.52ms  max=122.84ms p(90)=11.24ms p(95)=15.31ms
+     ??{ name:payment_accept }......: avg=6.95ms   min=4.69ms  med=6.15ms  max=62.31ms  p(90)=8.34ms  p(95)=9.47ms
+     ??{ name:purchase }............: avg=11.55ms  min=6.45ms  med=8.55ms  max=122.84ms p(90)=13.82ms p(95)=23.78ms
+     http_req_failed................: 0.00%  0 out of 4803
+     http_req_receiving.............: avg=147.14쨉s min=38.92쨉s med=116.6쨉s max=7.28ms   p(90)=217.2쨉s p(95)=330.57쨉s
+     http_req_sending...............: avg=42.8쨉s   min=8.63쨉s  med=41.58쨉s max=1.49ms   p(90)=54쨉s    p(95)=63.69쨉s
+     http_req_tls_handshaking.......: avg=0s       min=0s      med=0s      max=0s       p(90)=0s      p(95)=0s
+     http_req_waiting...............: avg=9.06ms   min=4.58ms  med=7.34ms  max=122.66ms p(90)=11.01ms p(95)=15.06ms
+     http_reqs......................: 4803   80.014449/s
+     iteration_duration.............: avg=19.05ms  min=11.96ms med=15.25ms max=149.08ms p(90)=23.8ms  p(95)=44.27ms
+     iterations.....................: 2401   39.998895/s
+     purchase_outcomes..............: 2401   39.998895/s
+   ??purchase_rejections............: 0.00%  0 out of 2401
+   ??unexpected_errors..............: 0.00%  0 out of 4802
+     vus............................: 0      min=0         max=5
+     vus_max........................: 64     min=64        max=64
+
+
+running (1m00.0s), 000/064 VUs, 2401 complete and 0 interrupted iterations
+capacity ??[ 100% ] 000/064 VUs  1m0s  40.00 iters/s
+Exception: D:\Code\limited-goods-reservation\ops\performance\capacity.ps1:33
+Line |
+  33 |  … ues.Count -gt 0) { throw "Capacity 최종 판정 실패: $($issues -join '; ')" }
+     |                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~에서
+     | Capacity 최종 판정 실패: confirmedOrders != accepted; succeededAttempts != accepted;
+     | confirmedReservations != accepted

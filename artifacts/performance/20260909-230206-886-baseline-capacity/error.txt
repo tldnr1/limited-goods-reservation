@@ -1,0 +1,7 @@
+Exception: D:\Code\limited-goods-reservation\ops\performance.ps1:228
+Line |
+ 228 |  …  ($k6Exit -ne 0) { throw "k6 실패 (exit=$k6Exit). 후속 실험은 실행하지 않았습니다." }
+     |                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~에서
+     | k6 실패 (exit=99). 후속 실험은 실행하지 않았습니다.
+
+

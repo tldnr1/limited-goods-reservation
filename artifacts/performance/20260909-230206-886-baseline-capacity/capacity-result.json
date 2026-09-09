@@ -1,0 +1,30 @@
+{
+  "evidence": {
+    "saleId": "426c40a9-739b-4924-b180-be4464caf7e1",
+    "iterations": 3000,
+    "outcomes": 3000,
+    "accepted": 3000,
+    "rejected": 0
+  },
+  "finalState": {
+    "orders": 3000,
+    "confirmedOrders": 865,
+    "attempts": 2999,
+    "succeededAttempts": 865,
+    "confirmedReservations": 865,
+    "inventoryViolations": 0,
+    "userLimitViolations": 0
+  },
+  "stateCheckedAt": "2026-09-09T14:07:16.9921738+00:00",
+  "issues": [
+    "confirmedOrders != accepted",
+    "attempts != accepted",
+    "succeededAttempts != accepted",
+    "confirmedReservations != accepted",
+    "api1 프로세스 변경/Hikari timeout"
+  ],
+  "finalStatePassed": false,
+  "maxPendingPayments": 2166.0,
+  "maxOldestPendingPaymentSeconds": 43.690739,
+  "sustainability": "requires_review: order-progress.txt의 부하 중 backlog/age 추세와 확정 처리율을 확인. 최종 drain 성공만으로 지속 용량 통과 아님."
+}

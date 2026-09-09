@@ -1,0 +1,8 @@
+Exception: D:\Code\limited-goods-reservation\ops\performance\capacity.ps1:33
+Line |
+  33 |  … ues.Count -gt 0) { throw "Capacity 최종 판정 실패: $($issues -join '; ')" }
+     |                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~에서
+     | Capacity 최종 판정 실패: confirmedOrders != accepted; succeededAttempts != accepted;
+     | confirmedReservations != accepted
+
+

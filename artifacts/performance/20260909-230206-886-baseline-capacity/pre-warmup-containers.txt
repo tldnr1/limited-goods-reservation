@@ -1,0 +1,9 @@
+NAME                              IMAGE                      COMMAND                   SERVICE      CREATED         STATUS                        PORTS
+limited-goods-java-api1-1         limited-goods-java:local   "java -XX:MaxRAMPerc??   api1         3 minutes ago   Up 30 seconds (healthy)       
+limited-goods-java-api2-1         limited-goods-java:local   "java -XX:MaxRAMPerc??   api2         3 minutes ago   Up 30 seconds (healthy)       
+limited-goods-java-mock-pg-1      limited-goods-java:local   "java -XX:MaxRAMPerc??   mock-pg      3 minutes ago   Up About a minute (healthy)   
+limited-goods-java-nginx-1        nginx:1.28-alpine          "/docker-entrypoint.??   nginx        32 hours ago    Up 4 seconds                  127.0.0.1:8080->80/tcp
+limited-goods-java-postgres-1     postgres:16-alpine         "docker-entrypoint.s??   postgres     32 hours ago    Up 3 minutes (healthy)        127.0.0.1:5433->5432/tcp
+limited-goods-java-prometheus-1   prom/prometheus:v2.55.1    "/bin/prometheus --c??   prometheus   22 hours ago    Up 3 minutes                  127.0.0.1:9090->9090/tcp
+limited-goods-java-redis-1        redis:7-alpine             "docker-entrypoint.s??   redis        32 hours ago    Up 3 minutes (healthy)        127.0.0.1:6380->6379/tcp
+limited-goods-java-worker-1       limited-goods-java:local   "java -XX:MaxRAMPerc??   worker       3 minutes ago   Up 30 seconds (healthy)       

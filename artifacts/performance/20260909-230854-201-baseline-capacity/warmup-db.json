@@ -1,0 +1,9 @@
+{
+  "orders": 300,
+  "confirmedOrders": 300,
+  "attempts": 300,
+  "succeededAttempts": 300,
+  "confirmedReservations": 300,
+  "inventoryViolations": 0,
+  "userLimitViolations": 0
+}

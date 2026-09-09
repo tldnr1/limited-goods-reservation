@@ -1,0 +1,17 @@
+ id | total | available | held | sold 
+----+-------+-----------+------+------
+(0 rows)
+
+       status       | count 
+--------------------+-------
+ PAYMENT_PROCESSING |  2093
+ CONFIRMED          |  1207
+ PAYMENT_PENDING    |     1
+(3 rows)
+
+  status   | count 
+-----------+-------
+ SUCCEEDED |  1207
+ CREATED   |  2093
+(2 rows)
+

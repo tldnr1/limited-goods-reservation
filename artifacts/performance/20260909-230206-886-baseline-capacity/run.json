@@ -1,0 +1,17 @@
+{
+  "status": "failed",
+  "mode": "baseline",
+  "scenario": "capacity",
+  "openingRps": 0,
+  "tailRps": 0,
+  "rps": 50,
+  "stock": 10000,
+  "durationSeconds": 60,
+  "orderProgressSeconds": 1,
+  "dbWaitSampleMilliseconds": null,
+  "warmupRps": 10,
+  "warmupSeconds": 30,
+  "diagnostics": false,
+  "prometheusScrapeSeconds": 1,
+  "startedAt": "2026-09-09T23:02:06.7755518+09:00"
+}
