@@ -1,4 +1,4 @@
--- This experiment uses SUCCESS payments. All counts are scoped to its warmup sale.
+-- SUCCESS purchase flow: shared final-state checks for warmup and capacity sales.
 WITH sale_orders AS (
     SELECT * FROM orders WHERE sale_id = :'sale_id'::uuid
 ), sale_attempts AS (

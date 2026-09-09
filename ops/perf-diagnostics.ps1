@@ -1,16 +1,28 @@
 # Loaded by performance.ps1. The observer uses one separate, read-only PostgreSQL connection.
 function Start-DbObserver {
-    param([string]$Directory, [int]$SampleCount = 450)
+    param([string]$Directory, [int]$SampleCount = 450,
+        [string]$SqlPath = "$PSScriptRoot/db-waits.sql", [string]$Label = 'db-waits',
+        [Guid]$ExcludeSaleId = [Guid]::Empty)
     $name = 'goods-perf-observer-' + [Guid]::NewGuid().ToString('N')
-    Copy-Item -LiteralPath "$PSScriptRoot/db-waits.sql" -Destination "$Directory/db-waits.sql"
+    Copy-Item -LiteralPath $SqlPath -Destination "$Directory/$Label.sql"
     $process = Start-Process -FilePath (Get-Command docker).Source -WindowStyle Hidden -PassThru `
         -ArgumentList @('compose','--env-file','ops/perf.env','exec','-T','-e',"PGAPPNAME=$name",
-            'postgres','psql','-X','-qAt','-v','ON_ERROR_STOP=1','-v',"sample_count=$SampleCount",
+            'postgres','psql','-X','-qAt','-v','ON_ERROR_STOP=1','-v',"sample_count=$SampleCount",'-v',"exclude_sale_id=$ExcludeSaleId",
             '-U','goods','-d','limited_goods_perf') `
-        -RedirectStandardInput "$Directory/db-waits.sql" `
-        -RedirectStandardOutput "$Directory/db-waits.txt" `
-        -RedirectStandardError "$Directory/db-waits-errors.txt"
-    [pscustomobject]@{ Process=$process; Name=$name; Directory=$Directory }
+        -RedirectStandardInput "$Directory/$Label.sql" `
+        -RedirectStandardOutput "$Directory/$Label.txt" `
+        -RedirectStandardError "$Directory/$Label-errors.txt"
+    [pscustomobject]@{ Process=$process; Name=$name; Directory=$Directory; Label=$Label }
+}
+
+function Wait-DbObserver {
+    param($Observer)
+    for ($i=0; $i -lt 25; $i++) {
+        if ($Observer.Process.HasExited) { throw "$($Observer.Label) 관측 프로세스가 부하 전에 종료됐습니다." }
+        if (Select-String -LiteralPath "$($Observer.Directory)/$($Observer.Label).txt" -Pattern '"sampled_at"' -Quiet) { return }
+        Start-Sleep -Milliseconds 200
+    }
+    throw "$($Observer.Label) 관측 준비 미완료. 부하는 시작하지 않았습니다."
 }
 
 function Stop-DbObserver {
@@ -23,13 +35,13 @@ function Stop-DbObserver {
             -U goods -d limited_goods_perf -c $sql | Out-Null
         if ($LASTEXITCODE -ne 0) { throw 'DB 관측 세션 종료 실패 (표본 횟수 상한 도달 시 자체 종료)' }
         if (-not $Observer.Process.WaitForExit(5000)) { throw 'DB 관측 프로세스 종료 확인 실패' }
-        Set-Content "$($Observer.Directory)/db-waits-status.txt" 'stopped by collector; PostgreSQL termination message is expected'
+        Set-Content "$($Observer.Directory)/$($Observer.Label)-status.txt" 'stopped by collector; PostgreSQL termination message is expected'
     } else {
         $Observer.Process.WaitForExit()
         if ($Observer.Process.ExitCode -ne 0) { throw "DB 관측 실패: exit=$($Observer.Process.ExitCode)" }
-        Set-Content "$($Observer.Directory)/db-waits-status.txt" 'sample count limit reached'
+        Set-Content "$($Observer.Directory)/$($Observer.Label)-status.txt" 'sample count limit reached'
     }
-    if (-not (Select-String -LiteralPath "$($Observer.Directory)/db-waits.txt" -Pattern '"sampled_at"' -Quiet)) {
+    if (-not (Select-String -LiteralPath "$($Observer.Directory)/$($Observer.Label).txt" -Pattern '"sampled_at"' -Quiet)) {
         throw 'DB 관측 표본 없음'
     }
 }

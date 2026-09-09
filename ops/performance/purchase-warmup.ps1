@@ -1,27 +1,29 @@
 # Experiment-specific checks. Loaded by performance.ps1; never called by application code.
-function Get-WarmupEvidence {
-    param([string]$Directory)
-    $summary = Get-Content "$Directory/warmup-summary.json" -Raw | ConvertFrom-Json
-    if ($null -eq $summary.metrics.unexpected_errors.value -or $summary.metrics.unexpected_errors.value -ne 0 -or
-        $null -eq $summary.metrics.dropped_iterations.count -or $summary.metrics.dropped_iterations.count -ne 0) {
+function Get-PurchaseEvidence {
+    param([string]$Directory, [ValidateSet('warmup','measured')][string]$Phase = 'warmup')
+    $prefix = if ($Phase -eq 'warmup') { 'warmup-' } else { '' }
+    $summary = Get-Content "$Directory/${prefix}summary.json" -Raw | ConvertFrom-Json
+    if ($Phase -eq 'warmup' -and ($null -eq $summary.metrics.unexpected_errors.value -or $summary.metrics.unexpected_errors.value -ne 0 -or
+        $null -eq $summary.metrics.dropped_iterations.count -or $summary.metrics.dropped_iterations.count -ne 0)) {
         throw '워밍업 오류/요청 누락 지표가 없거나 0이 아닙니다.'
     }
-    $outcomes = @(Get-Content "$Directory/warmup-raw.json" | ForEach-Object { $_ | ConvertFrom-Json } |
+    $outcomes = @(Get-Content "$Directory/${prefix}raw.json" | Where-Object { $_ -match '"metric"\s*:\s*"purchase_outcomes"' } |
+        ForEach-Object { $_ | ConvertFrom-Json } |
         Where-Object { $_.type -eq 'Point' -and $_.metric -eq 'purchase_outcomes' })
     $saleIds = @($outcomes.data.tags.sale_id | Sort-Object -Unique)
     if ($saleIds.Count -ne 1 -or $saleIds[0] -notmatch '^[0-9a-fA-F-]{36}$') {
-        throw '워밍업 판매 ID를 하나로 식별할 수 없습니다.'
+        throw "$Phase 판매 ID를 하나로 식별할 수 없습니다."
     }
     $saleId = [Guid]::Parse($saleIds[0]).ToString()
     $accepted = @($outcomes | Where-Object { $_.data.tags.outcome -eq 'held' }).Count
-    if ($accepted -le 0 -or $outcomes.Count -ne $summary.metrics.iterations.count) {
+    if ($Phase -eq 'warmup' -and ($accepted -le 0 -or $outcomes.Count -ne $summary.metrics.iterations.count)) {
         throw '워밍업 성공 구매가 없거나 원시 결과와 완료 iteration 수가 다릅니다.'
     }
-    [pscustomobject]@{ saleId=$saleId; iterations=$outcomes.Count; accepted=$accepted;
-        rejected=$outcomes.Count-$accepted }
+    [pscustomobject]@{ saleId=$saleId; iterations=$summary.metrics.iterations.count; outcomes=$outcomes.Count;
+        accepted=$accepted; rejected=$outcomes.Count-$accepted }
 }
 
-function Get-WarmupPools {
+function Get-PurchasePools {
     $result = @()
     foreach ($service in @('api1','api2','worker','mock-pg')) {
         $raw = (Invoke-Docker -Arguments ($compose + @('exec','-T',$service,'curl','--fail','--silent',
@@ -35,17 +37,22 @@ function Get-WarmupPools {
     $result
 }
 
+function Get-PurchaseState {
+    param([Guid]$SaleId)
+    $raw = Get-Content "$PSScriptRoot/purchase-state.sql" |
+        & docker @compose exec -T postgres psql -X -qAt -v ON_ERROR_STOP=1 -v "sale_id=$SaleId" `
+            -U goods -d limited_goods_perf
+    if ($LASTEXITCODE -ne 0) { throw '판매 상태 조회 실패' }
+    $raw | ConvertFrom-Json
+}
+
 function Wait-PurchaseWarmup {
     param([string]$Directory, $PoolsBefore)
-    $evidence = Get-WarmupEvidence -Directory $Directory
+    $evidence = Get-PurchaseEvidence -Directory $Directory
     $evidence | ConvertTo-Json | Set-Content "$Directory/warmup-evidence.json" -Encoding utf8
     $drained = $false
     for ($i=0; $i -lt 15; $i++) {
-        $raw = Get-Content "$PSScriptRoot/purchase-warmup.sql" |
-            & docker @compose exec -T postgres psql -X -qAt -v ON_ERROR_STOP=1 -v "sale_id=$($evidence.saleId)" `
-                -U goods -d limited_goods_perf
-        if ($LASTEXITCODE -ne 0) { throw '워밍업 판매 상태 조회 실패' }
-        $state = $raw | ConvertFrom-Json
+        $state = Get-PurchaseState -SaleId $evidence.saleId
         $state | ConvertTo-Json | Set-Content "$Directory/warmup-db.json" -Encoding utf8
         if ($state.inventoryViolations -ne 0 -or $state.userLimitViolations -ne 0) {
             throw '워밍업 재고/인당 한도 불변식 위반'
@@ -56,7 +63,7 @@ function Wait-PurchaseWarmup {
         Start-Sleep -Seconds 2
     }
     if (-not $drained) { throw "워밍업 미확정/건수 불일치: 성공 구매=$($evidence.accepted), 상태=$($state | ConvertTo-Json -Compress)" }
-    $after = @(Get-WarmupPools)
+    $after = @(Get-PurchasePools)
     $after | ConvertTo-Json | Set-Content "$Directory/warmup-pools-after.json" -Encoding utf8
     foreach ($pool in $after) {
         $before = @($PoolsBefore | Where-Object service -eq $pool.service)

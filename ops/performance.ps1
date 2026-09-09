@@ -2,9 +2,12 @@
 param(
     [ValidateSet('Check','Prepare','Run')][string]$Action = 'Check',
     [ValidateSet('baseline','gate')][string]$Mode = 'baseline',
-    [ValidateSet('purchase-spike')][string]$Scenario = 'purchase-spike',
+    [ValidateSet('purchase-spike','capacity')][string]$Scenario = 'purchase-spike',
     [int]$OpeningRps = 0,
     [int]$TailRps = 0,
+    [int]$Rps = 0,
+    [int]$Stock = 10000,
+    [int]$DurationSeconds = 60,
     [switch]$Diagnostics
 )
 $ErrorActionPreference = 'Stop'
@@ -16,9 +19,11 @@ $prepared = $false
 $startedAt = [DateTimeOffset]::UtcNow
 $savedEnvironment = @{}
 $observer = $null
+$progressObserver = $null
 $observationStart = $null
 . (Join-Path $PSScriptRoot 'perf-diagnostics.ps1')
 . (Join-Path $PSScriptRoot 'performance/purchase-warmup.ps1')
+. (Join-Path $PSScriptRoot 'performance/capacity.ps1')
 
 function Invoke-Docker {
     param([string[]]$Arguments)
@@ -69,8 +74,17 @@ function Save-Snapshot {
 
 Push-Location $root
 try {
-    if ($Action -eq 'Run' -and ($OpeningRps -le 0 -or $TailRps -le 0)) {
-        throw 'Run에는 양수 OpeningRps와 TailRps를 명시해야 합니다.'
+    if ($Action -eq 'Run') {
+        if ($Scenario -eq 'capacity') {
+            if ($Rps -le 0 -or $DurationSeconds -le 0 -or $DurationSeconds -gt 3600 -or
+                $Stock -gt 1000000 -or $Stock -lt [Math]::Ceiling([double]$Rps * $DurationSeconds * 1.1) + 1) {
+                throw 'capacity: 양수 Rps, DurationSeconds 1~3600, Stock >= ceil(Rps*DurationSeconds*1.1)+1 (최대 1000000)이 필요합니다.'
+            }
+            if ($OpeningRps -ne 0 -or $TailRps -ne 0) { throw 'capacity는 OpeningRps/TailRps 대신 Rps를 사용합니다.' }
+        } elseif ($OpeningRps -le 0 -or $TailRps -le 0 -or $Rps -ne 0 -or
+            $PSBoundParameters.ContainsKey('Stock') -or $PSBoundParameters.ContainsKey('DurationSeconds')) {
+            throw 'purchase-spike는 양수 OpeningRps/TailRps만 사용합니다. Rps/Stock/DurationSeconds는 capacity 전용입니다.'
+        }
     }
     if ($Action -eq 'Check') {
         Invoke-Docker -Arguments @('compose','config','--quiet')
@@ -91,6 +105,10 @@ try {
         $runDir = Join-Path $root "artifacts/performance/$stamp-$Mode-$Scenario"
         New-Item -ItemType Directory -Path $runDir -ErrorAction Stop | Out-Null
         [ordered]@{ status='preparing'; mode=$Mode; scenario=$Scenario; openingRps=$OpeningRps; tailRps=$TailRps;
+            rps=$Rps; stock=$(if ($Scenario -eq 'capacity') { $Stock } else { 1000 });
+            durationSeconds=$(if ($Scenario -eq 'capacity') { $DurationSeconds } else { 60 });
+            orderProgressSeconds=$(if ($Scenario -eq 'capacity') { 1 } else { $null });
+            dbWaitSampleMilliseconds=$(if ($Diagnostics) { 100 } else { $null });
             warmupRps=10; warmupSeconds=30;
             diagnostics=[bool]$Diagnostics; prometheusScrapeSeconds=1;
             startedAt=$startedAt.ToString('o') } | ConvertTo-Json | Set-Content "$runDir/run.json" -Encoding utf8
@@ -115,7 +133,7 @@ try {
         ConvertTo-Json -Depth 8 | Set-Content "$runDir/container-network-map.json" -Encoding utf8
     Copy-Item -LiteralPath (Join-Path $root "k6/$Scenario.js") -Destination "$runDir/scenario.js"
     Copy-Item -LiteralPath (Join-Path $root 'k6/lib') -Destination "$runDir/lib" -Recurse
-    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'performance/purchase-warmup.sql') -Destination $runDir
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'performance/purchase-state.sql') -Destination $runDir
     Get-FileHash build/libs/limited-goods.jar | Select-Object Algorithm,Hash |
         ConvertTo-Json | Set-Content "$runDir/jar-hash.json" -Encoding utf8
     Invoke-WebRequest 'http://127.0.0.1:9090/-/ready' -TimeoutSec 5 | Out-Null
@@ -134,18 +152,12 @@ try {
     if (-not $targetsReady) { throw 'Prometheus의 API 2개/Worker 수집 준비 미완료. 부하는 시작하지 않았습니다.' }
     Copy-Item -LiteralPath (Join-Path $root 'k6/warmup.js') -Destination "$runDir/warmup.js"
     Save-Snapshot -Label 'pre-warmup'
-    $poolsBefore = @(Get-WarmupPools)
+    $poolsBefore = @(Get-PurchasePools)
     $poolsBefore | ConvertTo-Json | Set-Content "$runDir/warmup-pools-before.json" -Encoding utf8
     $observationStart = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     if ($Diagnostics) {
         $observer = Start-DbObserver -Directory $runDir
-        $ready = $false
-        for ($i=0; $i -lt 25; $i++) {
-            if ($observer.Process.HasExited) { throw 'DB 관측 프로세스가 워밍업 전에 종료됐습니다.' }
-            if (Select-String -LiteralPath "$runDir/db-waits.txt" -Pattern '"sampled_at"' -Quiet) { $ready=$true; break }
-            Start-Sleep -Milliseconds 200
-        }
-        if (-not $ready) { throw 'DB 관측 준비 미완료. 부하는 시작하지 않았습니다.' }
+        Wait-DbObserver -Observer $observer
     }
     [ordered]@{ observationStart=$observationStart; warmupStart=[DateTimeOffset]::UtcNow.ToString('o') } |
         ConvertTo-Json | Set-Content "$runDir/phases.json" -Encoding utf8
@@ -166,27 +178,55 @@ try {
     $observer = $null
     Wait-PurchaseWarmup -Directory $runDir -PoolsBefore $poolsBefore
     Save-Snapshot -Label 'before'
+    $measuredSeconds = if ($Scenario -eq 'capacity') { $DurationSeconds } else { 60 }
+    if ($Scenario -eq 'capacity') {
+        $measuredPoolsBefore = @(Get-PurchasePools)
+        $measuredPoolsBefore | ConvertTo-Json | Set-Content "$runDir/measured-pools-before.json" -Encoding utf8
+        $warmupEvidence = Get-Content "$runDir/warmup-evidence.json" -Raw | ConvertFrom-Json
+        $progressObserver = Start-DbObserver -Directory $runDir -SampleCount ($measuredSeconds + 120) `
+            -SqlPath (Join-Path $PSScriptRoot 'performance/order-progress.sql') -Label 'order-progress' -ExcludeSaleId $warmupEvidence.saleId
+        Wait-DbObserver -Observer $progressObserver
+    }
+    if ($Diagnostics) {
+        $observer = Start-DbObserver -Directory $runDir -SampleCount (($measuredSeconds + 120) * 10) -Label 'measured-db-waits'
+        Wait-DbObserver -Observer $observer
+    }
     $loadStart = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     $phases | Add-Member -NotePropertyName loadStart -NotePropertyValue $loadStart
     $phases | ConvertTo-Json | Set-Content "$runDir/phases.json" -Encoding utf8
-    Write-Output "실제 부하 시작: $Mode / $OpeningRps RPS 10초 → $TailRps RPS 50초"
+    if ($Scenario -eq 'capacity') { Write-Output "실제 부하 시작: $Mode / capacity $Rps RPS × $DurationSeconds 초, 재고 $Stock" }
+    else { Write-Output "실제 부하 시작: $Mode / $OpeningRps RPS 10초 → $TailRps RPS 50초" }
     $arguments = @('run','--rm','--name','goods-k6','--cpus','1.5','--memory','1g',
         '--mount',"type=bind,source=$root/k6,target=/scripts,readonly",
         '--mount',"type=bind,source=$runDir,target=/results",
         '-e',"OPENING_RPS=$OpeningRps",'-e',"TAIL_RPS=$TailRps",
+        '-e',"RPS=$Rps",'-e',"STOCK=$Stock",'-e',"DURATION_SECONDS=$DurationSeconds",
         'grafana/k6:0.54.0','run','--summary-export=/results/summary.json','--out','json=/results/raw.json',
         "/scripts/$Scenario.js")
     & docker @arguments 2>&1 | Tee-Object -FilePath "$runDir/k6.log"
     $k6Exit = $LASTEXITCODE
     Set-Content "$runDir/exit-code.txt" $k6Exit -Encoding utf8
+    $phases | Add-Member -NotePropertyName loadFinished -NotePropertyValue ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+    $phases | ConvertTo-Json | Set-Content "$runDir/phases.json" -Encoding utf8
     # Save failed-run evidence, but never retry or advance to another experiment.
     if ($k6Exit -eq 0) { Start-Sleep -Seconds 30 }
+    Stop-DbObserver -Observer $progressObserver
+    $progressObserver = $null
+    Stop-DbObserver -Observer $observer
+    $observer = $null
+    $capacityFailure = $null
+    if ($Scenario -eq 'capacity') {
+        try { Save-CapacityResult -Directory $runDir -PoolsBefore $measuredPoolsBefore }
+        catch { $capacityFailure = $_ }
+    }
     Save-Snapshot -Label 'after'
     $loadEnd = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     $phases | Add-Member -NotePropertyName loadEnd -NotePropertyValue $loadEnd
     $phases | ConvertTo-Json | Set-Content "$runDir/phases.json" -Encoding utf8
     Save-Prometheus -Directory $runDir -Start $observationStart -End $loadEnd
+    if ($capacityFailure -and $k6Exit -ne 0) { $capacityFailure | Out-String | Add-Content "$runDir/collection-errors.txt" }
     if ($k6Exit -ne 0) { throw "k6 실패 (exit=$k6Exit). 후속 실험은 실행하지 않았습니다." }
+    if ($capacityFailure) { throw $capacityFailure }
     $manifest = Get-Content "$runDir/run.json" -Raw | ConvertFrom-Json
     $manifest.status = 'collected'
     $manifest | Add-Member -NotePropertyName completedAt -NotePropertyValue ([DateTimeOffset]::UtcNow.ToString('o'))
@@ -201,6 +241,10 @@ try {
     }
     throw
 } finally {
+    if ($progressObserver) {
+        try { Stop-DbObserver -Observer $progressObserver }
+        catch { $_ | Out-String | Add-Content "$runDir/collection-errors.txt"; Write-Warning $_ }
+    }
     if ($observer) {
         try { Stop-DbObserver -Observer $observer }
         catch { $_ | Out-String | Add-Content "$runDir/collection-errors.txt"; Write-Warning $_ }

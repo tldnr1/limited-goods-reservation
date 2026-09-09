@@ -8,7 +8,7 @@
 
 Java/Spring 구매·점유·결제·만료, API 2개/Nginx/Worker/Mock PG,
 PostgreSQL의 dev/test/perf DB, Redis gate, 기능 테스트 22개가 있다.
-공통 실행은 `ops/performance.ps1`, 요청 패턴은 `k6/purchase-spike.js`가 담당한다.
+공통 실행은 `ops/performance.ps1`, 요청 패턴은 `k6/purchase-spike.js`와 `k6/capacity.js`가 담당한다.
 워밍업과 본 측정이 공유하는 요청 흐름은 `k6/lib/purchase-flow.js`에 있다.
 코드 읽기는 [learning.md](learning.md), 자원·합격 기준은 [performance.md](performance.md)를 본다.
 
@@ -55,7 +55,46 @@ API 2개/Worker/Mock PG의 Hikari timeout 증가와 프로세스 재시작도 �
 후반부 안정화 여부는 결과 분석에서 확인한다. 위 조건 통과가 JVM 성능의 완전한 안정화를 보장하지는 않는다.
 통과하면 앱을 재기동하거나 DB를 다시 초기화하지 않고, 새 판매에서 본 측정을 시작한다.
 
-## 3. 직접 실행할 명령
+## 3. 다음 capacity 탐색 — 직접 실행할 명령
+
+정상 구매→결제 처리의 지속 용량은 재고가 충분한 `capacity`로 측정한다. 파일을 매번 수정할 필요 없이
+`-Rps`, `-Stock`, `-DurationSeconds`만 바꾼다. 기본 재고는 10,000개, 본 측정 시간은 60초다.
+먼저 Diagnostics OFF인 10 RPS 참조 실행을 확보하고, 결과를 확인하면서 25 → 50 → 100으로 올린다.
+기존 10 RPS 결과는 Diagnostics ON이고 재고·시나리오도 달랐으므로 동일 조건의 성능 비교값은 아니다.
+
+```bash
+cd /d/Code/limited-goods-reservation
+pwsh -NoProfile -File ./ops/performance.ps1 -Action Run -Mode baseline -Scenario capacity -Rps 10 -Stock 10000 -DurationSeconds 60
+# 위 결과 확인 후, 한 번에 한 단계만 실행 (25를 50 또는 100으로 변경)
+pwsh -NoProfile -File ./ops/performance.ps1 -Action Run -Mode baseline -Scenario capacity -Rps 25 -Stock 10000 -DurationSeconds 60
+# 경계 발견 후 같은 조건을 진단용으로 재현하는 예시
+pwsh -NoProfile -File ./ops/performance.ps1 -Action Run -Mode baseline -Scenario capacity -Rps 25 -Stock 10000 -DurationSeconds 60 -Diagnostics
+```
+
+각 Run은 perf 초기화→별도 판매 워밍업→본 측정→성공 시 30초 drain→수집·판정까지 한 번 수행한다.
+자동 증가/반복은 없다. 실패하거나 backlog가 계속 증가하면 다음 RPS로 올리지 말고 결과를 검토한다.
+재고는 `ceil(Rps × DurationSeconds × 1.1) + 1` 이상, 최대 1,000,000으로 제한한다.
+10% 여유와 1건은 재고 소진/실행 경계의 요청 수 차이 방지용이며 성능 보장값이 아니다.
+예를 들어 100 RPS·300초 재확인은 `-Stock 40000 -DurationSeconds 300`으로 실행한다.
+
+capacity는 모든 구매 성공을 전제로 409/429도 실패로 판정한다. 예상 밖 오류와 dropped iteration은 0,
+구매 p99 < 1초, 결제 접수 p95 < 1초를 검사한다. k6 성공 후 실제 성공 수만큼 주문/결제/점유가
+모두 확정됐는지, 재고·사용자 한도 불변식과 Hikari timeout/프로세스 재시작도 검사한다.
+워밍업 수량은 본 측정 판정에서 제외한다. 이 엄격한 정상 용량 조건은 품절/거절을 허용하는 business workload와 다르다.
+
+1초 간격 `order-progress.txt`에서 주문/확정 누적 수, 미처리 결제 수와 가장 오래된 작업의 나이를 확인한다.
+표본 간 `confirmed` 증가량/실제 시간 차이로 확정 처리율을 본다. `phases.json`의 loadStart~loadFinished는
+본 측정 실행 구간이며 k6 setup/종료 대기도 포함한다. 정확한 요청 시작/종료는 raw.json과 함께 본다.
+그 이후는 drain이다. **부하 종료 후 모두 확정됐어도 부하 중 backlog/age가 계속 증가했다면 지속 용량 통과로 보지 않는다.**
+`capacity-result.json`의 finalStatePassed는 최종 상태 검사다. sustainability는 추세 검토가 필요하다고 남긴다.
+최종 조회는 30초 drain 뒤 원시 결과 대조·관측기 종료에 걸리는 시간이 더해질 수 있다.
+stateCheckedAt에 실제 조회 시각을 기록하며, 30초 내 복구 여부는 진행 표본의 시각으로 확인한다.
+60초 탐색으로 경계를 좁힌 뒤 경계 아래 조건을 더 길게 실행하고 반복해 안정성을 확인한다.
+
+VU는 64개를 미리 준비하고 최대 512개로 제한한다. dropped iteration은 서버 지연 또는 생성기 한계 모두에서
+발생할 수 있다. 이를 곧바로 서버 최대 용량으로 해석하거나 VU를 무조건 늘리지 않는다.
+
+### 기존 purchase-spike 실행
 
 Docker Desktop을 실행한 뒤 Git Bash에서 아래 명령을 사용한다. 별도 Prepare나 수동 DB 초기화는 필요 없다.
 워밍업 통과 시 10 RPS × 60초 본 측정까지 자동 진행하며, 실패하면 재시도 없이 자료를 남기고 중단한다.
@@ -67,7 +106,7 @@ cd /d/Code/limited-goods-reservation
 # 낮은 요청량에서 실행·수집 절차를 확인하는 예시. 비즈니스 목표 수치가 아니다.
 pwsh -NoProfile -File ./ops/performance.ps1 -Action Run -Mode baseline -OpeningRps 10 -TailRps 10
 
-# 초기 지연 진단: 같은 부하 조건 + 구매 단계 로그/워밍업 DB 대기 표본
+# 초기/본 측정 진단: 같은 부하 조건 + 구매 단계 로그/DB 대기 표본
 pwsh -NoProfile -File ./ops/performance.ps1 -Action Run -Mode baseline -OpeningRps 10 -TailRps 10 -Diagnostics
 
 # 목표 도착 부하 예시. 이전 결과를 확인한 뒤 별도로 실행한다.
@@ -78,11 +117,13 @@ RPS를 생략한 Run은 거절한다. 자동 증가·반복·후속 개선은 �
 현재 시나리오는 재고 1,000개를 생성하고 첫 10초 OpeningRps, 다음 50초 TailRps의 최초 구매를 보낸다.
 성공 점유의 결제 접수도 추가하므로 전체 HTTP RPS는 구매 RPS보다 높다.
 다른 요청 행동은 별도 k6 파일로 추가하고 스크립트의 Scenario 허용 목록을 확장한다.
-지금은 purchase-spike 하나만 지원한다. 이 패턴의 RPS 변경만으로 모든 시나리오를 대신하지 않는다.
+purchase-spike와 capacity를 지원한다. 이 패턴의 RPS 변경만으로 재시도·포기·재구매 등 모든 시나리오를 대신하지 않는다.
 
 ## 4. 자동 저장되는 결과
 
 결과는 `artifacts/performance/시각-mode-scenario/`에 모인다.
+시각은 `yyyyMMdd-HHmmss-fff`로 자동 생성한다. 매번 이름을 입력할 필요가 없으므로 형식은 유지한다.
+예: `20260910-010203-456-baseline-capacity`. 정확한 RPS/재고/시간/Diagnostics 여부는 run.json에 기록한다.
 
 | 파일 | 용도 |
 |---|---|
@@ -90,7 +131,9 @@ RPS를 생략한 Run은 거절한다. 자동 증가·반복·후속 개선은 �
 | compose.yaml, scenario.js, lib/purchase-flow.js | 실행 설정·시나리오·공통 요청 흐름 복사 |
 | k6.log, exit-code.txt, summary.json, raw.json | 생성 요청량·지연·결과 태그·실패 근거 |
 | warmup.js, warmup.log, warmup-summary.json, warmup-raw.json, warmup-exit-code.txt | 본 측정과 분리된 워밍업 조건·결과·시간별 표본 |
-| warmup-evidence.json, warmup-db.json, purchase-warmup.sql | 실제 구매 성공/거절 수, 판매별 확정·불변식 대조 결과와 SQL |
+| warmup-evidence.json, warmup-db.json, purchase-state.sql | 실제 구매 성공/거절 수, 판매별 확정·불변식 대조 결과와 SQL |
+| capacity-result.json, measured-pools-before/after.json | capacity 최종 확정/정합성 판정과 Hikari 비교 |
+| order-progress.sql/txt, order-progress-errors/status.txt | capacity의 본 측정·drain 중 1초 간격 Worker 진행 관측 |
 | warmup-pools-before.json, warmup-pools-after.json | 워밍업 전후 Hikari timeout/프로세스 시작 시각 |
 | phases.json | 워밍업/본 측정 경계. 본 측정 미실행 시 loadStart 없음 |
 | nginx.conf, prometheus.yml, container-network-map.json | 실제 파일 설정과 upstream IP → 서비스 대응 |
@@ -98,6 +141,7 @@ RPS를 생략한 Run은 거절한다. 자동 증가·반복·후속 개선은 �
 | before/after-db.txt, inventory.txt | 불변식·주문·결제 집계, 판매별 재고 |
 | prometheus.json | 워밍업부터 종료까지 앱/JVM/HTTP/Hikari 시계열. 실제 scrape/query step 모두 1초 |
 | db-waits.sql, db-waits.txt, db-waits-errors.txt, db-waits-status.txt | Diagnostics에서 워밍업 초기 100ms 간격, 최대 450회 DB 세션·대기·차단 PID 표본 |
+| measured-db-waits.sql/txt, measured-db-waits-errors/status.txt | Diagnostics에서 본 측정·drain의 DB 대기 표본. 최대 (본 측정 초+120)×10회 |
 | pre-warmup/before/after/failed-서비스-cpu-stat.txt | cgroup v2 CPU 누적 사용·throttling 카운터. 전후 차이로 해석 |
 | services.log, error.txt(실패 시) | 서비스 로그·중단 이유 |
 | collection-errors.txt(수집 실패 시) | 최초 실험 오류와 별개인 후속 수집 오류 |
@@ -106,8 +150,10 @@ RPS를 생략한 Run은 거절한다. 자동 증가·반복·후속 개선은 �
 수집 중 실패해도 이미 저장한 파일은 유지한다. 모든 실패에서 모든 파일이 생기는 것은 아니다.
 `collected`는 수집 완료이며 비즈니스 합격이 아니다. raw.json은 크기가 클 수 있어 Git에서 제외한다.
 워밍업 실패도 DB/자원 스냅샷과 Prometheus를 저장한다. services.log는 이번 실행 시작 이후만 포함한다.
-Diagnostics의 DB 관측기는 앱 풀과 별개인 연결 하나를 쓰며, 워밍업 종료 또는 실패 시 자기 세션만 종료한다.
-최대 450회라는 상한도 있다. 표본 파일은 psql watch 머리글을 포함하므로 `{`로 시작하는 줄이 JSON 표본이다.
+각 DB 관측기는 앱 풀과 별개인 연결 하나를 쓰며, 해당 단계 종료 또는 실패 시 자기 세션만 종료한다.
+표본 횟수 상한도 있다. 표본 파일은 psql watch 머리글을 포함할 수 있으므로 `{`로 시작하는 줄이 JSON 표본이다.
+capacity의 1초 진행 집계도 DB 자원을 쓴다. Diagnostics OFF가 무관측 실행을 뜻하지 않으며,
+기본 nginx 로그/1초 Prometheus/진행 집계 조건을 비교 실험에서 동일하게 유지한다.
 부하 발생기 자체의 자원 시계열은 아직 수집하지 않는다. 단계 로그 해석은 [진단 가이드](diagnostics.md)를 본다.
 
 ## 5. 결과를 보고 다음 단계 결정
@@ -115,7 +161,7 @@ Diagnostics의 DB 관측기는 앱 풀과 별개인 연결 하나를 쓰며, 워
 먼저 종료 코드·dropped_iterations로 목표 요청을 실제로 보냈는지 확인한다.
 그 뒤 성공/409/429/오류, 지연, CONFIRMED/held/UNKNOWN과 측정 판매의 재고를 함께 본다.
 본 측정 후 DB 불변식 쿼리 첫 결과는 0행이어야 한다. 전체 비즈니스 합격 판정은 사람이 확인한다.
-워밍업의 판매별 불변식과 확정 완료만 harness가 본 측정 진입 전에 자동 검사한다.
+워밍업의 판매별 불변식과 확정 완료는 본 측정 진입 전에 검사한다. capacity는 본 측정 판매도 자동 대조한다.
 
 본 측정은 구매 요청 p99 < 1초, 결제 접수 p95 < 1초를 각각 검사한다.
 판매 등록과 워밍업의 HTTP 응답은 이 두 지연 판정에 포함하지 않는다.
@@ -131,6 +177,6 @@ Diagnostics의 DB 관측기는 앱 풀과 별개인 연결 하나를 쓰며, 워
 - `src/main`: 서비스 구현과 기본 OFF인 진단 로그. 부하 발생이나 실험 합격 판정은 없다.
 - `src/test`: Java 기능/진단 테스트. Run은 bootJar만 빌드하며 Gradle test나 smoke를 호출하지 않는다.
 - `ops/performance.ps1`: 준비·기동·초기화·수집·실험 순서 조정.
-- `ops/performance/purchase-warmup.*`: 이 구매 실험의 워밍업 결과 대조와 SQL. 일반 DB 초기화/health와 분리.
-- `k6/lib/purchase-flow.js`: 공통 HTTP 동작. `warmup.js`와 `purchase-spike.js`는 각자의 도착 패턴·threshold만 정의.
+- `ops/performance/`: 구매 실험의 워밍업/최종 상태 대조, capacity 판정과 Worker 진행 SQL. 일반 DB 초기화/health와 분리.
+- `k6/lib/purchase-flow.js`: 공통 HTTP 동작. `warmup.js`, `purchase-spike.js`, `capacity.js`는 도착 패턴·재고·threshold 정의.
 - `artifacts/performance`: 실행 결과. 실행 코드나 테스트 모듈로 import하지 않는다.
