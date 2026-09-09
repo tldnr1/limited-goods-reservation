@@ -20,21 +20,31 @@ public class PurchaseTransactionService {
         this.orders=orders; this.sales=sales; this.reservations=reservations; this.query=query; this.gate=gate; this.clock=clock;
     }
     @Transactional
-    public OrderView purchase(String user,String key,PurchaseRequest request) {
+    public OrderView purchase(String user,String key,PurchaseRequest request,PurchaseTrace trace) {
+        trace.next("request_preparation");
         String fingerprint=request.fingerprint();
         var now=clock.instant();
+        trace.next("idempotency_lock_query");
         orders.serializeKey(user,key);
+        trace.next("idempotency_lookup");
         var existing=orders.byKey(user,key);
         if(existing!=null) {
             if(!existing.fingerprint.equals(fingerprint)) throw new ApiError(409,"IDEMPOTENCY_KEY_REUSED");
-            return query.view(existing);
+            trace.next("response_queries_and_auto_flush");
+            var view=query.view(existing);
+            trace.next("transaction_completion");
+            return view;
         }
+        trace.next("sale_lookup_and_cache");
         var sale=sales.find(request.saleId());
         if(sale==null) throw new ApiError(404,"SALE_NOT_FOUND");
         if(sale.opensAt.isAfter(now)) throw new ApiError(409,"SALE_NOT_OPEN");
         // Durable idempotency is checked before this bounded, advisory negative cache.
         for(var item:request.items()) if(gate.unavailable(item.saleItemId())) throw new ApiError(409,"TEMPORARILY_UNAVAILABLE");
+        trace.next("inventory_lock_query");
         var stocks=sales.lockItems(request.items().stream().map(PurchaseRequest.Item::saleItemId).toList());
+        trace.inventoryLocked();
+        trace.next("stock_validation");
         if(stocks.size()!=request.items().size() || stocks.stream().anyMatch(i->!i.saleId.equals(sale.id)))
             throw new ApiError(400,"INVALID_SALE_ITEM");
         var quantities=new HashMap<UUID,Integer>();
@@ -45,17 +55,25 @@ public class PurchaseTransactionService {
                 if(stock.available==0) gate.rememberUnavailable(stock.id);
                 throw new ApiError(409,"TEMPORARILY_UNAVAILABLE");
             }
+            trace.next("user_limit_query");
             if(orders.used(user,stock.id)+quantity>stock.perUserLimit) throw new ApiError(409,"USER_LIMIT_EXCEEDED");
+            trace.next("stock_validation");
         }
+        trace.next("order_persist");
         var order=new Order(user,sale.id,key,fingerprint,now);
         for(var stock:stocks) order.totalAmount+=stock.price*quantities.get(stock.id);
         orders.save(order);
+        trace.next("items_persist_and_stock_changes");
         for(var stock:stocks) {
             int quantity=quantities.get(stock.id);
             stock.available-=quantity; stock.held+=quantity;
             orders.save(new OrderItem(order.id,stock.id,quantity,stock.price));
         }
+        trace.next("reservation_persist");
         reservations.create(order);
-        return query.view(order);
+        trace.next("response_queries_and_auto_flush");
+        var view=query.view(order);
+        trace.next("transaction_completion");
+        return view;
     }
 }

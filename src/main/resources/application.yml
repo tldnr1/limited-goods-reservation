@@ -9,6 +9,8 @@ spring:
       maximum-pool-size: ${DB_POOL_SIZE:8}
       connection-timeout: 1000
       connection-init-sql: "SET statement_timeout = '5s'"
+      data-source-properties:
+        ApplicationName: ${APP_INSTANCE:local}
   jpa:
     open-in-view: false
     hibernate:
@@ -47,3 +49,6 @@ app:
     delay-ms: 250
   pg-url: ${PG_URL:http://localhost:8081}
   pg-secret: ${PG_SECRET:local-pg-secret}
+logging:
+  level:
+    com.limitedgoods.purchases.PurchaseTrace: ${PURCHASE_TIMING_LOG_LEVEL:OFF}

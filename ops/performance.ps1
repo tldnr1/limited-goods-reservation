@@ -4,7 +4,8 @@ param(
     [ValidateSet('baseline','gate')][string]$Mode = 'baseline',
     [ValidateSet('purchase-spike')][string]$Scenario = 'purchase-spike',
     [int]$OpeningRps = 0,
-    [int]$TailRps = 0
+    [int]$TailRps = 0,
+    [switch]$Diagnostics
 )
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
@@ -14,6 +15,9 @@ $runDir = $null
 $prepared = $false
 $startedAt = [DateTimeOffset]::UtcNow
 $savedEnvironment = @{}
+$observer = $null
+$observationStart = $null
+. (Join-Path $PSScriptRoot 'perf-diagnostics.ps1')
 
 function Invoke-Docker {
     param([string[]]$Arguments)
@@ -49,6 +53,10 @@ function Save-Snapshot {
     $ids = @(Invoke-Docker -Arguments ($compose + @('ps','-q')))
     Invoke-Docker -Arguments (@('stats','--no-stream','--format','{{json .}}') + $ids) |
         Set-Content "$runDir/$Label-resources.jsonl" -Encoding utf8
+    foreach ($service in @('api1','api2','worker','mock-pg','postgres')) {
+        Invoke-Docker -Arguments ($compose + @('exec','-T',$service,'cat','/sys/fs/cgroup/cpu.stat')) |
+            Set-Content "$runDir/$Label-$service-cpu-stat.txt" -Encoding utf8
+    }
     Get-Content (Join-Path $PSScriptRoot 'invariants.sql') |
         & docker @compose exec -T postgres psql -v ON_ERROR_STOP=1 -U goods -d limited_goods_perf |
         Set-Content "$runDir/$Label-db.txt" -Encoding utf8
@@ -69,19 +77,21 @@ try {
         return
     }
     # Restore inherited shell settings when the command ends.
-    foreach ($name in @('APP_ENV','DB_NAME','ADMISSION_ENABLED','MSYS_NO_PATHCONV')) {
+    foreach ($name in @('APP_ENV','DB_NAME','ADMISSION_ENABLED','MSYS_NO_PATHCONV','PURCHASE_TIMING_LOG_LEVEL')) {
         $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name,'Process')
     }
     $env:APP_ENV='perf'
     $env:DB_NAME='limited_goods_perf'
     $env:ADMISSION_ENABLED=if ($Mode -eq 'gate') { 'true' } else { 'false' }
     $env:MSYS_NO_PATHCONV='1'
+    $env:PURCHASE_TIMING_LOG_LEVEL=if ($Diagnostics) { 'INFO' } else { 'OFF' }
     if ($Action -eq 'Run') {
         $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
         $runDir = Join-Path $root "artifacts/performance/$stamp-$Mode-$Scenario"
         New-Item -ItemType Directory -Path $runDir -ErrorAction Stop | Out-Null
         [ordered]@{ status='preparing'; mode=$Mode; scenario=$Scenario; openingRps=$OpeningRps; tailRps=$TailRps;
             warmupRps=10; warmupSeconds=30;
+            diagnostics=[bool]$Diagnostics; prometheusScrapeSeconds=1;
             startedAt=$startedAt.ToString('o') } | ConvertTo-Json | Set-Content "$runDir/run.json" -Encoding utf8
         git rev-parse HEAD | Set-Content "$runDir/commit.txt" -Encoding utf8
         if ($LASTEXITCODE -ne 0) { throw 'Git revision 조회 실패' }
@@ -97,6 +107,11 @@ try {
         return
     }
     Invoke-Docker -Arguments ($compose + @('config')) | Set-Content "$runDir/compose.yaml" -Encoding utf8
+    Copy-Item ops/nginx.conf,ops/prometheus.yml -Destination $runDir
+    $ids = @(Invoke-Docker -Arguments ($compose + @('ps','-q')))
+    (Invoke-Docker -Arguments (@('inspect') + $ids) | ConvertFrom-Json) |
+        Select-Object Name,@{Name='Networks';Expression={$_.NetworkSettings.Networks}} |
+        ConvertTo-Json -Depth 8 | Set-Content "$runDir/container-network-map.json" -Encoding utf8
     Copy-Item -LiteralPath (Join-Path $root "k6/$Scenario.js") -Destination "$runDir/scenario.js"
     Get-FileHash build/libs/limited-goods.jar | Select-Object Algorithm,Hash |
         ConvertTo-Json | Set-Content "$runDir/jar-hash.json" -Encoding utf8
@@ -115,13 +130,35 @@ try {
     }
     if (-not $targetsReady) { throw 'Prometheus의 API 2개/Worker 수집 준비 미완료. 부하는 시작하지 않았습니다.' }
     Copy-Item -LiteralPath (Join-Path $root 'k6/warmup.js') -Destination "$runDir/warmup.js"
+    Save-Snapshot -Label 'pre-warmup'
+    $observationStart = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    if ($Diagnostics) {
+        $observer = Start-DbObserver -Directory $runDir
+        $ready = $false
+        for ($i=0; $i -lt 25; $i++) {
+            if ($observer.Process.HasExited) { throw 'DB 관측 프로세스가 워밍업 전에 종료됐습니다.' }
+            if (Select-String -LiteralPath "$runDir/db-waits.txt" -Pattern '"sampled_at"' -Quiet) { $ready=$true; break }
+            Start-Sleep -Milliseconds 200
+        }
+        if (-not $ready) { throw 'DB 관측 준비 미완료. 부하는 시작하지 않았습니다.' }
+    }
+    [ordered]@{ observationStart=$observationStart; warmupStart=[DateTimeOffset]::UtcNow.ToString('o') } |
+        ConvertTo-Json | Set-Content "$runDir/phases.json" -Encoding utf8
     Write-Output '워밍업: 별도 판매, 10 RPS × 30초'
     $warmupArguments = @('run','--rm','--name','goods-k6','--cpus','1.5','--memory','1g',
         '--mount',"type=bind,source=$root/k6,target=/scripts,readonly",
         '--mount',"type=bind,source=$runDir,target=/results",
-        'grafana/k6:0.54.0','run','--summary-export=/results/warmup-summary.json','/scripts/warmup.js')
+        'grafana/k6:0.54.0','run','--summary-export=/results/warmup-summary.json',
+        '--out','json=/results/warmup-raw.json','/scripts/warmup.js')
     & docker @warmupArguments 2>&1 | Tee-Object -FilePath "$runDir/warmup.log"
-    if ($LASTEXITCODE -ne 0) { throw '워밍업 실패. 본 측정은 실행하지 않았습니다.' }
+    $warmupExit = $LASTEXITCODE
+    Set-Content "$runDir/warmup-exit-code.txt" $warmupExit -Encoding utf8
+    $phases = Get-Content "$runDir/phases.json" -Raw | ConvertFrom-Json
+    $phases | Add-Member -NotePropertyName warmupEnd -NotePropertyValue ([DateTimeOffset]::UtcNow.ToString('o'))
+    $phases | ConvertTo-Json | Set-Content "$runDir/phases.json" -Encoding utf8
+    if ($warmupExit -ne 0) { throw '워밍업 실패. 본 측정은 실행하지 않았습니다.' }
+    Stop-DbObserver -Observer $observer
+    $observer = $null
     $warmupComplete = $false
     for ($i=0; $i -lt 15; $i++) {
         $counts = Invoke-Docker -Arguments ($compose + @('exec','-T','postgres','psql','-v','ON_ERROR_STOP=1',
@@ -133,6 +170,8 @@ try {
     if (-not $warmupComplete) { throw "워밍업 주문 확정 불완전: $counts. 본 측정은 실행하지 않았습니다." }
     Save-Snapshot -Label 'before'
     $loadStart = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+    $phases | Add-Member -NotePropertyName loadStart -NotePropertyValue $loadStart
+    $phases | ConvertTo-Json | Set-Content "$runDir/phases.json" -Encoding utf8
     Write-Output "실제 부하 시작: $Mode / $OpeningRps RPS 10초 → $TailRps RPS 50초"
     $arguments = @('run','--rm','--name','goods-k6','--cpus','1.5','--memory','1g',
         '--mount',"type=bind,source=$root/k6,target=/scripts,readonly",
@@ -147,11 +186,9 @@ try {
     if ($k6Exit -eq 0) { Start-Sleep -Seconds 30 }
     Save-Snapshot -Label 'after'
     $loadEnd = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    $query = [Uri]::EscapeDataString('{job="goods"}')
-    $url = "http://127.0.0.1:9090/api/v1/query_range?query=$query&start=$loadStart&end=$loadEnd&step=5"
-    Invoke-WebRequest $url -TimeoutSec 30 -OutFile "$runDir/prometheus.json"
-    $series = Get-Content "$runDir/prometheus.json" -Raw | ConvertFrom-Json
-    if ($series.status -ne 'success' -or @($series.data.result).Count -eq 0) { throw 'Prometheus 시계열 수집 결과가 비어 있습니다.' }
+    $phases | Add-Member -NotePropertyName loadEnd -NotePropertyValue $loadEnd
+    $phases | ConvertTo-Json | Set-Content "$runDir/phases.json" -Encoding utf8
+    Save-Prometheus -Directory $runDir -Start $observationStart -End $loadEnd
     if ($k6Exit -ne 0) { throw "k6 실패 (exit=$k6Exit). 후속 실험은 실행하지 않았습니다." }
     $manifest = Get-Content "$runDir/run.json" -Raw | ConvertFrom-Json
     $manifest.status = 'collected'
@@ -167,8 +204,19 @@ try {
     }
     throw
 } finally {
+    if ($observer) {
+        try { Stop-DbObserver -Observer $observer }
+        catch { $_ | Out-String | Add-Content "$runDir/collection-errors.txt"; Write-Warning $_ }
+    }
+    if ($observationStart -and -not (Test-Path "$runDir/prometheus.json")) {
+        # A failed warmup must retain evidence too; do not replace the original failure.
+        try { Save-Snapshot -Label 'failed' }
+        catch { $_ | Out-String | Add-Content "$runDir/collection-errors.txt"; Write-Warning $_ }
+        try { Save-Prometheus -Directory $runDir -Start $observationStart -End ([DateTimeOffset]::UtcNow.ToUnixTimeSeconds()) }
+        catch { $_ | Out-String | Add-Content "$runDir/collection-errors.txt"; Write-Warning $_ }
+    }
     if ($runDir -and $prepared) {
-        & docker @compose logs --no-color > "$runDir/services.log"
+        & docker @compose logs --no-color --since $startedAt.ToString('o') > "$runDir/services.log"
         if ($LASTEXITCODE -ne 0) { Write-Warning '서비스 로그 저장 실패' }
     }
     foreach ($name in $savedEnvironment.Keys) {

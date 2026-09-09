@@ -1,6 +1,7 @@
 # 부하테스트 실행 가이드 — Git Bash
 
-이번 변경은 실행 절차 자동화와 health 확인까지다. 실제 부하·성능 측정은 아직 하지 않았다.
+첫 baseline 실행은 워밍업에서 결제 접수 500 세 건과 dropped iteration 한 건으로 중단됐다.
+본 측정은 아직 실행하지 않았다. 다음 실행은 아래 진단 옵션으로 초기 지연을 구분한다.
 
 ## 현재 준비된 것
 
@@ -55,6 +56,9 @@ Run은 별도 판매에서 10 RPS·30초 워밍업을 수행하고 300건 결제
 # 낮은 요청량에서 실행·수집 절차를 확인하는 예시. 비즈니스 목표 수치가 아니다.
 pwsh -NoProfile -File ./ops/performance.ps1 -Action Run -Mode baseline -OpeningRps 10 -TailRps 10
 
+# 초기 지연 진단: 같은 부하 조건 + 구매 단계 로그/워밍업 DB 대기 표본
+pwsh -NoProfile -File ./ops/performance.ps1 -Action Run -Mode baseline -OpeningRps 10 -TailRps 10 -Diagnostics
+
 # 목표 도착 부하 예시. 이전 결과를 확인한 뒤 별도로 실행한다.
 pwsh -NoProfile -File ./ops/performance.ps1 -Action Run -Mode gate -OpeningRps 3000 -TailRps 400
 ```
@@ -74,16 +78,24 @@ RPS를 생략한 Run은 거절한다. 자동 증가·반복·후속 개선은 �
 | run.json, commit.txt, git-status.txt, working-tree.patch, jar-hash.json | 실행 조건·코드 식별·완료/실패 상태 |
 | compose.yaml, scenario.js | 실행 설정과 시나리오 복사 |
 | k6.log, exit-code.txt, summary.json, raw.json | 생성 요청량·지연·결과 태그·실패 근거 |
-| warmup.js, warmup.log, warmup-summary.json | 본 측정과 분리된 워밍업 조건·결과 |
+| warmup.js, warmup.log, warmup-summary.json, warmup-raw.json, warmup-exit-code.txt | 본 측정과 분리된 워밍업 조건·결과·시간별 표본 |
+| phases.json | 워밍업/본 측정 경계. 본 측정 미실행 시 loadStart 없음 |
+| nginx.conf, prometheus.yml, container-network-map.json | 실제 파일 설정과 upstream IP → 서비스 대응 |
 | before/after-containers.txt, resources.jsonl | 전후 상태와 자원 스냅샷 |
 | before/after-db.txt, inventory.txt | 불변식·주문·결제 집계, 판매별 재고 |
-| prometheus.json | 실행 구간 앱/JVM/HTTP/Hikari 시계열 |
+| prometheus.json | 워밍업부터 종료까지 앱/JVM/HTTP/Hikari 시계열. 실제 scrape/query step 모두 1초 |
+| db-waits.sql, db-waits.txt, db-waits-errors.txt, db-waits-status.txt | Diagnostics에서 워밍업 초기 100ms 간격, 최대 450회 DB 세션·대기·차단 PID 표본 |
+| pre-warmup/before/after/failed-서비스-cpu-stat.txt | cgroup v2 CPU 누적 사용·throttling 카운터. 전후 차이로 해석 |
 | services.log, error.txt(실패 시) | 서비스 로그·중단 이유 |
+| collection-errors.txt(수집 실패 시) | 최초 실험 오류와 별개인 후속 수집 오류 |
 
 성공한 k6 종료 후 30초 뒤 최종 상태를 저장한다. 실패하면 기다리지 않고 가능한 진단 자료를 저장한 뒤 종료한다.
 수집 중 실패해도 이미 저장한 파일은 유지한다. 모든 실패에서 모든 파일이 생기는 것은 아니다.
 `collected`는 수집 완료이며 비즈니스 합격이 아니다. raw.json은 크기가 클 수 있어 Git에서 제외한다.
-자원 스냅샷은 순간값이다. PostgreSQL 락 대기 시계열과 부하 발생기 자체의 자원 시계열은 아직 수집하지 않는다.
+워밍업 실패도 DB/자원 스냅샷과 Prometheus를 저장한다. services.log는 이번 실행 시작 이후만 포함한다.
+Diagnostics의 DB 관측기는 앱 풀과 별개인 연결 하나를 쓰며, 워밍업 종료 또는 실패 시 자기 세션만 종료한다.
+최대 450회라는 상한도 있다. 표본 파일은 psql watch 머리글을 포함하므로 `{`로 시작하는 줄이 JSON 표본이다.
+부하 발생기 자체의 자원 시계열은 아직 수집하지 않는다. 단계 로그 해석은 [진단 가이드](diagnostics.md)를 본다.
 
 ## 5. 결과를 보고 다음 단계 결정
 

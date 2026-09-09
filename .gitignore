@@ -13,4 +13,5 @@ __pycache__/
 htmlcov/
 *.egg-info/
 artifacts/performance/**/raw.json
+artifacts/performance/**/warmup-raw.json
 artifacts/performance/**/k6-output.log

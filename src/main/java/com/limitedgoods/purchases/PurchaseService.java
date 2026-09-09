@@ -11,7 +11,15 @@ public class PurchaseService {
         Identity.validate(user,key);
         request.fingerprint();
         String token=gate.enter();
-        try { return transactions.purchase(user,key,request); }
-        finally { gate.leave(token); } // Separate bean: transaction commit happens before permit release.
+        var trace=new PurchaseTrace();
+        OrderView result=null;
+        Throwable failure=null;
+        try { result=transactions.purchase(user,key,request,trace); return result; }
+        catch(RuntimeException | Error e) { failure=e; throw e; }
+        finally {
+            // Separate bean: commit/rollback and connection cleanup have already completed.
+            trace.finish(request.saleId(),result==null?null:result.id(),failure);
+            gate.leave(token);
+        }
     }
 }

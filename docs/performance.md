@@ -99,3 +99,19 @@ PostgreSQL·Redis·앱 4개는 healthy, Nginx는 running이며 Nginx 경유 읽�
 이번에는 Prepare/Run, 초기화, 구매·결제 스모크, 기능 테스트 재실행, 부하 측정을 하지 않았다.
 따라서 실제 부하 발생부터 결과 수집까지의 자동화 경로는 아직 실행 검증 전이다.
 다음 단계는 낮은 고정 요청량 실험 한 번으로 생성기·수집 유효성을 확인하는 것이다.
+
+## 초기 실패 후 진단 보강 (2026-09-09)
+
+첫 baseline은 10 RPS/30초 워밍업에서 결제 접수 500 세 건과 dropped iteration 한 건으로 중단됐다.
+본 측정·반복 실행은 하지 않았다. 원래 자료와 분석은
+`artifacts/performance/20260909-011321-469-baseline-purchase-spike/review.md`에 보존했다.
+
+구매 단계 계측, 100ms DB 대기 표본, 1초 Prometheus, nginx 요청별 upstream/시간/request_id,
+워밍업 실패 자료 보존을 추가했다. 사용법과 해석 한계는 [diagnostics.md](diagnostics.md)를 따른다.
+
+- PostgreSQL 계약 18개 + Redis 4개 + 진단 성공/실패 경로 3개, 총 25개 테스트와 bootJar 통과.
+- 실제 PostgreSQL에서 관측 SQL 두 표본 저장/횟수 제한 종료, 별도 관측 세션 명시적 종료 확인.
+- PowerShell 구문, Compose 설정, nginx -t, promtool check config 통과.
+- 실제 계약 테스트에서도 단계 로그와 transaction_completion 출력 확인. 이 시간은 perf 측정값으로 사용하지 않는다.
+- 이번에는 perf 데이터 초기화, 워밍업, k6 본 측정, 성능 개선 효과 검증을 실행하지 않았다.
+  Run의 전체 실패 수집 경로는 다음 승인된 실행에서 확인해야 한다.
