@@ -18,6 +18,7 @@ $savedEnvironment = @{}
 $observer = $null
 $observationStart = $null
 . (Join-Path $PSScriptRoot 'perf-diagnostics.ps1')
+. (Join-Path $PSScriptRoot 'performance/purchase-warmup.ps1')
 
 function Invoke-Docker {
     param([string[]]$Arguments)
@@ -113,6 +114,8 @@ try {
         Select-Object Name,@{Name='Networks';Expression={$_.NetworkSettings.Networks}} |
         ConvertTo-Json -Depth 8 | Set-Content "$runDir/container-network-map.json" -Encoding utf8
     Copy-Item -LiteralPath (Join-Path $root "k6/$Scenario.js") -Destination "$runDir/scenario.js"
+    Copy-Item -LiteralPath (Join-Path $root 'k6/lib') -Destination "$runDir/lib" -Recurse
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'performance/purchase-warmup.sql') -Destination $runDir
     Get-FileHash build/libs/limited-goods.jar | Select-Object Algorithm,Hash |
         ConvertTo-Json | Set-Content "$runDir/jar-hash.json" -Encoding utf8
     Invoke-WebRequest 'http://127.0.0.1:9090/-/ready' -TimeoutSec 5 | Out-Null
@@ -131,6 +134,8 @@ try {
     if (-not $targetsReady) { throw 'Prometheus의 API 2개/Worker 수집 준비 미완료. 부하는 시작하지 않았습니다.' }
     Copy-Item -LiteralPath (Join-Path $root 'k6/warmup.js') -Destination "$runDir/warmup.js"
     Save-Snapshot -Label 'pre-warmup'
+    $poolsBefore = @(Get-WarmupPools)
+    $poolsBefore | ConvertTo-Json | Set-Content "$runDir/warmup-pools-before.json" -Encoding utf8
     $observationStart = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     if ($Diagnostics) {
         $observer = Start-DbObserver -Directory $runDir
@@ -159,15 +164,7 @@ try {
     if ($warmupExit -ne 0) { throw '워밍업 실패. 본 측정은 실행하지 않았습니다.' }
     Stop-DbObserver -Observer $observer
     $observer = $null
-    $warmupComplete = $false
-    for ($i=0; $i -lt 15; $i++) {
-        $counts = Invoke-Docker -Arguments ($compose + @('exec','-T','postgres','psql','-v','ON_ERROR_STOP=1',
-            '-U','goods','-d','limited_goods_perf','-Atc',
-            "SELECT count(*) FILTER (WHERE status='CONFIRMED') || '/' || count(*) FROM orders"))
-        if ($counts -eq '300/300') { $warmupComplete = $true; break }
-        Start-Sleep -Seconds 2
-    }
-    if (-not $warmupComplete) { throw "워밍업 주문 확정 불완전: $counts. 본 측정은 실행하지 않았습니다." }
+    Wait-PurchaseWarmup -Directory $runDir -PoolsBefore $poolsBefore
     Save-Snapshot -Label 'before'
     $loadStart = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     $phases | Add-Member -NotePropertyName loadStart -NotePropertyValue $loadStart

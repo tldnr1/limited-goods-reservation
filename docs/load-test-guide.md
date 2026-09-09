@@ -1,13 +1,15 @@
 # 부하테스트 실행 가이드 — Git Bash
 
-첫 baseline 실행은 워밍업에서 결제 접수 500 세 건과 dropped iteration 한 건으로 중단됐다.
-본 측정은 아직 실행하지 않았다. 다음 실행은 아래 진단 옵션으로 초기 지연을 구분한다.
+최근 워밍업은 301건을 모두 확정했지만 자동화의 300/300 고정 판정 때문에 본 측정 전에 중단됐다.
+이제 실제 성공 건수로 판정한다. 초기 지연은 예열 자료로 남기고, 응답 시간 목표는 본 측정에 적용한다.
+이번 harness 수정 후 부하 실행은 하지 않았다. 아래 명령으로 사용자가 다음 실행을 진행한다.
 
 ## 현재 준비된 것
 
 Java/Spring 구매·점유·결제·만료, API 2개/Nginx/Worker/Mock PG,
 PostgreSQL의 dev/test/perf DB, Redis gate, 기능 테스트 22개가 있다.
 공통 실행은 `ops/performance.ps1`, 요청 패턴은 `k6/purchase-spike.js`가 담당한다.
+워밍업과 본 측정이 공유하는 요청 흐름은 `k6/lib/purchase-flow.js`에 있다.
 코드 읽기는 [learning.md](learning.md), 자원·합격 기준은 [performance.md](performance.md)를 본다.
 
 ## 1. 지금 가능한 읽기 전용 확인
@@ -44,15 +46,24 @@ pwsh -NoProfile -File ./ops/performance.ps1 -Action Prepare -Mode baseline
 
 baseline은 Redis gate OFF, gate는 ON이다. CPU·메모리·pool 구성은 같다.
 Run은 재현성을 위해 준비·초기화를 다시 수행하므로 Prepare를 먼저 실행할 필요는 없다.
-Run은 별도 판매에서 10 RPS·30초 워밍업을 수행하고 300건 결제 확정을 확인한 뒤 본 측정을 시작한다.
-워밍업 오류·요청 누락·미확정 주문이 남으면 본 측정을 실행하지 않는다.
-고정 워밍업 조건을 맞춘 것이며 JVM 성능이 완전히 안정화됐다는 보장은 아니다.
+Run은 별도 판매에서 10 RPS·30초 워밍업을 수행한다. 실제 성공한 구매 수를 원시 결과에서 읽고,
+그 판매의 주문·점유·결제 확정 수와 대조한다. 300건 또는 301건이어도 실제 처리 수와 일치하면 된다.
+성공 구매가 0건이거나 예상 밖 오류·요청 누락·정합성 위반·미확정 작업이 있으면 본 측정으로 넘어가지 않는다.
+API 2개/Worker/Mock PG의 Hikari timeout 증가와 프로세스 재시작도 검사한다. 확정 대기는 기존처럼 최대 약 30초다.
+409/429 거절 건수도 warmup-evidence.json에 별도 기록하며, 성공 점유 건만 확정 수와 대조한다.
+워밍업에는 지연시간 threshold를 두지 않는다. 초기 p95/p99는 관측값이며 steady-state SLO 판정에 섞지 않는다.
+후반부 안정화 여부는 결과 분석에서 확인한다. 위 조건 통과가 JVM 성능의 완전한 안정화를 보장하지는 않는다.
+통과하면 앱을 재기동하거나 DB를 다시 초기화하지 않고, 새 판매에서 본 측정을 시작한다.
 
-## 3. 나중에 실제 부하를 승인한 뒤 사용할 명령
+## 3. 직접 실행할 명령
 
-다음은 **부하를 발생시키는** 예시다. 이번 작업에서는 실행하지 않았다.
+Docker Desktop을 실행한 뒤 Git Bash에서 아래 명령을 사용한다. 별도 Prepare나 수동 DB 초기화는 필요 없다.
+워밍업 통과 시 10 RPS × 60초 본 측정까지 자동 진행하며, 실패하면 재시도 없이 자료를 남기고 중단한다.
+JFR은 이번 실행 절차에 추가하지 않았다. 기존과 같은 상세 진단 조건을 유지하려면 -Diagnostics를 사용한다.
 
 ```bash
+cd /d/Code/limited-goods-reservation
+
 # 낮은 요청량에서 실행·수집 절차를 확인하는 예시. 비즈니스 목표 수치가 아니다.
 pwsh -NoProfile -File ./ops/performance.ps1 -Action Run -Mode baseline -OpeningRps 10 -TailRps 10
 
@@ -76,9 +87,11 @@ RPS를 생략한 Run은 거절한다. 자동 증가·반복·후속 개선은 �
 | 파일 | 용도 |
 |---|---|
 | run.json, commit.txt, git-status.txt, working-tree.patch, jar-hash.json | 실행 조건·코드 식별·완료/실패 상태 |
-| compose.yaml, scenario.js | 실행 설정과 시나리오 복사 |
+| compose.yaml, scenario.js, lib/purchase-flow.js | 실행 설정·시나리오·공통 요청 흐름 복사 |
 | k6.log, exit-code.txt, summary.json, raw.json | 생성 요청량·지연·결과 태그·실패 근거 |
 | warmup.js, warmup.log, warmup-summary.json, warmup-raw.json, warmup-exit-code.txt | 본 측정과 분리된 워밍업 조건·결과·시간별 표본 |
+| warmup-evidence.json, warmup-db.json, purchase-warmup.sql | 실제 구매 성공/거절 수, 판매별 확정·불변식 대조 결과와 SQL |
+| warmup-pools-before.json, warmup-pools-after.json | 워밍업 전후 Hikari timeout/프로세스 시작 시각 |
 | phases.json | 워밍업/본 측정 경계. 본 측정 미실행 시 loadStart 없음 |
 | nginx.conf, prometheus.yml, container-network-map.json | 실제 파일 설정과 upstream IP → 서비스 대응 |
 | before/after-containers.txt, resources.jsonl | 전후 상태와 자원 스냅샷 |
@@ -101,12 +114,23 @@ Diagnostics의 DB 관측기는 앱 풀과 별개인 연결 하나를 쓰며, 워
 
 먼저 종료 코드·dropped_iterations로 목표 요청을 실제로 보냈는지 확인한다.
 그 뒤 성공/409/429/오류, 지연, CONFIRMED/held/UNKNOWN과 측정 판매의 재고를 함께 본다.
-DB 불변식 쿼리 첫 결과는 0행이어야 한다. 위반 여부를 사람이 확인하며 자동 합격 판정은 하지 않는다.
+본 측정 후 DB 불변식 쿼리 첫 결과는 0행이어야 한다. 전체 비즈니스 합격 판정은 사람이 확인한다.
+워밍업의 판매별 불변식과 확정 완료만 harness가 본 측정 진입 전에 자동 검사한다.
 
-현재 k6 threshold는 전체 HTTP 지연 기준이고 결제 접수 p95 전용 판정은 없다.
+본 측정은 구매 요청 p99 < 1초, 결제 접수 p95 < 1초를 각각 검사한다.
+판매 등록과 워밍업의 HTTP 응답은 이 두 지연 판정에 포함하지 않는다.
 빠른 거절만으로 개선을 주장하지 않는다. 낮은 요청량 실험이 유효하면 DB 기준선의 요청량을 한 단계씩 올리고,
 병목 근거가 생긴 뒤 같은 조건의 gate OFF/ON을 비교한다.
 생성기가 막히거나 수집이 불완전하면 서버 최적화보다 측정 조건을 먼저 정리한다.
 
 재시도 폭주·구매 포기·반환 재고 재구매, 장애 주입, API 1개/2개 공정 비교는 후속 실험이다.
 기존 세 건짜리 기능 스모크는 `pwsh -NoProfile -File ./ops/smoke.ps1`로 별도 실행할 수 있다.
+
+## 코드 경계
+
+- `src/main`: 서비스 구현과 기본 OFF인 진단 로그. 부하 발생이나 실험 합격 판정은 없다.
+- `src/test`: Java 기능/진단 테스트. Run은 bootJar만 빌드하며 Gradle test나 smoke를 호출하지 않는다.
+- `ops/performance.ps1`: 준비·기동·초기화·수집·실험 순서 조정.
+- `ops/performance/purchase-warmup.*`: 이 구매 실험의 워밍업 결과 대조와 SQL. 일반 DB 초기화/health와 분리.
+- `k6/lib/purchase-flow.js`: 공통 HTTP 동작. `warmup.js`와 `purchase-spike.js`는 각자의 도착 패턴·threshold만 정의.
+- `artifacts/performance`: 실행 결과. 실행 코드나 테스트 모듈로 import하지 않는다.

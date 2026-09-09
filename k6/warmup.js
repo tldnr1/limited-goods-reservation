@@ -1,5 +1,5 @@
 // Same purchase/payment path, separate execution and sale from the measured run.
-export { setup, purchase, teardown } from './purchase-spike.js';
+export { setup, purchase, teardown } from './lib/purchase-flow.js';
 export const options = {
   scenarios: {
     warmup: { executor: 'constant-arrival-rate', rate: 10, timeUnit: '1s',
