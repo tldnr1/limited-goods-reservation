@@ -63,7 +63,9 @@ class WaitingTest {
         assertThatThrownBy(()->waiting.join("u","k",request)).hasMessage("SALE_NOT_OPEN");
         redis.opsForValue().set(prefix+"catalog:"+request.saleId(),"0:FULLY_HELD");
         var joined=waiting.join("u","k",request);
-        assertThat(waiting.get("u",joined.id()).state()).isEqualTo("WAITING_FOR_INVENTORY_RETURN");
+        var returning=waiting.get("u",joined.id());
+        assertThat(returning.state()).isEqualTo("WAITING_FOR_INVENTORY_RETURN");
+        assertThat(returning.retryAfter()).isEqualTo(1);
         redis.opsForHash().put(prefix+"waiting:item:"+joined.id(),"next","0");
         redis.opsForValue().set(prefix+"catalog:"+request.saleId(),"0:SOLD_OUT");
         assertThat(waiting.get("u",joined.id()).state()).isEqualTo("SOLD_OUT");

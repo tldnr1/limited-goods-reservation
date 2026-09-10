@@ -1,5 +1,21 @@
 # 성능 실험 기준
 
+## 현재 Target v1 검증 방향
+
+기능 구현·계약 검증 이후, **Worker → Waiting → Reservation → Isolation → Business** 순서로 측정한다.
+[Target 실행 가이드](target-v1-load-guide.md)에 각 단계의 독립 실행·수집 지표·자동/수동 판정이 있고,
+[시나리오 아키텍처](target-v1-load-scenario.md)는 부하가 지나가는 역할을 시각화한다.
+자동화 준비는 실제 성능 검증과 구분한다. 이번 준비 작업에서는 실제 부하나 wall-clock 300초 시험을 하지 않았다.
+
+Worker 정상 최소 요구는 약32 jobs/s, 첫 검증 목표는 40 jobs/s 이상이다.
+집중 결제는 backlog와 최초 PG 호출 지연·기한 내 해소로 별도 평가하며 125/s를 모든 역할의 고정 요구량으로 두지 않는다.
+Waiting의 READY 발급률은 유입 조절이고 Reservation rate/permit은 DB 보호다. 같은 25/s 초기값의 적절성도 측정 대상이다.
+반환 대기 polling은 1초로 맞췄으며, 반환 가능 시점부터 5초 목표는 실측 전이다.
+역할별 풀 분리가 물리적 독립성이나 기동 장애 독립성을 뜻하지 않는다. catalog 전체 조회 최적화는 현재 보류한다.
+아래 baseline 수치·실행 이력은 변경 전 근거로 보존하며 Target 달성값으로 인용하지 않는다.
+
+## Baseline 실행 이력의 범위
+
 Target v1 첫 구현은 [별도 실행·검증 문서](target-v1.md)를 따른다. 아래 자원 표와 실행 이력은 baseline 기준이다.
 Target 오버레이는 같은 총 CPU/메모리 상한을 역할별로 재배분한다. 새 목표 처리량과 대량 polling은 미검증이다.
 
@@ -45,7 +61,7 @@ API 하나와 둘을 비교할 때는 API 총 CPU=1.5, 총 메모리=1536MiB, �
 429는 오류와 분리해도 반드시 비율을 보고한다. 판매 수량/확정 시간 없이 빠른 거절만으로 통과시키지 않는다.
 영구 UNKNOWN과 의도적으로 중단한 PG에는 정상 판매 완료 목표를 적용하지 않으며 상태 정합성을 확인한다.
 
-## 실행 방법
+## Baseline 실행 방법
 
 공통 절차는 ops/performance.ps1로 통합했다. 명령과 결과 파일 설명은
 [Git Bash 실행 가이드](load-test-guide.md)를 따른다.
@@ -64,7 +80,9 @@ capacity 경계를 확인한 뒤 business workload로 넘어가는 이해는 맞
 필요하면 축소 부하로 흐름을 먼저 확인하되 목표 부하를 충족했다고 기록하지 않는다.
 현재 purchase-spike의 3,000→400은 최초 도착 패턴일 뿐, 위 행동을 포함한 완성된 business workload는 아니다.
 
-## 남은 성능 실험
+## Baseline에서 남았던 성능 실험
+
+아래는 baseline의 미완료 목록이다. 현재 우선순위와 Target 시험은 문서 상단의 단계별 계획을 따른다.
 
 - 시드 고정의 정상 backoff+jitter/최대 5회 과도 재시도, 구매 포기/반환 재고 재구매를 포함한 120초 workload.
 - 기준선 vs Redis gate의 실제 처리량·락 대기·DB 쿼리/요청 비용.

@@ -15,3 +15,4 @@ htmlcov/
 artifacts/performance/**/raw.json
 artifacts/performance/**/warmup-raw.json
 artifacts/performance/**/k6-output.log
+artifacts/performance/*-target-*/fixture.json

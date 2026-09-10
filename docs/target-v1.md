@@ -1,4 +1,4 @@
-# Target v1 — 첫 기능 구현
+# Target v1 — 기능 계약과 검증 범위
 
 이번 실행 결과: [2026-09-10 기능 검증](../artifacts/target-v1/20260910-functional/review.md).
 
@@ -57,6 +57,8 @@ Redis 유실 시 미점유 순서 복구는 보장하지 않는다. 기존 주�
 
 총 4.25 CPU / 4,480MiB로 기존 총상한을 유지한 최초 배분이다. 물리 자원 전용 할당이나 처리량 보장이 아니다.
 Waiting HTTP/Redis와 Reservation/Payment의 Tomcat/Hikari가 분리되지만, DB·호스트·네트워크는 공유한다.
+Compose 기동 시 Payment/Worker/Checkout Nginx는 Reservation readiness에 일부 의존한다.
+따라서 실행 중 결제 보호와 Reservation 장애 중 독립 기동은 별도 검증이며, 현재 강한 장애 독립성을 주장하지 않는다.
 대기 포트는 8080, 구매/결제 포트는 8082다. 모두 localhost 전용이다. X-User-Id와 기본 서명 비밀은 로컬 시험용이다.
 
 ## API와 실행
@@ -67,7 +69,7 @@ Waiting HTTP/Redis와 Reservation/Payment의 Tomcat/Hikari가 분리되지만, D
 4. 8082 `POST /api/purchases`: 같은 본문/멱등키와 `X-Admission-Ticket`. 응답 유실 시 같은 요청으로 재시도한다.
 5. 8082 `POST /api/orders/{id}/payments`, `GET /api/orders/{id}`: 기존 결제/조회 계약.
 
-조회 응답은 `Cache-Control: no-store`, `Retry-After`/retryAfter를 제공한다. 가까운 대기는 1초, 먼 대기와 반환 대기는 12초다.
+조회 응답은 `Cache-Control: no-store`, `Retry-After`/retryAfter를 제공한다. 가까운 대기와 반환 대기는 1초, 먼 일반 대기는 12초다.
 클라이언트는 이 최소 간격에 양의 jitter를 추가하고 완료 시 중단해야 한다. 브라우저 UI는 미구현이다.
 대기 항목이 TTL로 사라지거나 유실되면 GET은 404다. 이를 주문 실패나 판매 완료로 해석하지 않고 재접수/기존 주문 확인으로 처리한다.
 너무 이른 조회는 새 READY 발급 판단을 생략한다. 이는 HTTP ingress 자체의 rate limit을 대체하지 않는다.
@@ -82,7 +84,10 @@ Waiting HTTP/Redis와 Reservation/Payment의 Tomcat/Hikari가 분리되지만, D
 
 Start는 JAR/image를 빌드하고 dev 역할 구성을 기동한다. 데이터 초기화/볼륨 삭제는 하지 않는다.
 Smoke는 작은 dev 판매를 새로 만들며, RedisOutage를 지정하면 Redis를 잠시 중단 후 복구한다.
-기존 perf 실행은 Target Stop 후 `ops/performance.ps1`을 사용한다. 아직 Target 전용 대량 harness는 없다.
+baseline perf 실행은 Target Stop 후 기존 `ops/performance.ps1`을 사용한다.
+Target 전용은 같은 진입점의 `-Mode target`이며 [단계별 실행 가이드](target-v1-load-guide.md)를 따른다.
+Worker / Waiting / Reservation / Isolation / Business 파일을 분리했으며 실제 부하 실행 검증은 아직 하지 않았다.
+부하 흐름 그림은 [Target v1 시나리오](target-v1-load-scenario.md)에 별도로 있다.
 
 ## 검증과 다음 단계
 
@@ -90,8 +95,11 @@ Smoke는 작은 dev 판매를 새로 만들며, RedisOutage를 지정하면 Redi
 만료 입장권/Redis 장애 후 DB 재조회, READY 상한·소유권·미사용 만료·이탈 제외,
 Waiting의 DB 없는 기동, Worker 연속 공급·동시성 상한을 확인한다.
 
-남은 일: 300초 실제 시간 보유 시험, 25/s와 정상 약 32/s·집중 약 125/s 실측, 5만 명 통합 부하,
+남은 일: 300초 실제 시간 보유 시험, READY/Reservation 초기 25/s 정책 측정, Worker 최소 요구 약32/s·정상 목표40/s 검증,
+결제 집중 시 backlog·최초 PG 지연 검증, 5만 명 통합 부하,
 앞단 폭주 중 결제 SLO, HTTP ingress 제한/브라우저 jitter, 신규 작업과 재확인 처리 예산의 세분화.
 현재 catalog publisher는 전체 판매를 1초 주기로 한 번 조회한다. 이벤트 수가 커질 때는 활성 판매 범위/페이징을 도입해야 한다.
 projection은 5초 TTL이며 장애 시 신규 대기는 503으로 닫힌다. 반영 지연과 조회 간격 때문에 UI의 반환 인지는 더 늦을 수 있다.
+반환 polling은 5초 재구매 목표와 맞추기 위해 1초로 조정했다. 명목 시간 예산과 실제 판정 한계는
+[시간 정책](target-v1-load-guide.md#5-반환-시간-정책)을 따른다. 5초 달성이나 모든 대기자의 READY 획득을 보장한 것은 아니다.
 현재 2초 Mock PG timeout과 10초 lease를 실제 PG에 그대로 적용하면 안 된다. 긴 호출의 lease 갱신·소유권 검증은 후속이다.

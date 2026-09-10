@@ -1,0 +1,168 @@
+# Target v1 단계별 부하 실행 가이드
+
+이 문서는 **사용자가 실행할 Target 전용 절차**다. 자동화 작성 과정에서는 k6, 반복 HTTP, 포화 시험,
+실제 300초 대기를 실행하지 않았다. 실행 경로와 수집기는 정적·오프라인 검증 대상이며 실제 컨테이너 부하로 검증되지는 않았다.
+과거 baseline 명령은 [load-test-guide](load-test-guide.md), 시나리오 그림은 [아키텍처 위의 부하 흐름](target-v1-load-scenario.md)을 본다.
+
+## 1. 실행 경계
+
+공통 진입점은 `ops/performance.ps1 -Mode target`이다. 각 단계는 독립적인 k6 파일을 갖는다.
+자동 상승·다음 단계 이동·반복 실행·장애 주입을 자동 수행하지 않는다. 매번 결과를 검토하고 다음 명령을 선택한다.
+
+| Action | 수행 내용 | 데이터/부하 |
+|---|---|---|
+| Check (기본) | Target profile, perf DB/Redis namespace, rate/permit, health, Prometheus 6개 target 확인 | 읽기 전용. 초기화·기동·HTTP 시나리오 없음 |
+| Prepare | bootJar/image 빌드, Flyway 기동, 앱 정지, perf 데이터/namespace 초기화, Target 기동 | **기존 perf 자료 삭제**. dev/test·Flyway 이력·볼륨 보존. 부하 없음 |
+| Run | 비어 있는 perf DB 확인, fixture 준비, 관측 시작, 선택한 k6 파일 1회 실행, 30초 drain, 결과 저장 | **실제 부하**. 내부에서 Prepare나 다른 시나리오를 실행하지 않음 |
+
+기존 dev/baseline 앱과 dev/test DB 연결이 있으면 준비를 거절한다. 다른 터미널의 Gradle test도 종료한 뒤 실행한다.
+같은 물리 호스트에서 dev/test/perf를 함께 실행하지 않는다. 기존 Target은 `./ops/target.ps1 -Action Stop`,
+baseline은 `docker compose stop nginx api1 api2 worker mock-pg`로 사용자가 명시적으로 멈춘다.
+Run은 이전 판매가 남아 있으면 거절한다. **결과를 보존하고 매 시험 전 Prepare를 다시 수행**한다.
+Run 중 Ctrl+C로 중단했다면 `docker ps --filter name=goods-target-k6`로 잔존 생성기를 확인하고
+필요할 때 해당 컨테이너만 `docker stop goods-target-k6`로 종료한다. 다음 Prepare는 실행 중 생성기가 있으면 거절한다.
+
+JDK 21, Docker Desktop, PowerShell 7, 로컬 `grafana/k6:0.54.0` 이미지가 필요하다.
+이미지가 없으면 사용자가 `docker pull grafana/k6:0.54.0`로 준비한다. fixture를 만든 뒤 이미지 pull로 hold 시간을 소모하지 않게 Run이 사전 확인한다.
+이미 실행 중인 Codex의 JAVA_HOME이 오래되었다면 설치된 JDK 경로를 현재 셸에 적용한다.
+
+```powershell
+# 저장소 루트. 이 문서의 Run 명령은 사용자가 선택하여 실행한다.
+pwsh -NoProfile -File ./ops/performance.ps1 -Mode target -Action Prepare
+pwsh -NoProfile -File ./ops/performance.ps1 -Mode target -Action Check
+
+# 1회 Worker 측정. 완료 후 result.json 검토.
+pwsh -NoProfile -File ./ops/performance.ps1 -Mode target -Action Run -Scenario worker -Rps 40 -DurationSeconds 60
+```
+
+Prepare/Check/Run의 `WaitingRate`, `ReservationRate`, `Permits`는 일치해야 한다. 기본은 25/25/8이다.
+기본값을 자동으로 높이거나 gate/ticket 검사를 끄지 않는다. 설정 변경 시험은 Prepare부터 같은 값을 명시한다.
+`-Diagnostics`는 baseline 옵션이므로 Target에서는 거절한다. Target 공통 관측은 항상 켜져 있다.
+
+## 2. 단계별 입력과 범위
+
+| 단계 / 실행 파일 | 공급 방법 | 분리하는 것 / 한계 |
+|---|---|---|
+| worker / `k6/target/worker.js` | SQL로 미결제 HELD 주문을 준비하고 Payment API에 `Rps`건/초 접수 | READY·구매 gate를 경유하지 않는 기존 주문. Worker+DB+Mock PG와 Payment 접수 경로의 용량. API 공급 자체가 막히면 Worker 단독 한계라고 해석하지 않음 |
+| waiting / `k6/target/waiting.js` | 초당 `Rps`명의 새 브라우저가 join 후 Retry-After+jitter로 poll | 구매/결제 없음. READY는 미사용 만료. `abandon`이면 절반이 join 직후 이탈 |
+| reservation / `k6/target/reservation.js` | 새 브라우저 → 실제 Waiting READY → 명시적 purchase | 충분한 재고, 결제 없음. 대기 시간을 purchase HTTP 지연과 분리. READY 공급 부족이면 DB 포화점으로 해석하지 않음 |
+| isolation / `k6/target/isolation.js` | Waiting 브라우저 `Rps`명/초와 별도 HELD 주문 결제 `PaymentRps`건/초 동시 실행 | Waiting 폭주 중 기존 결제의 런타임 격리. 기동 의존성/Reservation 장애 독립성의 시험은 아님 |
+| business / `k6/target/business.js` | Users의 60%/30%/10%를 5초/10초/45초에 유입 | 기본 50,000명·1,000개. 실제 READY/hold/payment 및 선택한 사용자 행동 |
+
+`Rps`는 Waiting/Reservation/Isolation에서 **새 브라우저 도착률**이다. HTTP RPS가 아니다.
+join, poll, purchase, payment를 각각 집계한다. Worker에서만 결제 접수 시도 도착률이다.
+생성기는 Compose 네트워크에서 두 Nginx의 80번 포트로 연결한다. 호스트 공개 포트의 NAT 비용은 이 측정에 포함하지 않는다.
+Waiting의 READY 수는 클라이언트가 관측한 서로 다른 ticket 수이며 응답 유실로 미관측된 서버 발급은 포함하지 않는다.
+서버 admission limited metric과 purchase 응답 429를 함께 읽는다.
+
+Worker/Isolation fixture는 별도 판매에 주문·항목·ACTIVE 점유·held 수량을 한 DB 트랜잭션으로 만든다.
+각 hold는 생성부터 **300초**, 결제는 실제 API에서 접수되어 +70초 PG 창을 얻는다. 작업/결제 원장을 Redis에 쓰지 않는다.
+이 fixture는 구매 계약의 검증 증거가 아니다. 측정 직전 생성하며 공급 기간은 1~180초로 제한한다.
+단일 5분 Worker 측정은 현재 fixture로 지원하지 않는다. 300초 hold를 늘리거나 미래 생성 시각을 위조하지 않는다.
+긴 지속 시험이 필요하면 주문을 시간에 맞춰 보충하는 별도 fixture 준비가 먼저 필요하다.
+
+`DurationSeconds`는 component의 **공급 기간**이며 전체 실행 시간은 아니다. 브라우저는 최대 180초 대기하고
+Business의 late-payment/abandon은 실제 300초 경계를 지난다. k6 gracefulStop은 최대 420초이며 이후 30초 drain을 관측한다.
+원래 대기 브라우저가 300초까지 살아 있다고 가정하지 않는다. abandon은 **300초부터 새로운 반환 수요 Stock명**을 60초에 걸쳐 보낸다.
+
+```powershell
+# 각 명령 전에 결과 보존 → Prepare → Check. 자동 연속 실행 예제가 아니다.
+pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Scenario waiting -Rps 100 -DurationSeconds 60 -Vus 200 -MaxVus 20000
+pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Scenario waiting -Variant abandon -Rps 100 -DurationSeconds 60 -Vus 200 -MaxVus 20000
+
+# Reservation: 실제 READY 공급과 safety ceiling을 같은 설정으로 준비/확인한다.
+pwsh -File ./ops/performance.ps1 -Mode target -Action Prepare -WaitingRate 100 -ReservationRate 100
+pwsh -File ./ops/performance.ps1 -Mode target -Action Check -WaitingRate 100 -ReservationRate 100
+pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Scenario reservation -Rps 40 -Stock 3000 -WaitingRate 100 -ReservationRate 100
+
+# 기본 25/25/8로 다시 Prepare/Check한 뒤 각각 선택 실행
+pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Scenario isolation -Rps 100 -PaymentRps 40 -Vus 200 -MaxVus 20000
+pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Scenario business -Variant normal -Users 50000 -Stock 1000 -Vus 1000 -MaxVus 50000
+```
+
+100/40 등은 **입력 예시**이며 안전/달성 용량이 아니다. 기본 MaxVus=2,000은 5만 명 재현을 보장하지 않는다.
+Business 세 도착 구간은 VU pool을 각각 갖고 대기 시간이 겹친다. Isolation도 두 pool이다.
+생성기는 1.5 CPU/1GiB로 제한한다. 높은 MaxVus를 적었다고 그 메모리에 모두 들어가는 것은 아니다.
+목표 유입 전에 작은 Users(10의 배수, 최대 50,000)로 생성기·수집을 확인하고, 누락/OOM이면 서버 한계와 구분한다.
+축소 시험 결과는 목표 부하 통과로 기록하지 않는다. 자동 예열은 없으므로 cold/예열 조건을 실행 기록에 명시하고 비교에서 맞춘다.
+
+## 3. Business variant
+
+| Variant | 행동 | 판정에서 구분할 것 |
+|---|---|---|
+| normal | 점유 후 시드 고정 1~45초 생각 시간 → SUCCESS 결제 | 초기 점유 60초, 120초 내 950/1000 확정, 정상 오류·결제 SLO |
+| burst | 점유 주문의 결제를 측정 시작+60초까지 모았다가 접수 | backlog/oldest age, 최초 PG 호출 지연, 사용자 기한 내 해소. 125/s 고정 달성을 요구하지 않음 |
+| late-payment | holdExpiresAt 약 1초 전 결제 시도 | 네트워크/락 때문에 기한 뒤 DB 접수가 되면 HOLD_EXPIRED 가능. 접수된 결제와 만료 반환 경쟁을 timeline/상태로 확인 |
+| abandon | 점유자의 시드 고정 약 20%가 결제하지 않음. +300초 신규 반환 수요 | 실제 만료·반환·재구매. 최초 대기 180초와 hold 300초를 혼동하지 않음 |
+| retry | 일시적 0/429/503은 최대 5회 backoff+jitter. 성공 구매도 같은 키로 1회 재전송 | 같은 주문 ID와 DB 주문 수 유지. 재시도는 최초 사용자 수와 별도 집계 |
+| pg-failure | 시드 고정 SUCCESS 60%, UNKNOWN/FAILURE/LOST_RESPONSE/DELAYED_SUCCESS 각 10% | Mock PG 행동 주입. 영구 UNKNOWN 재고 보유·중복 확정 없음. 정상 950개/120초 판정을 적용하지 않음 |
+
+각 분포는 기대 비율이며 적은 실제 점유 수에서는 정확히 일치하지 않는다. seed 기본값은 20260911이다.
+PG 컨테이너 중지/네트워크 단절/프로세스 kill은 수행하지 않는다. 이는 별도 장애 시험이며 이 variant의 증거로 대체하지 않는다.
+결제 실패 후 새 시도, 악의적인 backoff 무시, 강한 startup fault isolation은 이 harness의 범위 밖이다.
+
+## 4. 수집 지표와 판정
+
+| 단계 | 주요 지표 | 자동 검사 | 사람이 판정할 기준 |
+|---|---|---|---|
+| 공통 | HTTP endpoint/status별 수·p95/p99, 예상 밖 오류, 누락, 재고/주문, 자원·Hikari | dropped=0, 예상 밖 오류 ≤0.1%, 공급/완료 iteration 수, 불변식 0, restart/OOM 없음, Hikari timeout 증가 없음, 수집 완전성 | 거절률과 성공 수를 함께 보고 생성기 제한·관측 비용·표본 공백 확인 |
+| Worker | 성공 확정/s, 처리 시도/s, active slots, PG/job latency, backlog slope/oldest age, DB/Mock PG CPU | 결제 접수 p95≤1초, 접수 전부 확정·pending=0 | 정상 최소 약32/s, 첫 목표 ≥40/s를 공급 구간에서 지속, backlog/age 증가가 지속되지 않음. 동일 조건 3회. drain 성공만으로 통과 금지 |
+| Waiting | join/poll 각각 RPS·p95/p99·429/503, Redis INFO commandstats/latencystats·CPU·memory, queue/live/stale/READY, JVM/Nginx CPU, DB 활동 | 주문/결제 생성 0, Waiting DB 연결 0 | 수천 RPS는 아직 목표. 정한 입력에서 지연이 발산하지 않고 DB 증가가 publisher/관측 비용을 넘어 유입에 비례하지 않는지. p95/p99의 별도 숫자 SLO는 아직 확정하지 않음 |
+| Reservation | 관측 READY/s → purchase 진입/s → 성공/s, gate limited, purchase 성공·거절 지연, lock/Hikari | 성공 purchase p99≤1초, HTTP/DB 주문 수 대조 | READY 공급이 충분했는지 먼저 확인. waiting pacing과 reservation safety ceiling/permit을 한 번에 하나씩 변경하여 원인 분리 |
+| Isolation | 동일 Payment/Worker 지표 + Waiting 유입, 공유 DB·CPU·Hikari | 기존 주문 결제 접수 p95≤1초, 접수 전부 확정 | 같은 PaymentRps의 Worker 시험과 비교. p99도 보고하고 backlog/age·복구를 함께 확인. 결제 SLO 유지가 핵심 |
+| Business | 사용자 단계별 결과, DB 확정 시계열, 반환/재구매 및 최초 PG 지연 | normal만 초기 전체 점유≤60초·95% 확정≤120초, purchase p99/payment p95≤1초; 공통 정합성 | 50,000/1,000 실제 유입, variant별 시간·실패 동작. 반환 가능 시점부터≤5초, 30초 복구, 세 번의 개별 결과 |
+
+`goods.worker.completed`는 UNKNOWN 재확인도 포함하는 **작업 처리 시도** 카운터다.
+실제 성공 처리량은 DB confirmed 증가 및 `goods.payment.results{result="SUCCEEDED"}`와 대조한다.
+`goods.worker.job`은 한 처리 시도의 시간이다. 접수→최초 PG는 timeline의 first_pg_delay_seconds,
+접수→최종 확정은 DB 표본에서 확인되는 상한으로 읽는다. 정확한 terminal timestamp는 현재 저장하지 않는다.
+PG 접수+70초는 최초 호출 허용 기한이며 성능 SLO가 아니다.
+
+## 5. 반환 시간 정책
+
+반환 대기(`WAITING_FOR_INVENTORY_RETURN`) polling을 기존 12초에서 **1초**로 맞췄다.
+가까운 일반 WAITING은 1초, 먼 일반 WAITING은 기존 12초를 유지한다. 클라이언트는 양의 jitter 0~250ms를 더한다.
+FULLY_HELD의 polling 빈도는 증가하므로 Redis/Waiting 부하도 함께 측정해야 한다.
+명목 예산은 만료 스캔 약1초 + projection 주기 약1초 + 반환 polling 최대1.25초 + 구매 응답1초 = 약4.25초다.
+fixed-delay 작업 시간·DB 대기·실패가 더해지므로 이 합은 **5초 달성의 증거가 아니다**.
+
+5초 목표는 재고가 반환 가능한 시각(미결제 holdExpiresAt)부터, 활성 구매 후보가 실제 재구매 가능한 시점까지다.
+모든 대기 사용자에게 5초 안에 READY를 보장하지 않는다. 먼 순위/180초 만료/부재 사용자는 별도로 집계한다.
+PG UNKNOWN은 반환 가능 상태가 아니므로 이 기준에 넣지 않는다.
+abandon 실행에서는 초기 FULLY_HELD를 확인하고 timeline의 만료 시각, 재구매 주문 생성 시각,
+Redis catalog와 poll 응답 시간을 대조한다. 재고가 원래 남아 있었거나 대응이 불명확하면 판정 보류한다.
+표본 간격만으로 정확한 DB 반환→projection 지연을 확정하지 않는다. 이 구간의 정확한 계측이 필요하면 그때 이벤트 계측을 추가한다.
+
+## 6. 결과 파일과 재검토
+
+결과는 `artifacts/performance/<timestamp>-target-<stage>-<variant>/`에 저장된다.
+
+| 파일 | 내용 |
+|---|---|
+| config.json / compose.yaml / commit.txt / working-tree.patch / git-status.txt / jar-hash.json / scripts | 입력·실제 설정·소스 snapshot. 미추적 파일은 diff에 없으므로 scripts와 복사된 target 스크립트도 보존 |
+| fixture.json | 실행 판매와 기존 HELD 주문 ID. 로컬 결과에 보존하되 대형 목록은 Git 제외 |
+| phases.json | 관측 시작, k6 setup 시각, 공급 종료, 전체 브라우저 종료, drain 종료. 공급 구간과 grace/drain을 분리 |
+| k6.log / k6-exit.txt / k6-summary.json / raw.json | 실행 로그·threshold 결과·요청 및 사용자 지표. raw의 endpoint/status 태그로 성공/거절 p95/p99·초당 유입 계산 |
+| db-samples.jsonl / before-db.json / after-db.json | confirmed/pending/oldest age·락 waiter·DB 활동·판매별 재고·정합성 |
+| timeline.json | 주문 생성/300초 만료/결제 접수/최초 PG 시각과 결과. 정확한 최종 확정 시각 필드는 없음 |
+| redis-samples.jsonl / redis-slowlog.txt | INFO, queue/READY/live/stale 수, catalog 값, slowlog. 응답 손실·정리 제한과 자원 비용 해석 |
+| resources.jsonl / generator-resources.jsonl / before-containers.json / after-containers.json | 서비스/생성기 CPU·memory·network, 컨테이너 ID·재시작·OOM |
+| prometheus.json | Waiting 2개·Reservation·Payment·Worker·Mock PG의 HTTP/JVM/process/Hikari/Worker histogram 시계열 |
+| observer.log / observer-error.txt / collection-errors.txt / error.txt / services.log | 관측기·실행·서비스 오류. 최초 오류와 후속 수집 오류를 함께 보존 |
+| result.json | 자동 검사 실패 또는 **requires_review**. 단독으로 성능 합격을 선언하지 않음 |
+
+Prometheus scrape/query step은 1초다. 별도 표본 수집은 component에서 작업 완료 후 5초,
+Business에서 1초 쉬므로 **실제 간격은 Docker/SQL 명령 시간만큼 더 길다**. 각 파일의 실제 timestamp를 사용한다.
+관측 SQL은 perf 연결 하나씩을 쓰고 집계를 실행하며 Redis 관측 EVAL도 commandstats에 포함된다.
+관측 비용을 제외한 순수 제품 CPU라고 주장하지 않는다. 동등 비교에서는 설정을 고정한다.
+Redis INFO latency는 누적 지표이고 slowlog에 항목이 없다는 것이 지연 0을 뜻하지 않는다.
+생성기가 매우 짧게 실행되어 자원 표본이 없다면 해당 실행의 생성기 용량 판정은 보류한다.
+
+```powershell
+# 저장한 결과만 다시 판정. Docker/HTTP/k6 호출 없음.
+pwsh -File ./ops/performance/target-review.ps1 -Directory ./artifacts/performance/<실행폴더>
+```
+
+대표 조건을 3회 각각 실행하여 결과를 합치지 않고 남긴다. 먼저 Worker, Waiting, Reservation을 측정하고
+그 결과로 Isolation의 입력을 정한 뒤 Business로 간다. 실제로 확인한 병목만 수정한다.
+아직 Target의 최대 용량·40/s·50,000명·결제 성능 격리·실제 300초 반환을 달성했다고 기록하지 않는다.

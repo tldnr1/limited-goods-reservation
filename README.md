@@ -13,6 +13,8 @@ PostgreSQL이 재고의 기준 상태를 보관하며, 선택적으로 Redis Lua
 
 대기/점유/결제/Worker 역할 분리, 300초 점유, 짧은 READY 입장권, Worker 연속 작업 공급을 추가했다.
 대규모 성능 목표는 아직 미검증이다. 계약·제약과 실행법은 [Target v1](docs/target-v1.md)을 따른다.
+성능 시험 준비는 [Target 단계별 실행 가이드](docs/target-v1-load-guide.md),
+부하가 지나가는 구조는 [Mermaid 시나리오](docs/target-v1-load-scenario.md)를 본다. 실제 Target 부하는 아직 실행 검증 전이다.
 
 ```powershell
 .\ops\target.ps1 -Action Start
@@ -88,6 +90,7 @@ perf DB 최초 마이그레이션은 docker compose --env-file ops/perf.env up -
 ## 문서
 
 읽기 전용 준비 확인: `pwsh -NoProfile -File ./ops/performance.ps1`.
+Target 준비 확인은 여기에 `-Mode target`을 추가한다. 아래 기본 명령은 baseline용이다.
 perf 초기화·기동과 단일 실험 기록은 같은 스크립트의 `Prepare` / `Run`으로 분리했다.
 `Run`은 RPS를 명시해야 하며 실제 부하를 발생시킨다. 자세한 사용법은 아래 가이드를 따른다.
 

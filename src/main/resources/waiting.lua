@@ -62,8 +62,8 @@ if state=='SOLD_OUT' then
   return result(state)
 end
 if state=='FULLY_HELD' then
-  redis.call('HSET',KEYS[1],'next',now+12000)
-  return result('WAITING_FOR_INVENTORY_RETURN',deadline,12)
+  redis.call('HSET',KEYS[1],'next',now+1000)
+  return result('WAITING_FOR_INVENTORY_RETURN',deadline,1)
 end
 local rank=redis.call('ZRANK',KEYS[2],id)
 local nextReady=tonumber(redis.call('GET',KEYS[4]) or '0')

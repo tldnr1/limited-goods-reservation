@@ -1,15 +1,31 @@
 #requires -Version 7.0
 param(
     [ValidateSet('Check','Prepare','Run')][string]$Action = 'Check',
-    [ValidateSet('baseline','gate')][string]$Mode = 'baseline',
-    [ValidateSet('purchase-spike','capacity')][string]$Scenario = 'purchase-spike',
+    [ValidateSet('baseline','gate','target')][string]$Mode = 'baseline',
+    [ValidateSet('purchase-spike','capacity','worker','waiting','reservation','isolation','business')][string]$Scenario = 'purchase-spike',
     [int]$OpeningRps = 0,
     [int]$TailRps = 0,
     [int]$Rps = 0,
     [int]$Stock = 10000,
     [int]$DurationSeconds = 60,
-    [switch]$Diagnostics
+    [switch]$Diagnostics,
+    [ValidateSet('normal','burst','late-payment','abandon','retry','pg-failure')][string]$Variant = 'normal',
+    [int]$Users = 50000,
+    [int]$PaymentRps = 40,
+    [int]$Vus = 100,
+    [int]$MaxVus = 2000,
+    [int]$WaitingRate = 25,
+    [int]$ReservationRate = 25,
+    [int]$Permits = 8,
+    [int]$Seed = 20260911
 )
+if ($Mode -eq 'target') {
+    $targetParameters = @{} + $PSBoundParameters
+    $targetParameters.Remove('Mode')
+    & (Join-Path $PSScriptRoot 'performance/target.ps1') @targetParameters
+    return
+}
+if ($Scenario -notin @('purchase-spike','capacity')) { throw 'Target 시나리오에는 -Mode target이 필요합니다.' }
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $root = Split-Path $PSScriptRoot -Parent

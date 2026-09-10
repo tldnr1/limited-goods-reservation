@@ -1,0 +1,18 @@
+# Performance-only settings; production role and ticket contracts remain enabled.
+services:
+  api1:
+    environment:
+      APP_WAITING_RATE: ${TARGET_WAITING_RATE:-25}
+  api2:
+    environment:
+      APP_WAITING_RATE: ${TARGET_WAITING_RATE:-25}
+  reservation:
+    environment:
+      RESERVATION_RATE: ${TARGET_RESERVATION_RATE:-25}
+      ADMISSION_PERMITS: ${TARGET_PERMITS:-8}
+  worker:
+    environment:
+      SPRING_APPLICATION_JSON: '{"management":{"metrics":{"distribution":{"percentiles-histogram":{"goods.worker.job":true,"goods.worker.pg":true}}}}}'
+  prometheus:
+    volumes: !override
+      - ./ops/performance/target-prometheus.yml:/etc/prometheus/prometheus.yml:ro
