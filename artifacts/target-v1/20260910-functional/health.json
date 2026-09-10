@@ -1,0 +1,52 @@
+[
+  {
+    "service": "postgres",
+    "profile": null,
+    "status": "running"
+  },
+  {
+    "service": "redis",
+    "profile": null,
+    "status": "running"
+  },
+  {
+    "service": "api1",
+    "profile": "SPRING_PROFILES_ACTIVE=waiting",
+    "status": "running"
+  },
+  {
+    "service": "api2",
+    "profile": "SPRING_PROFILES_ACTIVE=waiting",
+    "status": "running"
+  },
+  {
+    "service": "reservation",
+    "profile": "SPRING_PROFILES_ACTIVE=reservation",
+    "status": "running"
+  },
+  {
+    "service": "payment",
+    "profile": "SPRING_PROFILES_ACTIVE=payment",
+    "status": "running"
+  },
+  {
+    "service": "worker",
+    "profile": "SPRING_PROFILES_ACTIVE=worker",
+    "status": "running"
+  },
+  {
+    "service": "mock-pg",
+    "profile": "SPRING_PROFILES_ACTIVE=mockpg",
+    "status": "running"
+  },
+  {
+    "service": "nginx",
+    "profile": null,
+    "status": "running"
+  },
+  {
+    "service": "checkout-nginx",
+    "profile": null,
+    "status": "running"
+  }
+]

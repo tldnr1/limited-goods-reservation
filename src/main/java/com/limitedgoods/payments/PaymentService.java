@@ -18,12 +18,12 @@ public class PaymentService {
     private final ReservationRepository holds;
     private final ReservationService reservations;
     private final Clock clock;
-    private final long grace;
+    private final long paymentWindow;
     private final MeterRegistry metrics;
     public PaymentService(OrderRepository orders,PaymentRepository payments,ReservationRepository holds,
-                          ReservationService reservations,Clock clock,@Value("${app.grace-seconds}") long grace,MeterRegistry metrics) {
+                          ReservationService reservations,Clock clock,@Value("${app.payment-window-seconds}") long paymentWindow,MeterRegistry metrics) {
         this.orders=orders; this.payments=payments; this.holds=holds; this.reservations=reservations;
-        this.clock=clock; this.grace=grace; this.metrics=metrics;
+        this.clock=clock; this.paymentWindow=paymentWindow; this.metrics=metrics;
     }
     @Transactional
     public OrderView.Payment start(UUID orderId,String user,String key,Scenario scenario) {
@@ -42,7 +42,8 @@ public class PaymentService {
         var attempt=new PaymentAttempt(orderId,key,scenario.name(),order.totalAmount,clock.instant());
         payments.save(attempt);
         order.status="PAYMENT_PROCESSING";
-        hold.confirmationDeadline=hold.holdExpiresAt.plusSeconds(grace);
+        // Dispatch budget starts at durable acceptance, independently of the stock-hold clock.
+        hold.confirmationDeadline=attempt.createdAt.plusSeconds(paymentWindow);
         return view(attempt);
     }
     private OrderView.Payment view(PaymentAttempt p) { return new OrderView.Payment(p.id,p.status,p.scenario); }

@@ -1,0 +1,4 @@
+app:
+  worker.enabled: true
+spring.task.scheduling.pool.size: 2
+management.health.redis.enabled: false

@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import com.limitedgoods.config.ApiError;
 import com.limitedgoods.purchases.OrderView;
-@RestController
+@RestController @org.springframework.context.annotation.Profile({"all","payment"})
 public class PaymentController {
     public record Start(@NotNull PaymentService.Scenario scenario) {}
     public record Callback(@NotNull UUID attemptId,@Positive long amount,@NotNull PaymentService.Result result) {}

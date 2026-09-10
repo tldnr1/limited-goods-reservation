@@ -9,6 +9,11 @@ if ($Environment -eq 'dev' -and -not $AllowDevReset) {
 }
 $dbName = "limited_goods_$Environment"
 $prefix = 'goods:' + $Environment + ':'
+$targetApps = docker ps --filter label=com.docker.compose.project=limited-goods-java --format '{{.Names}}'
+if ($LASTEXITCODE -ne 0) { throw '실행 역할 조회 실패. 초기화를 수행하지 않았습니다.' }
+if ($targetApps | Where-Object { $_ -match '-(reservation|payment|checkout-nginx)-' }) {
+    throw 'Target 역할이 실행 중입니다. ops/target.ps1 -Action Stop 후 초기화하세요.'
+}
 # Stop only this Compose project; preserve volumes and other projects.
 docker compose stop nginx api1 api2 worker mock-pg
 if ($LASTEXITCODE -ne 0) { throw '서비스 중단 실패. 초기화를 수행하지 않았습니다.' }

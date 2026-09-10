@@ -1,0 +1,33 @@
+{
+  "saleId": "dec8b426-9feb-471b-ab0e-dcd1d6b3aab9",
+  "ghostHold": 0,
+  "holdSeconds": 300,
+  "redisOutage": true,
+  "sold": 4,
+  "results": [
+    {
+      "scenario": "SUCCESS",
+      "order": "d840d9cb-7811-47f3-a87f-e9fd8bb68e7d",
+      "attempt": "1a8864df-72cd-4f85-9309-eef0fdf694c3",
+      "status": "CONFIRMED"
+    },
+    {
+      "scenario": "LOST_RESPONSE",
+      "order": "6d040ce5-f673-4987-93fd-10793286715d",
+      "attempt": "ebdf8010-a634-47b1-8a08-73fb5c609ca5",
+      "status": "CONFIRMED"
+    },
+    {
+      "scenario": "DELAYED_SUCCESS",
+      "order": "d06649c9-e88b-4b48-b108-8dc9e4ae7377",
+      "attempt": "4c71081b-7125-4051-8d22-77bc2650e2b7",
+      "status": "CONFIRMED"
+    },
+    {
+      "scenario": "DELAYED_SUCCESS",
+      "order": "1a7976bd-fec7-4363-9b58-dfe732d6d141",
+      "attempt": "341e5d5c-d0a0-41fe-ad10-b57b5f6a8bd5",
+      "status": "CONFIRMED"
+    }
+  ]
+}

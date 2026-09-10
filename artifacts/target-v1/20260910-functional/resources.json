@@ -1,0 +1,66 @@
+{
+  "roles": [
+    {
+      "service": "api1",
+      "cpu": 0.375,
+      "memoryMiB": 384,
+      "profile": "waiting"
+    },
+    {
+      "service": "api2",
+      "cpu": 0.375,
+      "memoryMiB": 384,
+      "profile": "waiting"
+    },
+    {
+      "service": "checkout-nginx",
+      "cpu": 0.125,
+      "memoryMiB": 64,
+      "profile": null
+    },
+    {
+      "service": "mock-pg",
+      "cpu": 0.25,
+      "memoryMiB": 384,
+      "profile": "mockpg"
+    },
+    {
+      "service": "nginx",
+      "cpu": 0.125,
+      "memoryMiB": 64,
+      "profile": null
+    },
+    {
+      "service": "payment",
+      "cpu": 0.25,
+      "memoryMiB": 384,
+      "profile": "payment"
+    },
+    {
+      "service": "postgres",
+      "cpu": 1.5,
+      "memoryMiB": 1536,
+      "profile": null
+    },
+    {
+      "service": "redis",
+      "cpu": 0.25,
+      "memoryMiB": 256,
+      "profile": null
+    },
+    {
+      "service": "reservation",
+      "cpu": 0.5,
+      "memoryMiB": 512,
+      "profile": "reservation"
+    },
+    {
+      "service": "worker",
+      "cpu": 0.5,
+      "memoryMiB": 512,
+      "profile": "worker"
+    }
+  ],
+  "cpuTotal": 4.25,
+  "memoryMiBTotal": 4480.0
+}

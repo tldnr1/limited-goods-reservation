@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    default: all
   application:
     name: limited-goods
   datasource:
@@ -29,24 +31,25 @@ server:
   port: 8080
   tomcat:
     threads:
-      max: 40
+      max: ${HTTP_THREADS:40}
       min-spare: 4
-    accept-count: 40
-    max-connections: 256
+    accept-count: ${HTTP_BACKLOG:40}
+    max-connections: ${HTTP_CONNECTIONS:256}
 management:
   endpoint.health.probes.enabled: true
   endpoints.web.exposure.include: health,prometheus
   metrics.distribution.percentiles-histogram.http.server.requests: true
 app:
-  hold-seconds: 60
-  grace-seconds: 10
+  hold-seconds: 300
+  payment-window-seconds: 70
   admission:
     enabled: ${ADMISSION_ENABLED:false}
     namespace: ${REDIS_NAMESPACE:goods:dev:}
     permits: ${ADMISSION_PERMITS:8}
   worker:
     enabled: ${WORKER_ENABLED:false}
-    delay-ms: 250
+    idle-delay-ms: ${WORKER_IDLE_DELAY_MS:250}
+    concurrency: ${WORKER_CONCURRENCY:4}
   pg-url: ${PG_URL:http://localhost:8081}
   pg-secret: ${PG_SECRET:local-pg-secret}
 logging:

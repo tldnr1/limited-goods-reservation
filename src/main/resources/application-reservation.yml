@@ -1,0 +1,6 @@
+app:
+  admission.enabled: true
+  admission.rate: ${RESERVATION_RATE:25}
+  waiting.required: true
+  catalog.enabled: true
+  worker.enabled: false

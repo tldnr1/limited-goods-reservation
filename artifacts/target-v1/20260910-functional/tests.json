@@ -1,0 +1,43 @@
+{
+  "suites": [
+    {
+      "suite": "com.limitedgoods.AdmissionTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "suite": "com.limitedgoods.ContractTest",
+      "tests": 23,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "suite": "com.limitedgoods.purchases.PurchaseDiagnosticsTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "suite": "com.limitedgoods.WaitingRoleTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "suite": "com.limitedgoods.WaitingTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "suite": "com.limitedgoods.WorkerTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0
+    }
+  ],
+  "totalTests": 39.0,
+  "loadTestExecuted": false,
+  "jarSha256": "0501A0AFBCBF04ED86E2B1B2E212F6ECDF1D6E13A49E72FF328642272C0E7930"
+}

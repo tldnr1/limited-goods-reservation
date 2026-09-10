@@ -9,6 +9,20 @@ PostgreSQL이 재고의 기준 상태를 보관하며, 선택적으로 Redis Lua
 
 이전 성능 결과는 archive에 있다. 새 Java 구현의 성능으로 인용하지 않는다.
 
+## Target v1 첫 구현
+
+대기/점유/결제/Worker 역할 분리, 300초 점유, 짧은 READY 입장권, Worker 연속 작업 공급을 추가했다.
+대규모 성능 목표는 아직 미검증이다. 계약·제약과 실행법은 [Target v1](docs/target-v1.md)을 따른다.
+
+```powershell
+.\ops\target.ps1 -Action Start
+.\ops\target.ps1 -Action Smoke -RedisOutage
+.\ops\target.ps1 -Action Stop
+```
+
+대기는 localhost:8080, 구매/결제는 localhost:8082다. 아래 기본 Compose는 기존 baseline 역할 구성이며,
+Target과 동시에 실행하지 않는다. 두 구성 모두 새 점유는 300초, Mock PG 최초 처리 창은 접수+70초다.
+
 ## 실행과 확인 (PowerShell)
 
 JDK 21 및 Docker Desktop이 필요하다. Gradle은 Wrapper가 내려받는다.
@@ -22,7 +36,7 @@ docker compose up -d --build --wait --wait-timeout 240
 
 접속 주소는 http://localhost:8080이다. Compose는 Mock PG의 Spring readiness를 확인한 뒤 API·Worker를 시작한다.
 Nginx는 API 두 개와 Worker가 healthy일 때 시작한다. smoke 스크립트도 이 네 프로세스의 health를 먼저 검사한다.
-기동 대기와 결제 확인 대기는 별개이며, 결제 확인 제한 30초와 비즈니스 점유 기한은 그대로다.
+기동 대기와 결제 확인 대기는 별개다. baseline smoke의 결제 확인 제한은 30초다.
 통합 테스트는 실제 PostgreSQL의 limited_goods_test와 Redis의 테스트 namespace만 사용한다.
 test 실행 시 해당 테스트 DB는 각 테스트 전에 초기화된다. perf 실행과 동시에 테스트하지 않는다.
 

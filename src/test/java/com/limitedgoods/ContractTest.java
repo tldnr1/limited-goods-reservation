@@ -44,6 +44,8 @@ class ContractTest {
     @Autowired MockPaymentStore pg;
     @Autowired JdbcTemplate jdbc;
     @Autowired TestRestTemplate http;
+    @Autowired PurchaseTransactionService transactions;
+    @Autowired com.limitedgoods.config.AdmissionTicket tickets;
     @BeforeEach void reset() {
         assertThat(jdbc.queryForObject("select current_database()",String.class)).isEqualTo("limited_goods_test");
         jdbc.execute("truncate mock_pg_receipts,payment_attempts,reservations,order_items,orders,sale_items,sales");
@@ -120,7 +122,7 @@ class ContractTest {
     }
     @Test void expiryReturnsStockAndUserAllowanceExactlyOnce() {
         var sale=sale(2,2,1); var order=buy(sale,"u","first",2);
-        clock.advance(61);
+        clock.advance(301);
         assertThat(reservations.expire(order.id())).isTrue();
         assertThat(reservations.expire(order.id())).isFalse();
         assertThat(buy(sale,"u","next",2).status()).isEqualTo("PAYMENT_PENDING");
@@ -128,7 +130,7 @@ class ContractTest {
     @Test void duplicateSuccessAndParallelExpiryCannotDoubleChangeStock() throws Exception {
         var sale=sale(2,2,1); var order=buy(sale,"u","first",2);
         var payment=payments.start(order.id(),"u","pay",PaymentService.Scenario.SUCCESS);
-        clock.advance(80);
+        clock.advance(320);
         concurrent(4,i->{if(i%2==0) payments.apply(payment.id(),20000,PaymentService.Result.SUCCEEDED);
                          else reservations.expire(order.id()); return true;});
         assertThat(orders.get(order.id(),"u").status()).isEqualTo("CONFIRMED");
@@ -146,7 +148,7 @@ class ContractTest {
         var sale=sale(1,1,1); var order=buy(sale,"u","first",1);
         var p=payments.start(order.id(),"u","p",PaymentService.Scenario.UNKNOWN);
         payments.apply(p.id(),10000,PaymentService.Result.UNKNOWN);
-        clock.advance(80);
+        clock.advance(320);
         assertThat(reservations.expire(order.id())).isFalse();
         assertThatThrownBy(()->payments.start(order.id(),"u","again",PaymentService.Scenario.SUCCESS))
             .hasMessage("PAYMENT_ATTEMPT_BLOCKED");
@@ -166,7 +168,7 @@ class ContractTest {
     @Test void failedLatePaymentReleasesStock() {
         var sale=sale(1,1,1); var order=buy(sale,"u","first",1);
         var p=payments.start(order.id(),"u","pay",PaymentService.Scenario.FAILURE);
-        clock.advance(61);
+        clock.advance(301);
         payments.apply(p.id(),10000,PaymentService.Result.FAILED);
         assertThat(orders.get(order.id(),"u").status()).isEqualTo("EXPIRED");
         assertThat(sales.get(sale.id()).items().getFirst().available()).isEqualTo(1);
@@ -189,7 +191,7 @@ class ContractTest {
     @Test void providerRejectsFirstSubmissionAfterDeadline() {
         var order=buy(sale(1,1,1),"u","first",1);
         var p=payments.start(order.id(),"u","pay",PaymentService.Scenario.SUCCESS);
-        clock.advance(71);
+        clock.advance(311);
         var work=payments.work(p.id()); var receipt=pg.accept(work);
         assertThat(receipt.response().result()).isEqualTo(PaymentService.Result.FAILED);
         payments.apply(p.id(),work.amount(),receipt.response().result());
@@ -224,6 +226,54 @@ class ContractTest {
         var nullItem=new PurchaseRequest(sale.id(),Arrays.asList((PurchaseRequest.Item)null));
         assertThat(http.postForEntity("/api/purchases",new HttpEntity<>(nullItem,headers),String.class)
             .getStatusCode().value()).isEqualTo(400);
+        assertThat(jdbc.queryForObject("select count(*) from orders",Long.class)).isZero();
+    }
+    @Test void stockIsHeldForFull300SecondsAndExpiresAtBoundary() {
+        var order=buy(sale(1,1,1),"u","key",1);
+        assertThat(order.holdExpiresAt()).isEqualTo(clock.instant().plusSeconds(300));
+        clock.advance(299); assertThat(reservations.expire(order.id())).isFalse();
+        clock.advance(1); assertThat(reservations.expire(order.id())).isTrue();
+    }
+    @Test void acceptedLatePaymentSurvivesHoldExpiryAndKeepsIndependentDispatchDeadline() {
+        var sale=sale(1,1,1); var order=buy(sale,"u","key",1);
+        clock.advance(299);
+        var accepted=payments.start(order.id(),"u","pay",PaymentService.Scenario.LOST_RESPONSE);
+        var work=payments.work(accepted.id());
+        assertThat(work.deadline()).isEqualTo(clock.instant().plusSeconds(70));
+        var receipt=pg.accept(work); // Provider succeeds while the browser/application loses the reply.
+        assertThat(receipt.loseResponse()).isTrue();
+        clock.advance(100);
+        assertThat(reservations.expire(order.id())).isFalse();
+        payments.apply(accepted.id(),work.amount(),pg.accept(work).response().result());
+        assertThat(orders.get(order.id(),"u").status()).isEqualTo("CONFIRMED");
+    }
+    @Test void paymentAtExpiryCannotRaceIntoAnExpiredHold() throws Exception {
+        var order=buy(sale(1,1,1),"u","key",1); clock.advance(300);
+        var outcomes=concurrent(2,i->{
+            if(i==0) return reservations.expire(order.id())?"EXPIRED":"UNCHANGED";
+            try { payments.start(order.id(),"u","pay",PaymentService.Scenario.SUCCESS); return "ACCEPTED"; }
+            catch(ApiError e) { return e.code; }
+        });
+        assertThat(outcomes).containsExactlyInAnyOrder("EXPIRED","HOLD_EXPIRED");
+        assertThat(jdbc.queryForObject("select count(*) from payment_attempts",Long.class)).isZero();
+    }
+    @Test void committedTicketReplayWorksAfterTicketExpiryAndRedisFailure() {
+        var sale=sale(1,1,1); var request=request(sale,1);
+        var token=tickets.issue(new com.limitedgoods.config.AdmissionTicket.Claims("ticket","u","key",request.fingerprint(),clock.millis()+10000));
+        var order=buy(sale,"u","key",1); clock.advance(11);
+        var unavailable=org.mockito.Mockito.mock(com.limitedgoods.admission.AdmissionGate.class);
+        org.mockito.Mockito.when(unavailable.enter()).thenThrow(new ApiError(503,"ADMISSION_UNAVAILABLE"));
+        var protectedPurchases=new PurchaseService(unavailable,transactions,tickets,true,new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+        assertThat(protectedPurchases.purchase("u","key",request,token).id()).isEqualTo(order.id());
+        org.mockito.Mockito.verify(unavailable,org.mockito.Mockito.never()).enter();
+    }
+    @Test void expiredTicketCannotCreateStockAfterWaitingForAdmission() {
+        var sale=sale(1,1,1); var request=request(sale,1);
+        var token=tickets.issue(new com.limitedgoods.config.AdmissionTicket.Claims("ticket","u","key",request.fingerprint(),clock.millis()+10000));
+        var delayed=org.mockito.Mockito.mock(com.limitedgoods.admission.AdmissionGate.class);
+        org.mockito.Mockito.when(delayed.enter()).thenAnswer(c->{clock.advance(11); return null;});
+        var protectedPurchases=new PurchaseService(delayed,transactions,tickets,true,new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+        assertThatThrownBy(()->protectedPurchases.purchase("u","key",request,token)).hasMessage("ADMISSION_EXPIRED");
         assertThat(jdbc.queryForObject("select count(*) from orders",Long.class)).isZero();
     }
 }

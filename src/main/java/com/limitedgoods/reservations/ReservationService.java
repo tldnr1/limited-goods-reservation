@@ -17,8 +17,10 @@ public class ReservationService {
                               Clock clock,@Value("${app.hold-seconds}") long holdSeconds) {
         this.reservations=reservations; this.orders=orders; this.sales=sales; this.clock=clock; this.holdSeconds=holdSeconds;
     }
-    public void create(Order order) {
-        reservations.save(new Reservation(order.id,order.createdAt.plusSeconds(holdSeconds)));
+    public Reservation create(Order order) {
+        var hold=new Reservation(order.id,order.createdAt.plusSeconds(holdSeconds));
+        reservations.save(hold);
+        return hold;
     }
     // Caller owns the order lock before touching its reservation or inventory.
     public void confirm(Order order) {

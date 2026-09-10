@@ -1,5 +1,8 @@
 # 성능 실험 기준
 
+Target v1 첫 구현은 [별도 실행·검증 문서](target-v1.md)를 따른다. 아래 자원 표와 실행 이력은 baseline 기준이다.
+Target 오버레이는 같은 총 CPU/메모리 상한을 역할별로 재배분한다. 새 목표 처리량과 대량 polling은 미검증이다.
+
 Java 정합성 테스트·컨테이너 스모크와 예열 후 10 RPS/60초 본 측정 1회를 완료했다. 아래 과거 기록과 구분하며,
 전체 실행 요약은 [실험 기록](../artifacts/performance/README.md)을 따른다.
 과거 Python 수치는 archive/python-fastapi-baseline에 보존했으며 Java 성능 수치로 재사용하지 않는다.

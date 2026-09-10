@@ -1,5 +1,8 @@
 # 설계
 
+Target v1의 역할 분리·입장권과 현재 검증 범위는 [target-v1.md](docs/target-v1.md)를 따른다.
+이 문서의 API1/API2 실행도는 오버레이 없는 baseline 구성이다.
+
 Java 21, Spring Boot 3.5.16, Spring MVC, JPA/Hibernate, HikariCP, Flyway를 사용한다.
 Java 21과 Gradle 8.10.2 조합은 [Spring Boot 3.5 지원 범위](https://docs.spring.io/spring-boot/3.5/system-requirements.html)에 맞춘다.
 기능별 패키지 안에서 Controller → Service → Repository를 읽는다. DTO는 HTTP 계약이며 호출 계층이 아니다.
@@ -54,13 +57,21 @@ Redis 장애 시 새 구매는 503, 이미 접수된 결제·주문 조회·Work
 
 PaymentService.start는 주문 락 → 소유자 → 멱등키 → 활성 시도/기한 검사 → CREATED 저장을 하나의 트랜잭션으로 수행한다.
 Worker는 SKIP LOCKED로 다음 작업의 10초 lease를 획득하고 커밋한다.
-최대 4개 실행 슬롯에서 HTTP를 호출한다. PG 호출에는 DB 트랜잭션이 없다.
+기본 4개 실행 슬롯에서 HTTP를 호출한다. 슬롯은 완료 즉시 다음 작업을 가져오며,
+250ms 스케줄은 빈 큐를 다시 확인하는 주기일 뿐 4건/250ms 처리 상한이 아니다.
+PG 호출에는 DB 트랜잭션이 없다. 동시성은 WORKER_CONCURRENCY로 조정하며 목표 처리율을 의미하지 않는다.
 attempt UUID를 PG 멱등키로 사용하므로, PG 성공 뒤 응답 유실/Worker 종료에도 같은 요청을 조회·재실행한다.
 
 결과 반영 순서는 주문 락 → 결제/점유 조회 → 상품 UUID 순 재고 락이다.
 성공이면 held→sold, 실패·기한 초과이면 held→available, 미확정이면 보유를 유지하고 1초 뒤 재확인한다.
-작업 lease 갱신은 주문 락을 함께 잡지 않는 별도 짧은 트랜잭션이다.
+현재 lease는 획득 시 10초이며 갱신 루프는 없다. Mock PG HTTP timeout은 2초다.
+실제 PG의 긴 timeout을 도입할 때는 lease 갱신/소유권과 슬롯 점유를 함께 재설계해야 한다.
 만료 작업도 먼저 주문 락을 잡고, 결제 미진행 상태를 다시 확인한다.
+점유는 300초, Mock PG 최초 처리 기한은 결제 접수+70초다. UNKNOWN에는 자동 재고 반환 기한을 적용하지 않는다.
+
+새 구매는 저장한 주문/항목/점유에서 응답을 만들어 재고 락 안의 응답 재조회 3개를 제거했다.
+멱등 재조회는 기존 DB 조회를 유지한다. `goods.purchase.after_lock`은 락 획득 후 트랜잭션 프록시 반환까지,
+`goods.worker.job`은 작업 조회·PG 호출·결과 반영, `goods.worker.pg`는 PG 호출 소요시간을 기록한다.
 
 ## 모듈과 향후 변경
 

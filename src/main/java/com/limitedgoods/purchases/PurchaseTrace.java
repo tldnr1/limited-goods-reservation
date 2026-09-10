@@ -6,12 +6,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import io.micrometer.core.instrument.MeterRegistry;
+import java.util.concurrent.TimeUnit;
 
 // One record after the transaction proxy exits; never logs while holding the inventory lock.
 final class PurchaseTrace {
     private static final Logger log=LoggerFactory.getLogger(PurchaseTrace.class);
     private final boolean enabled=log.isInfoEnabled();
-    private final long started=enabled?System.nanoTime():0;
+    private final long started=System.nanoTime();
+    private final MeterRegistry metrics;
+    PurchaseTrace() { this(null); }
+    PurchaseTrace(MeterRegistry metrics) { this.metrics=metrics; }
     private long checkpoint=started;
     private long locked;
     private String phase="transaction_entry";
@@ -30,8 +35,14 @@ final class PurchaseTrace {
         stages.merge(phase,(now-checkpoint)/1_000_000.0,Double::sum);
         checkpoint=now; phase=name;
     }
-    void inventoryLocked() { if(enabled) locked=System.nanoTime(); }
+    void inventoryLocked() { locked=System.nanoTime(); }
     void finish(UUID saleId,UUID orderId,Throwable failure) {
+        long finished=System.nanoTime();
+        if(metrics!=null) {
+            String outcome=failure==null?"success":"error";
+            metrics.timer("goods.purchase.transaction","outcome",outcome).record(finished-started,TimeUnit.NANOSECONDS);
+            if(locked!=0) metrics.timer("goods.purchase.after_lock","outcome",outcome).record(finished-locked,TimeUnit.NANOSECONDS);
+        }
         if(!enabled) return;
         String finalPhase=phase;
         next("finished");

@@ -20,10 +20,10 @@ class AdmissionTest {
         connection.afterPropertiesSet(); connection.start();
         redis=new StringRedisTemplate(connection);
         prefix="goods:test:"+UUID.randomUUID()+":";
-        gate=new AdmissionGate(redis,true,prefix,4,new SimpleMeterRegistry());
+        gate=new AdmissionGate(redis,true,prefix,4,new SimpleMeterRegistry(),0);
     }
     @AfterEach void cleanup() {
-        redis.delete(prefix+"inflight");
+        redis.delete(List.of(prefix+"inflight",prefix+"purchase:rate"));
         connection.destroy();
     }
     @Test void luaAdmissionIsAtomicAcrossConcurrentClients() throws Exception {
@@ -46,6 +46,16 @@ class AdmissionTest {
         assertThat(redis.opsForZSet().score(prefix+"inflight","dead-process")).isNull();
         gate.leave(token);
     }
+    @Test void releasingConcurrencyPermitDoesNotBypassRateBudget() {
+        var limited=new AdmissionGate(redis,true,prefix,4,new SimpleMeterRegistry(),25);
+        var token=limited.enter(); limited.leave(token);
+        // Pin the next permitted time instead of relying on the test machine's execution speed.
+        redis.opsForValue().set(prefix+"purchase:rate",""+(System.currentTimeMillis()+60000));
+        assertThatThrownBy(limited::enter).hasMessage("PURCHASE_BUSY");
+        assertThat(redis.opsForZSet().zCard(prefix+"inflight")).isZero();
+        redis.delete(prefix+"purchase:rate");
+        limited.leave(limited.enter());
+    }
     @Test void negativeCacheIsBoundedAndAdvisory() {
         UUID item=UUID.randomUUID();
         gate.rememberUnavailable(item);
@@ -58,7 +68,7 @@ class AdmissionTest {
         var broken=mock(StringRedisTemplate.class);
         when(broken.execute(any(org.springframework.data.redis.core.script.RedisScript.class),anyList(),any(Object[].class)))
             .thenThrow(new RedisConnectionFailureException("offline"));
-        var unavailable=new AdmissionGate(broken,true,prefix,4,new SimpleMeterRegistry());
+        var unavailable=new AdmissionGate(broken,true,prefix,4,new SimpleMeterRegistry(),0);
         assertThatThrownBy(unavailable::enter).isInstanceOf(ApiError.class).hasMessage("ADMISSION_UNAVAILABLE");
     }
 }

@@ -32,6 +32,9 @@ function Invoke-Docker {
 }
 
 function Prepare-Performance {
+    $targetApps = Invoke-Docker -Arguments @('ps','--filter','label=com.docker.compose.project=limited-goods-java',
+        '--format','{{.Names}}') | Where-Object { $_ -match '-(reservation|payment|checkout-nginx)-' }
+    if ($targetApps) { throw 'Target 역할이 실행 중입니다. ops/target.ps1 -Action Stop 후 baseline 실험을 준비하세요.' }
     $activeLoad = Invoke-Docker -Arguments @('ps','--filter','name=^/goods-k6$','-q')
     if ($activeLoad) { throw 'goods-k6가 실행 중입니다. 기존 실험을 먼저 종료하세요.' }
     & (Join-Path $root 'gradlew.bat') --no-daemon bootJar

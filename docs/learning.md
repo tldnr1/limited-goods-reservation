@@ -22,7 +22,7 @@
 | SQLAlchemy model | @Entity, @Id, 컬럼과 테이블 |
 | session.begin/commit | 다른 Spring bean을 통한 @Transactional 호출 |
 | DB pool | HikariCP, application.yml의 maximum-pool-size |
-| background worker loop | @Scheduled 트리거 + DB 작업 lease + 최대 4개 executor 슬롯 |
+| background worker loop | 기본 4개 슬롯이 DB lease 작업을 연속 처리. @Scheduled는 빈 큐 재확인만 담당 |
 
 DI가 매 요청마다 모든 객체를 생성한다는 뜻은 아니다. 기본 bean은 singleton이다.
 그래서 Service 필드에 특정 사용자의 요청 상태를 보관하면 안 된다.

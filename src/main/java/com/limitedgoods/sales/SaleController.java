@@ -2,7 +2,7 @@ package com.limitedgoods.sales;
 import java.util.UUID;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
-@RestController @RequestMapping("/api/sales")
+@RestController @RequestMapping("/api/sales") @org.springframework.context.annotation.Profile({"all","reservation"})
 public class SaleController {
     private final SaleService service;
     public SaleController(SaleService service) { this.service=service; }

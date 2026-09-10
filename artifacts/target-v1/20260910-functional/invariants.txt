@@ -1,0 +1,14 @@
+ id | total | available | held | sold 
+----+-------+-----------+------+------
+(0 rows)
+
+  status   | count 
+-----------+-------
+ CONFIRMED |    11
+(1 row)
+
+  status   | count 
+-----------+-------
+ SUCCEEDED |    11
+(1 row)
+
