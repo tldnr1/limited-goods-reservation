@@ -180,7 +180,14 @@ COMMIT;
     if (-not $projected) { throw 'Sale projection not ready' }
     Sql (Get-Content "$PSScriptRoot/target-state.sql" -Raw) | Set-Content "$directory/before-db.json"
     $observationStart=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    $observer=Start-Job -FilePath "$PSScriptRoot/target-observe.ps1" -ArgumentList $directory,$ids.postgres,$ids.redis,@($ids.Values),$(if ($Scenario -eq 'business') { 1 } else { 5 })
+    # -FilePath runs script text without its file context. Invoke the absolute path in the child instead.
+    $observer=Start-Job -ScriptBlock {
+        param([string]$ObserverPath,[hashtable]$ObserverParameters)
+        & $ObserverPath @ObserverParameters
+    } -ArgumentList "$PSScriptRoot/target-observe.ps1",@{
+        Directory=$directory;Postgres=$ids.postgres;Redis=$ids.redis;Containers=@($ids.Values)
+        IntervalSeconds=$(if ($Scenario -eq 'business') { 1 } else { 5 })
+    }
     for ($i=0;$i -lt 20 -and -not (Test-Path "$directory/observer-ready");$i++) {
         if ($observer.State -eq 'Failed' -or (Test-Path "$directory/observer-error.txt")) { throw 'Observer startup failed' }
         Start-Sleep -Seconds 1

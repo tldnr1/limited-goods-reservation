@@ -38,6 +38,8 @@ Git Bash에서도 아래처럼 `pwsh -NoProfile -File ./ops/performance.ps1 ...`
 이 문서의 한 줄 `pwsh -File` 명령은 두 셸에서 동일하다. Git Bash에서 여러 줄로 나누려면 `\`를 사용하며,
 PowerShell의 줄 연속 문자(백틱)를 사용하지 않는다. `.ps1` 파일을 Bash에 직접 실행시키지 않는다.
 Docker의 `/scripts`, `/results` 및 mount 인자는 PowerShell 내부에서 구성하므로 Bash 명령줄로 직접 넘길 필요가 없다.
+저장소 밖에서 실행하려면 `-File`에 스크립트의 절대경로를 지정한다. 공백이 있으면 경로를 따옴표로 감싼다.
+Target은 Compose 실행 위치를 저장소 루트로 맞추고 종료 후 호출자의 위치를 복원한다.
 
 ```bash
 # 최초 준비 또는 앱 코드/배포 설정 변경 시. 기존 데이터는 유지한다.
@@ -224,5 +226,26 @@ node --experimental-vm-modules ./ops/performance/target-static-test.mjs
 - review: 정상 자료의 수동 판정 유지, 미확정·threshold 실패/누락·Hikari timeout·증거 누락을 검사한다.
 - static: k6 모듈·HTTP·시계·sleep을 대체해 각 시나리오와 재시도·입장권·300초 시간 계약, 두 VU 문맥의 주문 파일 단일 로드·주문 선택을 검사한다.
 
+관측 작업의 실제 PowerShell 프로세스 경계는 아래 검사로 확인한다. Docker는 자식 프로세스에서도 모의 처리하며,
+한 표본 후 즉시 종료한다. HTTP·k6·DB 접근·실제 sleep은 없다.
+
+```bash
+pwsh -NoProfile -File ./ops/performance/target-observer-test.ps1
+```
+
+다른 작업 디렉터리, 공백·한글이 있는 스크립트/결과 경로, 컨테이너 ID 배열, 단계별 관측 간격,
+SQL 파일 누락·Docker 실패 시 readiness 미발행과 오류 파일 보존을 검사한다.
+
 PowerShell은 대소문자를 구분하지 않으므로 native `docker`의 래퍼 함수를 `Docker`라고 이름 붙이면 재귀 호출된다.
 `target.ps1`은 `Invoke-Docker`를 사용한다. 이 회귀 검사의 통과는 실제 부하/컨테이너 실행 검증을 대신하지 않는다.
+
+### Observer startup failed / target-state.sql 경로 오류
+
+`20260911-232830-531-target-worker-normal`은 관측 준비 중 `D:\target-state.sql`을 찾다가 중단됐다.
+`Start-Job -FilePath`에서 스크립트 파일 문맥이 유지되지 않아 `$PSScriptRoot`가 비어 생긴 오류이며 Git Bash의 경로 변환 문제가 아니다.
+자식 작업 안에서 관측 스크립트를 절대경로로 호출하도록 수정했다. 결과 경로·DB/Redis ID·컨테이너 배열·간격은 이름 있는 인자로 전달한다.
+SQL과 fixture는 관측 시작 시 한 번 읽으며, 필요한 파일이 없으면 readiness를 발행하기 전에 오류를 기록한다.
+
+이 실패는 fixture 준비 이후, k6 시작 이전에 발생했으므로 Worker 성능 실패로 해석하지 않는다.
+기존 오류 폴더를 보존하고, 역할들이 준비된 상태라면 같은 Worker 명령에 `-Reset`을 붙여 다시 실행한다.
+PowerShell 수정만 적용하므로 이미지 재빌드는 필요 없다. 서비스가 중단되었거나 사전 검사에 실패한다면 먼저 Prepare로 복구한다.

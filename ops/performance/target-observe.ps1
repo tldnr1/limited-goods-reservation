@@ -2,11 +2,13 @@ param([string]$Directory,[string]$Postgres,[string]$Redis,[string[]]$Containers,
 $ErrorActionPreference='Stop'
 $PSNativeCommandUseErrorActionPreference=$false
 try {
+    $stateSql=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'target-state.sql') -Raw
+    $fixture=Get-Content -LiteralPath (Join-Path $Directory 'fixture.json') -Raw | ConvertFrom-Json
     # Bounded even if the parent terminates without writing stop-observer.
     $deadline=[DateTimeOffset]::UtcNow.AddMinutes(20)
     while (-not (Test-Path "$Directory/stop-observer") -and [DateTimeOffset]::UtcNow -lt $deadline) {
         $at=[DateTimeOffset]::UtcNow.ToString('o')
-        $db=Get-Content "$PSScriptRoot/target-state.sql" -Raw | & docker exec -i $Postgres psql -X -qAt -v ON_ERROR_STOP=1 -U goods -d limited_goods_perf
+        $db=$stateSql | & docker exec -i $Postgres psql -X -qAt -v ON_ERROR_STOP=1 -U goods -d limited_goods_perf
         if ($LASTEXITCODE -ne 0) { throw 'DB sampling failed' }
         $db | Add-Content "$Directory/db-samples.jsonl" -Encoding utf8
         $stats=& docker stats --no-stream --format '{{json .}}' @Containers
@@ -25,7 +27,6 @@ try {
         $script="local t=redis.call('TIME'); local now=t[1]*1000+math.floor(t[2]/1000); return cjson.encode({queue=redis.call('ZCARD','goods:perf:waiting:queue'),ready=redis.call('ZCARD','goods:perf:waiting:ready'),live=redis.call('ZCARD','goods:perf:waiting:live'),stale=redis.call('ZCOUNT','goods:perf:waiting:live','-inf',now)})"
         $queue=& docker exec $Redis redis-cli EVAL $script 0
         if ($LASTEXITCODE -ne 0) { throw 'Redis queue sampling failed' }
-        $fixture=Get-Content "$Directory/fixture.json" -Raw | ConvertFrom-Json
         $catalog=& docker exec $Redis redis-cli GET "goods:perf:catalog:$($fixture.sale.id)"
         if ($LASTEXITCODE -ne 0) { throw 'Redis projection sampling failed' }
         @{at=$at;info=($info -join "`n");queue=($queue | ConvertFrom-Json);catalog=$catalog} |
