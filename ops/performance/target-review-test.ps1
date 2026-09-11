@@ -32,6 +32,13 @@ try {
     $series+=@(1..4 | ForEach-Object { @{metric=@{__name__='hikaricp_connections_timeout_total';instance="pool$_"};values=@(@(1800000000,'0'),@(1800000060,'0'))} })
     Json @{status='success';data=@{result=$series}} 'prometheus.json'
     Verify 'requires_review' # Even complete evidence must not auto-declare capacity success.
+    $state.confirmed=2404; $state.succeeded=2404
+    Json $state 'after-db.json'
+    Verify 'failed'
+    $mismatch=Get-Content "$directory/result.json" -Raw | ConvertFrom-Json
+    if (-not ($mismatch.issues -like '*HTTP/DB payment count mismatch*') -or
+        ($mismatch.issues -like '*remain pending*')) { throw 'Response loss was misreported as unfinished Worker jobs' }
+    $state.confirmed=2400; $state.succeeded=2400; Json $state 'after-db.json'
     $paymentThreshold=$metrics.target_payment_ms
     $metrics.Remove('target_payment_ms')
     Json @{metrics=$metrics} 'k6-summary.json'
@@ -56,7 +63,7 @@ try {
     Verify 'failed'
     Remove-Item -LiteralPath "$directory/prometheus.json"
     Verify 'failed'
-    '7 offline result-review checks passed.'
+    '8 offline result-review checks passed.'
 } finally {
     # Delete only this test's newly created, resolved temporary directory.
     $resolved=[IO.Path]::GetFullPath($directory)

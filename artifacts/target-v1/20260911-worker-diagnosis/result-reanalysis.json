@@ -1,0 +1,31 @@
+{
+  "status": "failed",
+  "issues": [
+    "k6 exited nonzero",
+    "Missing/failed threshold: target_payment_ms: p(95)<=1000",
+    "Missing/failed threshold: target_unexpected: rate<=0.001",
+    "Missing/failed threshold: target_payment_rejected: rate==0",
+    "Missing/failed threshold: dropped_iterations: count==0",
+    "target_unexpected: rate<=0.001",
+    "dropped_iterations: count==0",
+    "target_payment_ms: p(95)<=1000",
+    "target_payment_rejected: rate==0",
+    "Actual arrivals differ from configured workload",
+    "HTTP/DB payment count mismatch: accepted=228, confirmed=232, succeeded=232. Check response loss/retries.",
+    "Hikari timeout or process restart: payment:8080",
+    "Scrape failure: payment:8080"
+  ],
+  "manualReview": [
+    "Inspect per-endpoint/status p95/p99, 429/503, READY versus actual purchase rate, Redis latency/CPU, DB lock/Hikari and generator resources.",
+    "Sustained capacity needs stable backlog/age within the supply window and 3 independent trials; drain alone is insufficient. Worker 32/s required, 40/s normal target.",
+    "For return/late/PG scenarios inspect timeline and state samples. Sampled projection timing is not an exact release-event timestamp; do not certify <=5s from coarse samples."
+  ],
+  "capacity": {
+    "confirmedPerSecond": 8.253511516547741,
+    "sampleSeconds": 19.143367,
+    "maxOldestSeconds": 0.076704,
+    "backlogSlope": 0.05223741466169456,
+    "maxPending": 1.0
+  },
+  "automatedChecksPassed": false
+}

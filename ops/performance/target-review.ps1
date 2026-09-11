@@ -41,7 +41,9 @@ try {
         $held=$summary.metrics.target_held.values.count
         $accepted=$summary.metrics.target_payment_accepted.values.count
         if ($config.scenario -in @('worker','isolation')) {
-            Require ($accepted -gt 0 -and $state.confirmed -eq $accepted -and $state.succeeded -eq $accepted -and $state.pending -eq 0 -and $state.failed -eq 0) 'Accepted payments not fully confirmed after drain'
+            Require ($accepted -gt 0) 'No payment acceptance observed by client'
+            Require ($state.confirmed -eq $accepted -and $state.succeeded -eq $accepted) "HTTP/DB payment count mismatch: accepted=$accepted, confirmed=$($state.confirmed), succeeded=$($state.succeeded). Check response loss/retries."
+            Require ($state.pending -eq 0 -and $state.failed -eq 0) 'Payment attempts remain pending or failed after drain'
         }
         if ($config.scenario -in @('reservation','business')) { Require ($held -gt 0 -and $state.orders -eq $held) 'No purchases or HTTP/DB order count mismatch' }
         if ($config.scenario -eq 'waiting') { Require ($state.orders -eq 0 -and $state.attempts -eq 0) 'Waiting created durable orders/payments' }

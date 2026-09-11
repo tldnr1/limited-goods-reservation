@@ -1,0 +1,6 @@
+{
+  "source": "artifacts/performance/20260911-234502-053-target-worker-normal",
+  "dbSamplesSha256": "af464f6cbc9930617a658911518cd3a0bc7095bffa454ca15fc22d34deb0aa8f",
+  "samples": 8,
+  "normalization": "Parse complete SQL JSON records and serialize one object per line. Original files unchanged."
+}

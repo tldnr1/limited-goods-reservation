@@ -10,7 +10,9 @@ try {
         $at=[DateTimeOffset]::UtcNow.ToString('o')
         $db=$stateSql | & docker exec -i $Postgres psql -X -qAt -v ON_ERROR_STOP=1 -U goods -d limited_goods_perf
         if ($LASTEXITCODE -ne 0) { throw 'DB sampling failed' }
-        $db | Add-Content "$Directory/db-samples.jsonl" -Encoding utf8
+        # psql JSON may span lines (e.g. json_agg of multiple inventory rows). JSONL requires one per sample.
+        ($db -join "`n") | ConvertFrom-Json | ConvertTo-Json -Depth 30 -Compress |
+            Add-Content "$Directory/db-samples.jsonl" -Encoding utf8
         $stats=& docker stats --no-stream --format '{{json .}}' @Containers
         if ($LASTEXITCODE -ne 0) { throw 'Resource sampling failed' }
         @{at=$at;containers=@($stats | ForEach-Object { $_ | ConvertFrom-Json })} | ConvertTo-Json -Compress -Depth 8 | Add-Content "$Directory/resources.jsonl"
