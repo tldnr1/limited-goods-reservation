@@ -12,13 +12,20 @@
 | Action | 수행 내용 | 데이터/부하 |
 |---|---|---|
 | Check (기본) | Target profile, perf DB/Redis namespace, rate/permit, health, Prometheus 6개 target 확인 | 읽기 전용. 초기화·기동·HTTP 시나리오 없음 |
-| Prepare | bootJar/image 빌드, Flyway 기동, 앱 정지, perf 데이터/namespace 초기화, Target 기동 | **기존 perf 자료 삭제**. dev/test·Flyway 이력·볼륨 보존. 부하 없음 |
+| Prepare | bootJar/image 빌드, 앱 중단, 기존 health 의존 순서로 한 번 기동, 준비 검사 | **데이터 초기화 없음**. 최초 DB의 Flyway는 앱 기동 중 적용. 부하 없음 |
 | Run | 비어 있는 perf DB 확인, fixture 준비, 관측 시작, 선택한 k6 파일 1회 실행, 30초 drain, 결과 저장 | **실제 부하**. 내부에서 Prepare나 다른 시나리오를 실행하지 않음 |
+| Run -Reset | 사전 검사, 앱 중단, 이전 DB 상태 보존, perf 초기화, 기존 이미지로 한 번 기동한 뒤 Run | **기존 perf 데이터/namespace 삭제 + 실제 부하**. 재빌드·이미지 pull 없음 |
 
 기존 dev/baseline 앱과 dev/test DB 연결이 있으면 준비를 거절한다. 다른 터미널의 Gradle test도 종료한 뒤 실행한다.
 같은 물리 호스트에서 dev/test/perf를 함께 실행하지 않는다. 기존 Target은 `./ops/target.ps1 -Action Stop`,
 baseline은 `docker compose stop nginx api1 api2 worker mock-pg`로 사용자가 명시적으로 멈춘다.
-Run은 이전 판매가 남아 있으면 거절한다. **결과를 보존하고 매 시험 전 Prepare를 다시 수행**한다.
+`Prepare`는 최초 배포 또는 애플리케이션 코드/설정 변경 시 사용한다. RPS·기간·재고·Users만 바꾸는 반복 실험에는
+**`Run -Reset` 한 번**이면 된다. `Run`이 사전 검사를 포함하므로 별도 `Check`는 선택 사항이다.
+`-Reset` 없는 Run은 이전 판매가 남아 있으면 거절한다. 이 경우 Prepare로 데이터를 지우려고 하지 않는다.
+`Run -Reset`도 준비된 역할/설정/관측 상태가 필요하다. 중단되었거나 준비가 실패한 환경은 Prepare로 복구한다.
+기존 결과 폴더는 덮어쓰지 않으며, 초기화 직전 DB 상태·timeline은 새 결과 폴더의 `pre-reset-*`에 저장한다.
+이 snapshot은 이전 실행의 전체 관측 자료를 대체하지 않는다. 기존 결과 수집이 완료된 뒤 다음 실험을 시작한다.
+동일 저장소의 Prepare/Run은 파일 잠금으로 drain·수집 종료까지 겹치지 않게 한다. 다른 도구/checkout의 실행까지 막지는 않는다.
 Run 중 Ctrl+C로 중단했다면 `docker ps --filter name=goods-target-k6`로 잔존 생성기를 확인하고
 필요할 때 해당 컨테이너만 `docker stop goods-target-k6`로 종료한다. 다음 Prepare는 실행 중 생성기가 있으면 거절한다.
 
@@ -26,18 +33,42 @@ JDK 21, Docker Desktop, PowerShell 7, 로컬 `grafana/k6:0.54.0` 이미지가 �
 이미지가 없으면 사용자가 `docker pull grafana/k6:0.54.0`로 준비한다. fixture를 만든 뒤 이미지 pull로 hold 시간을 소모하지 않게 Run이 사전 확인한다.
 이미 실행 중인 Codex의 JAVA_HOME이 오래되었다면 설치된 JDK 경로를 현재 셸에 적용한다.
 
-```powershell
-# 저장소 루트. 이 문서의 Run 명령은 사용자가 선택하여 실행한다.
+Git Bash에서도 아래처럼 `pwsh -NoProfile -File ./ops/performance.ps1 ...`로 실행한다.
+`cd /d/Code/limited-goods-reservation`으로 저장소 루트에 이동한 뒤 사용한다.
+이 문서의 한 줄 `pwsh -File` 명령은 두 셸에서 동일하다. Git Bash에서 여러 줄로 나누려면 `\`를 사용하며,
+PowerShell의 줄 연속 문자(백틱)를 사용하지 않는다. `.ps1` 파일을 Bash에 직접 실행시키지 않는다.
+Docker의 `/scripts`, `/results` 및 mount 인자는 PowerShell 내부에서 구성하므로 Bash 명령줄로 직접 넘길 필요가 없다.
+
+```bash
+# 최초 준비 또는 앱 코드/배포 설정 변경 시. 기존 데이터는 유지한다.
 pwsh -NoProfile -File ./ops/performance.ps1 -Mode target -Action Prepare
+# 선택 사항: Run에도 같은 준비 검사가 포함된다.
 pwsh -NoProfile -File ./ops/performance.ps1 -Mode target -Action Check
 
-# 1회 Worker 측정. 완료 후 result.json 검토.
-pwsh -NoProfile -File ./ops/performance.ps1 -Mode target -Action Run -Scenario worker -Rps 40 -DurationSeconds 60
+# perf 초기화 후 1회 Worker 측정. 완료 후 result.json 검토.
+pwsh -NoProfile -File ./ops/performance.ps1 -Mode target -Action Run -Reset -Scenario worker -Rps 10 -DurationSeconds 30 -Vus 10 -MaxVus 50
+# 앞선 결과를 확인한 후 입력만 변경해서 별도로 실행한다.
+pwsh -NoProfile -File ./ops/performance.ps1 -Mode target -Action Run -Reset -Scenario worker -Rps 40 -DurationSeconds 60 -Vus 10 -MaxVus 100
 ```
 
 Prepare/Check/Run의 `WaitingRate`, `ReservationRate`, `Permits`는 일치해야 한다. 기본은 25/25/8이다.
 기본값을 자동으로 높이거나 gate/ticket 검사를 끄지 않는다. 설정 변경 시험은 Prepare부터 같은 값을 명시한다.
 `-Diagnostics`는 baseline 옵션이므로 Target에서는 거절한다. Target 공통 관측은 항상 켜져 있다.
+
+### 기동·초기화 순서
+
+- Prepare: 빌드 → Target 앱 8개 중단 → Compose 기동 1회 → 역할/관측 준비 검사.
+  Mock PG는 PostgreSQL health 뒤 기동하면서 Flyway를 적용하고, Reservation은 PostgreSQL·Redis·Mock PG health를 기다린다.
+  Waiting 2개는 Redis, Payment는 PostgreSQL·Reservation, Worker는 PostgreSQL·Mock PG·Reservation을 기다린다.
+  Public Nginx는 Waiting 2개, Checkout Nginx는 Reservation·Payment·Worker health 뒤 기동한다.
+- Run -Reset: 설정·이미지·실행 충돌 검사 → 앱 8개 중단 → 이전 DB 상태 보존 → 공통 reset의 `-AppsStopped`로 초기화
+  → `up --no-build --pull never --wait` 1회 → 준비 검사 → fixture → 관측·부하·drain·수집.
+  PostgreSQL·Redis·Prometheus는 명시적으로 중단하지 않는다. 초기화 실패 시 재기동/부하로 넘어가지 않는다.
+- `-AppsStopped`는 중단 검사를 생략하지 않는다. 앱이 남아 있으면 삭제를 거절하고, 이미 멈춘 앱에 stop을 중복 호출하지 않는다.
+
+Prepare는 데이터를 보존하지만 앱을 기동하므로 기존 미완료 주문의 Worker 처리가 다시 진행될 수 있다.
+Run -Reset은 앱을 재기동하므로 JVM 예열 상태가 유지되지 않는다. DB/OS 캐시는 남을 수 있어 완전한 cold 환경이라고 부르지 않는다.
+비교 시험은 같은 reset/예열 조건을 사용한다. 성공 응답을 위한 자동 예열은 추가하지 않았다.
 
 ## 2. 단계별 입력과 범위
 
@@ -66,18 +97,18 @@ Business의 late-payment/abandon은 실제 300초 경계를 지난다. k6 gracef
 원래 대기 브라우저가 300초까지 살아 있다고 가정하지 않는다. abandon은 **300초부터 새로운 반환 수요 Stock명**을 60초에 걸쳐 보낸다.
 
 ```powershell
-# 각 명령 전에 결과 보존 → Prepare → Check. 자동 연속 실행 예제가 아니다.
-pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Scenario waiting -Rps 100 -DurationSeconds 60 -Vus 200 -MaxVus 20000
-pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Scenario waiting -Variant abandon -Rps 100 -DurationSeconds 60 -Vus 200 -MaxVus 20000
+# 최초 Prepare 후 각각 선택 실행. 매 명령은 perf를 초기화하며 자동 연속 실행 예제가 아니다.
+pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Reset -Scenario waiting -Rps 100 -DurationSeconds 60 -Vus 200 -MaxVus 20000
+pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Reset -Scenario waiting -Variant abandon -Rps 100 -DurationSeconds 60 -Vus 200 -MaxVus 20000
 
 # Reservation: 실제 READY 공급과 safety ceiling을 같은 설정으로 준비/확인한다.
 pwsh -File ./ops/performance.ps1 -Mode target -Action Prepare -WaitingRate 100 -ReservationRate 100
 pwsh -File ./ops/performance.ps1 -Mode target -Action Check -WaitingRate 100 -ReservationRate 100
-pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Scenario reservation -Rps 40 -Stock 3000 -WaitingRate 100 -ReservationRate 100
+pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Reset -Scenario reservation -Rps 40 -Stock 3000 -WaitingRate 100 -ReservationRate 100
 
-# 기본 25/25/8로 다시 Prepare/Check한 뒤 각각 선택 실행
-pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Scenario isolation -Rps 100 -PaymentRps 40 -Vus 200 -MaxVus 20000
-pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Scenario business -Variant normal -Users 50000 -Stock 1000 -Vus 1000 -MaxVus 50000
+# 기본 25/25/8로 다시 Prepare한 뒤 각각 선택 실행
+pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Reset -Scenario isolation -Rps 100 -PaymentRps 40 -Vus 200 -MaxVus 20000
+pwsh -File ./ops/performance.ps1 -Mode target -Action Run -Reset -Scenario business -Variant normal -Users 50000 -Stock 1000 -Vus 1000 -MaxVus 50000
 ```
 
 100/40 등은 **입력 예시**이며 안전/달성 용량이 아니다. 기본 MaxVus=2,000은 5만 명 재현을 보장하지 않는다.
@@ -85,6 +116,15 @@ Business 세 도착 구간은 VU pool을 각각 갖고 대기 시간이 겹친�
 생성기는 1.5 CPU/1GiB로 제한한다. 높은 MaxVus를 적었다고 그 메모리에 모두 들어가는 것은 아니다.
 목표 유입 전에 작은 Users(10의 배수, 최대 50,000)로 생성기·수집을 확인하고, 누락/OOM이면 서버 한계와 구분한다.
 축소 시험 결과는 목표 부하 통과로 기록하지 않는다. 자동 예열은 없으므로 cold/예열 조건을 실행 기록에 명시하고 비교에서 맞춘다.
+
+### 생성기 주문 데이터 공유
+
+작은 판매 정보는 `fixture.json`, Worker/Isolation의 주문 목록은 `orders.json`으로 분리한다.
+`common.js`는 init 단계의 `SharedArray` 안에서 주문 JSON을 읽고 파싱한다. 전체 목록은 k6 프로세스당 한 번 저장하고,
+각 VU는 자기 iteration에 필요한 주문 하나만 읽는다. 전체 목록을 VU마다 복사하거나 setup 결과로 전달하지 않는다.
+주문 선택 인덱스·사용자·멱등키·실제 결제 접수 경로는 동일하다. 나머지 시나리오는 빈 주문 배열을 사용한다.
+이는 읽기 전용 fixture 공유이며 Redis/PostgreSQL 책임 분리나 동시 사용자 수를 바꾸지 않는다.
+실제 메모리 절감량과 최대 VU는 아직 측정하지 않았다. [k6 SharedArray](https://grafana.com/docs/k6/latest/javascript-api/k6-data/sharedarray/)를 참고한다.
 
 ## 3. Business variant
 
@@ -140,7 +180,8 @@ Redis catalog와 poll 응답 시간을 대조한다. 재고가 원래 남아 있
 | 파일 | 내용 |
 |---|---|
 | config.json / compose.yaml / commit.txt / working-tree.patch / git-status.txt / jar-hash.json / scripts | 입력·실제 설정·소스 snapshot. 미추적 파일은 diff에 없으므로 scripts와 복사된 target 스크립트도 보존 |
-| fixture.json | 실행 판매와 기존 HELD 주문 ID. 로컬 결과에 보존하되 대형 목록은 Git 제외 |
+| fixture.json / orders.json | 실행 판매 / 기존 HELD 주문 ID·사용자 목록. 로컬 결과에 보존하며 Git 제외 |
+| pre-reset-db.json / pre-reset-timeline.json | Run -Reset에서 초기화 전 보존한 이전 DB 상태. 이번 실험의 측정 자료와 구분 |
 | phases.json | 관측 시작, k6 setup 시각, 공급 종료, 전체 브라우저 종료, drain 종료. 공급 구간과 grace/drain을 분리 |
 | k6.log / k6-exit.txt / k6-summary.json / raw.json | 실행 로그·threshold 결과·요청 및 사용자 지표. raw의 endpoint/status 태그로 성공/거절 p95/p99·초당 유입 계산 |
 | db-samples.jsonl / before-db.json / after-db.json | confirmed/pending/oldest age·락 waiter·DB 활동·판매별 재고·정합성 |
@@ -166,3 +207,22 @@ pwsh -File ./ops/performance/target-review.ps1 -Directory ./artifacts/performanc
 대표 조건을 3회 각각 실행하여 결과를 합치지 않고 남긴다. 먼저 Worker, Waiting, Reservation을 측정하고
 그 결과로 Isolation의 입력을 정한 뒤 Business로 간다. 실제로 확인한 병목만 수정한다.
 아직 Target의 최대 용량·40/s·50,000명·결제 성능 격리·실제 300초 반환을 달성했다고 기록하지 않는다.
+
+## 7. 부하 없는 스크립트 회귀 검사
+
+아래 검사는 Git Bash 또는 PowerShell에서 실행할 수 있다. 실제 Docker/HTTP/k6, DB 초기화, 실제 대기는 수행하지 않는다.
+
+```bash
+pwsh -NoProfile -File ./ops/performance/target-command-test.ps1
+pwsh -NoProfile -File ./ops/performance/target-lifecycle-test.ps1
+pwsh -NoProfile -File ./ops/performance/target-review-test.ps1
+node --experimental-vm-modules ./ops/performance/target-static-test.mjs
+```
+
+- command: Docker 함수 이름 충돌, Check 호출/인자 전달, 작업 디렉터리·환경 복원, 실패 시 중단을 모의 검사한다.
+- lifecycle: 임시 workspace에서 Docker/HTTP/Git과 빌드를 대체해 단일 기동·무빌드 재실행·상태 보존·초기화 순서·실패 차단·수집 잠금을 검사한다. 실제 부하 진입 전 멈춘다.
+- review: 정상 자료의 수동 판정 유지, 미확정·threshold 실패/누락·Hikari timeout·증거 누락을 검사한다.
+- static: k6 모듈·HTTP·시계·sleep을 대체해 각 시나리오와 재시도·입장권·300초 시간 계약, 두 VU 문맥의 주문 파일 단일 로드·주문 선택을 검사한다.
+
+PowerShell은 대소문자를 구분하지 않으므로 native `docker`의 래퍼 함수를 `Docker`라고 이름 붙이면 재귀 호출된다.
+`target.ps1`은 `Invoke-Docker`를 사용한다. 이 회귀 검사의 통과는 실제 부하/컨테이너 실행 검증을 대신하지 않는다.

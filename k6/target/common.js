@@ -2,9 +2,12 @@ import http from 'k6/http';
 import exec from 'k6/execution';
 import { sleep } from 'k6';
 import { Counter, Rate, Trend } from 'k6/metrics';
+import { SharedArray } from 'k6/data';
 
 export const config = JSON.parse(open(__ENV.TARGET_CONFIG));
 export const fixture = JSON.parse(open(__ENV.TARGET_FIXTURE));
+// Keep the small sale metadata per VU; parse the large order list only once per k6 process.
+const orders = new SharedArray('target-payment-orders', () => JSON.parse(open(__ENV.TARGET_ORDERS)));
 export function setup() {
   const startedAt = Date.now();
   console.log(`TARGET_MEASUREMENT_START=${startedAt}`);
@@ -83,8 +86,8 @@ export function payment(order, index, scenario = 'SUCCESS') {
 export function existingPayment() {
   const index = exec.scenario.iterationInTest;
   started.add(1);
-  if (index >= fixture.orders.length) throw new Error('Payment fixture exhausted');
-  payment(fixture.orders[index], index);
+  if (index >= orders.length) throw new Error('Payment fixture exhausted');
+  payment(orders[index], index);
   finished.add(1);
 }
 

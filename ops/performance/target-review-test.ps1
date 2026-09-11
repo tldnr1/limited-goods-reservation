@@ -19,6 +19,9 @@ try {
     $metrics=@{}
     foreach ($name in @('target_started','target_finished','target_payment_accepted')) { $metrics[$name]=@{values=@{count=2400}} }
     $metrics.target_payment_ms=@{thresholds=@{'p(95)<=1000'=@{ok=$true}}}
+    $metrics.target_payment_rejected=@{thresholds=@{'rate==0'=@{ok=$true}}}
+    $metrics.target_unexpected=@{thresholds=@{'rate<=0.001'=@{ok=$true}}}
+    $metrics.dropped_iterations=@{thresholds=@{'count==0'=@{ok=$true}}}
     Json @{metrics=$metrics} 'k6-summary.json'
     Set-Content "$directory/k6-exit.txt" '0'
     foreach ($name in @('redis-samples.jsonl','resources.jsonl','timeline.json')) { Set-Content "$directory/$name" '{}' }
@@ -29,6 +32,16 @@ try {
     $series+=@(1..4 | ForEach-Object { @{metric=@{__name__='hikaricp_connections_timeout_total';instance="pool$_"};values=@(@(1800000000,'0'),@(1800000060,'0'))} })
     Json @{status='success';data=@{result=$series}} 'prometheus.json'
     Verify 'requires_review' # Even complete evidence must not auto-declare capacity success.
+    $paymentThreshold=$metrics.target_payment_ms
+    $metrics.Remove('target_payment_ms')
+    Json @{metrics=$metrics} 'k6-summary.json'
+    Verify 'failed'
+    $metrics.target_payment_ms=$paymentThreshold
+    $metrics.dropped_iterations.thresholds=@{}
+    Json @{metrics=$metrics} 'k6-summary.json'
+    Verify 'failed'
+    $metrics.dropped_iterations.thresholds=@{'count==0'=@{ok=$true}}
+    Json @{metrics=$metrics} 'k6-summary.json'
     $state.pending=1
     Json $state 'after-db.json'
     Verify 'failed'
@@ -43,7 +56,7 @@ try {
     Verify 'failed'
     Remove-Item -LiteralPath "$directory/prometheus.json"
     Verify 'failed'
-    '5 offline result-review checks passed.'
+    '7 offline result-review checks passed.'
 } finally {
     # Delete only this test's newly created, resolved temporary directory.
     $resolved=[IO.Path]::GetFullPath($directory)

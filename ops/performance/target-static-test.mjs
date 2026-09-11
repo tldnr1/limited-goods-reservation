@@ -8,14 +8,37 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 let passed = 0;
-async function harness(stage, overrides = {}, responses = []) {
+async function harness(stage, overrides = {}, responses = [], shared = { arrays: new Map(), orderReads: 0 }) {
   let now = 1800000000000;
   const calls = [];
   const sleeps = [];
   const metrics = {};
   const config = { runId: 'offline', scenario: stage, variant: 'normal', rps: 40, paymentRps: 40,
     durationSeconds: 60, stock: 1000, users: 50000, vus: 100, maxVus: 2000, seed: 20260911, ...overrides };
-  const fixture = { sale: { id: 'sale', items: [{ id: 'item' }] }, orders: [{ id: 'held-order', user: 'fixture-0' }] };
+  const fixture = { sale: { id: 'sale', items: [{ id: 'item' }] } };
+  const orders = ['worker', 'isolation'].includes(stage)
+    ? [{ id: 'held-order', user: 'fixture-0' }, { id: 'held-order-2', user: 'fixture-1' }] : [];
+  let loadingShared = false;
+  class SharedArray {
+    constructor(name, loader) {
+      if (!shared.arrays.has(name)) {
+        loadingShared = true;
+        const values = loader();
+        loadingShared = false;
+        assert.ok(Array.isArray(values));
+        shared.arrays.set(name, Array.from(values, value => JSON.stringify(value)));
+      }
+      const values = shared.arrays.get(name);
+      return new Proxy([], {
+        get(_, key) {
+          if (key === 'length') return values.length;
+          if (/^\d+$/.test(String(key))) return JSON.parse(values[Number(key)]);
+          throw new Error(`Unexpected SharedArray operation: ${String(key)}`);
+        },
+        set() { throw new Error('SharedArray is read-only'); },
+      });
+    }
+  }
   const execution = { scenario: { name: stage === 'business' ? 'opening' : stage, iterationInTest: 0 } };
   class Metric {
     constructor(name) { this.name = name; metrics[name] = []; }
@@ -26,8 +49,14 @@ async function harness(stage, overrides = {}, responses = []) {
     static now() { return now; }
   }
   const context = vm.createContext({
-    __ENV: { TARGET_CONFIG: 'config', TARGET_FIXTURE: 'fixture' }, Date: FakeDate,
-    open: name => JSON.stringify(name === 'config' ? config : fixture), console: { log() {} },
+    __ENV: { TARGET_CONFIG: 'config', TARGET_FIXTURE: 'fixture', TARGET_ORDERS: 'orders' }, Date: FakeDate,
+    open: name => {
+      if (name === 'orders') {
+        assert.ok(loadingShared, 'Large orders file must be opened inside SharedArray');
+        shared.orderReads++;
+      }
+      return JSON.stringify(name === 'config' ? config : name === 'orders' ? orders : fixture);
+    }, console: { log() {} },
   });
   const http = {
     expectedStatuses: (...args) => args,
@@ -42,6 +71,7 @@ async function harness(stage, overrides = {}, responses = []) {
   const externals = {
     'k6/http': { default: http }, 'k6/execution': { default: execution },
     'k6/metrics': { Counter: Metric, Rate: Metric, Trend: Metric },
+    'k6/data': { SharedArray },
     k6: { sleep: seconds => { assert.ok(Number.isFinite(seconds) && seconds >= 0); sleeps.push(seconds); now += seconds * 1000; } },
   };
   const cache = new Map();
@@ -69,6 +99,22 @@ const joined = () => ({ status: 202, value: { id: 'admission', state: 'WAITING',
 const ready = () => ({ status: 200, value: now => ({ id: 'admission', state: 'READY', ticket: 'real-ticket', expiresAt: now + 10000 }) });
 const held = () => ({ status: 201, value: now => ({ id: 'new-order', holdExpiresAt: new Date(now + 300000).toISOString() }) });
 const paid = () => ({ status: 202, value: { id: 'attempt' } });
+
+{
+  const shared = { arrays: new Map(), orderReads: 0 };
+  const first = await harness('worker', {}, [paid()], shared);
+  const second = await harness('worker', {}, [paid()], shared);
+  second.execution.scenario.iterationInTest = 1;
+  first.module.pay(); second.module.pay();
+  assert.equal(shared.orderReads, 1, 'Two VU contexts must load the large file once');
+  assert.ok(first.calls[0].url.includes('/held-order/'));
+  assert.ok(second.calls[0].url.includes('/held-order-2/'));
+  assert.equal(second.calls[0].params.headers['X-User-Id'], 'fixture-1');
+  second.execution.scenario.iterationInTest = 2;
+  assert.throws(() => second.module.pay(), /Payment fixture exhausted/);
+  assert.deepEqual(Object.keys(first.module.setup()), ['startedAt'], 'setup must not serialize shared orders');
+  passed++;
+}
 
 for (const stage of ['worker', 'waiting', 'reservation', 'isolation', 'business']) {
   const h = await harness(stage);

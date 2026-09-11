@@ -1,6 +1,7 @@
 param(
     [ValidateSet('test','perf','dev')][string]$Environment = 'test',
-    [switch]$AllowDevReset
+    [switch]$AllowDevReset,
+    [switch]$AppsStopped
 )
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
@@ -15,8 +16,14 @@ if ($targetApps | Where-Object { $_ -match '-(reservation|payment|checkout-nginx
     throw 'Target 역할이 실행 중입니다. ops/target.ps1 -Action Stop 후 초기화하세요.'
 }
 # Stop only this Compose project; preserve volumes and other projects.
-docker compose stop nginx api1 api2 worker mock-pg
-if ($LASTEXITCODE -ne 0) { throw '서비스 중단 실패. 초기화를 수행하지 않았습니다.' }
+if ($AppsStopped) {
+    if ($targetApps | Where-Object { $_ -match '-(nginx|api1|api2|worker|mock-pg)-' }) {
+        throw '-AppsStopped에는 모든 앱이 중단되어 있어야 합니다. 초기화를 수행하지 않았습니다.'
+    }
+} else {
+    docker compose stop nginx api1 api2 worker mock-pg
+    if ($LASTEXITCODE -ne 0) { throw '서비스 중단 실패. 초기화를 수행하지 않았습니다.' }
+}
 $actual = docker compose exec -T postgres psql -U goods -d $dbName -Atc 'select current_database()'
 if ($LASTEXITCODE -ne 0 -or $actual.Trim() -ne $dbName) { throw '초기화 대상 DB 검증 실패' }
 $sql = @'
@@ -35,4 +42,6 @@ foreach ($key in $keys) {
     }
 }
 Write-Output "$dbName 및 $prefix 초기화 완료. Flyway 이력과 볼륨은 보존했습니다."
-Write-Output '서비스는 중단 상태입니다. dev: docker compose up -d / perf: docker compose --env-file ops/perf.env up -d'
+if (-not $AppsStopped) {
+    Write-Output '서비스는 중단 상태입니다. dev: docker compose up -d / perf: docker compose --env-file ops/perf.env up -d'
+}

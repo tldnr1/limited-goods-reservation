@@ -18,6 +18,13 @@ try {
         foreach ($field in @('inventoryViolations','userLimitViolations','holdViolations','duplicateSuccess','waitingDbConnections')) {
             Require ($null -ne $state.$field -and $state.$field -eq 0) "$field must be zero"
         }
+        $requiredThresholds=@{dropped_iterations='count==0';target_unexpected='rate<=0.001'}
+        if ($config.scenario -in @('worker','isolation','business')) { $requiredThresholds.target_payment_ms='p(95)<=1000' }
+        if ($config.scenario -in @('worker','isolation')) { $requiredThresholds.target_payment_rejected='rate==0' }
+        if ($config.scenario -in @('reservation','business')) { $requiredThresholds.target_purchase_accepted_ms='p(99)<=1000' }
+        foreach ($entry in $requiredThresholds.GetEnumerator()) {
+            Require ($summary.metrics.($entry.Key).thresholds.($entry.Value).ok -eq $true) "Missing/failed threshold: $($entry.Key): $($entry.Value)"
+        }
         foreach ($metric in $summary.metrics.PSObject.Properties) {
             if ($metric.Value.thresholds) {
                 foreach ($threshold in $metric.Value.thresholds.PSObject.Properties) { Require ($threshold.Value.ok -eq $true) "$($metric.Name): $($threshold.Name)" }

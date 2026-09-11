@@ -17,7 +17,8 @@ param(
     [int]$WaitingRate = 25,
     [int]$ReservationRate = 25,
     [int]$Permits = 8,
-    [int]$Seed = 20260911
+    [int]$Seed = 20260911,
+    [switch]$Reset
 )
 if ($Mode -eq 'target') {
     $targetParameters = @{} + $PSBoundParameters
@@ -26,6 +27,7 @@ if ($Mode -eq 'target') {
     return
 }
 if ($Scenario -notin @('purchase-spike','capacity')) { throw 'Target 시나리오에는 -Mode target이 필요합니다.' }
+if ($Reset) { throw '-Reset은 -Mode target -Action Run 전용입니다.' }
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $root = Split-Path $PSScriptRoot -Parent

@@ -92,6 +92,7 @@ perf DB 최초 마이그레이션은 docker compose --env-file ops/perf.env up -
 읽기 전용 준비 확인: `pwsh -NoProfile -File ./ops/performance.ps1`.
 Target 준비 확인은 여기에 `-Mode target`을 추가한다. 아래 기본 명령은 baseline용이다.
 perf 초기화·기동과 단일 실험 기록은 같은 스크립트의 `Prepare` / `Run`으로 분리했다.
+Target은 `Prepare`로 데이터 삭제 없이 배포하고, 반복 실험은 `Run -Reset`으로 재빌드 없이 초기화·측정한다.
 `Run`은 RPS를 명시해야 하며 실제 부하를 발생시킨다. 자세한 사용법은 아래 가이드를 따른다.
 
 - [비즈니스 계약](PROJECT.md), [인프라·트랜잭션 설계](DESIGN.md)
