@@ -1,6 +1,7 @@
 # Offline review only; never calls Docker, HTTP, k6, or changes the database.
 param([Parameter(Mandatory)][string]$Directory)
 $ErrorActionPreference='Stop'
+. "$PSScriptRoot/target-hikari.ps1"
 $issues=[System.Collections.Generic.List[string]]::new()
 $review=[System.Collections.Generic.List[string]]::new()
 $capacity=$null
@@ -9,7 +10,7 @@ $alignment=$null
 function Read-Json([string]$Name) { Get-Content (Join-Path $Directory $Name) -Raw | ConvertFrom-Json }
 function Require([bool]$Condition,[string]$Message) { if (-not $Condition) { $issues.Add($Message) } }
 try {
-    foreach ($name in @('config.json','phases.json','k6-summary.json','k6-exit.txt','before-db.json','after-db.json','db-samples.jsonl','redis-samples.jsonl','resources.jsonl','prometheus.json','before-containers.json','after-containers.json','timeline.json')) {
+    foreach ($name in @('boundary-before.json','boundary-after.json','config.json','phases.json','k6-summary.json','k6-exit.txt','before-db.json','after-db.json','db-samples.jsonl','redis-samples.jsonl','resources.jsonl','prometheus.json','before-containers.json','after-containers.json','timeline.json')) {
         Require (Test-Path "$Directory/$name") "Missing evidence: $name"
     }
     foreach ($name in @('error.txt','collection-errors.txt','observer-error.txt')) { Require (-not (Test-Path "$Directory/$name")) "Run/collection error: $name" }
@@ -119,13 +120,22 @@ try {
         Require ($prom.status -eq 'success') 'Prometheus query failed'
         $up=@($prom.data.result | Where-Object { $_.metric.__name__ -eq 'up' })
         Require ($up.Count -eq 6) 'Missing Prometheus targets'
-        $timeouts=@($prom.data.result | Where-Object { $_.metric.__name__ -eq 'hikaricp_connections_timeout_total' })
+        $hikariBefore=Read-Json 'boundary-before.json'; $hikariAfter=Read-Json 'boundary-after.json'
+        $beforeMap=Get-TargetHikariMap $hikariBefore; $afterMap=Get-TargetHikariMap $hikariAfter
+        Require ($hikariAfter.boundaryRequestedAt -ge $hikariBefore.timestamp) 'Hikari boundary order invalid'
+        foreach ($key in $beforeMap.Keys) {
+            Require ($afterMap.ContainsKey($key)) "Hikari series mismatch: $key"
+            if ($afterMap.ContainsKey($key)) {
+                $delta=$afterMap[$key].value-$beforeMap[$key].value
+                Require ($delta -eq 0) "Hikari timeout boundary delta must be zero (increase/reset): $key delta=$delta"
+            }
+        }
         $starts=@($prom.data.result | Where-Object { $_.metric.__name__ -eq 'process_start_time_seconds' })
-        Require ($timeouts.Count -eq 4 -and $starts.Count -eq 6) 'Missing Hikari/process evidence'
+        Require ($starts.Count -eq 6) 'Missing process evidence'
         foreach ($series in $prom.data.result) {
             if ($series.metric.__name__ -eq 'up') { Require (@($series.values | Where-Object { $_[1] -ne '1' }).Count -eq 0) "Scrape failure: $($series.metric.instance)" }
-            if ($series.metric.__name__ -in @('hikaricp_connections_timeout_total','process_start_time_seconds')) {
-                Require ($series.values[0][1] -eq $series.values[-1][1]) "Hikari timeout or process restart: $($series.metric.instance)"
+            if ($series.metric.__name__ -eq 'process_start_time_seconds') {
+                Require ($series.values[0][1] -eq $series.values[-1][1]) "Process restart: $($series.metric.instance)"
             }
         }
     }

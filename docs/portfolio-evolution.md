@@ -1,5 +1,7 @@
 # 한정 굿즈 예약 시스템 — 문제를 좁혀 온 발전 기록
 
+현재 포트폴리오에서 사용할 수 있는 claim과 실측 대기 중 claim은 [portfolio-evidence.md](portfolio-evidence.md)에서 관리한다.
+
 **최종 목표(미검증):** 대량 유입을 Waiting/READY에서 흡수해 PostgreSQL 재고 경로의 진입률을 통제하고,
 재고 점유는 PostgreSQL 원장으로 보장하며, durable acceptance 이후 Worker가 비동기로 결제를 처리해 외부 PG 지연·폭주의 전파를 막는다.
 대표 normal workload는 관심 사용자 50,000명·초기 stock 1,000개·인당 최대 1개이며,

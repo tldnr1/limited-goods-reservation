@@ -10,7 +10,13 @@ function Verify($expected) {
     $result=Get-Content "$directory/result.json" -Raw | ConvertFrom-Json
     if ($result.status -ne $expected) { throw "Expected $expected, got $($result | ConvertTo-Json -Depth 6)" }
 }
+function Boundary($value,$name,$time) {
+    Json @{metric='hikaricp_connections_timeout_total';boundaryRequestedAt=$time;timestamp=$time+1;
+        series=@('reservation:8080','payment:8080','worker:8080','mock-pg:8080' | ForEach-Object { @{instance=$_;pool='HikariPool-1';value=$value;scrapedAt=$time+0.5} })} $name
+}
 try {
+    Boundary 0 'boundary-before.json' 1799999998
+    Boundary 0 'boundary-after.json' 1800000061
     Json @{scenario='worker';variant='normal';mockPgDelayMs=0;rps=40;durationSeconds=60} 'config.json'
     Json @{status='collected';measurementStart=1800000000;arrivalEnd=1800000060} 'phases.json'
     $state=@{at='2027-01-15T08:00:01Z';inventoryViolations=0;userLimitViolations=0;holdViolations=0;duplicateSuccess=0;waitingDbConnections=0;confirmed=2400;succeeded=2400;pending=0;failed=0;oldestPendingSeconds=0;successAccepted=2400;successConfirmed=2400;successPending=0;successDeadlineViolations=0;terminalEvidenceMissing=0}
@@ -61,11 +67,32 @@ try {
     Verify 'failed'
     $metrics.target_payment_accepted_ms.thresholds.'p(95)<=1000'.ok=$true
     Json @{metrics=$metrics} 'k6-summary.json'
-    $series[-1].values[-1][1]='1'
+    # A-F: range remains flat throughout; only explicit boundary is authoritative.
+    $series[-1].values[0][1]='1'; $series[-1].values[-1][1]='1'
     Json @{status='success';data=@{result=$series}} 'prometheus.json'
+    foreach ($case in @(@(0,0,'requires_review'),@(0,1,'failed'),@(3,3,'requires_review'),@(3,4,'failed'),@(3,2,'failed'))) {
+        Boundary $case[0] 'boundary-before.json' 1799999998
+        Boundary $case[1] 'boundary-after.json' 1800000061
+        Verify $case[2]
+        if ($case[2] -eq 'failed') {
+            $latest=Get-Content "$directory/result.json" -Raw | ConvertFrom-Json
+            if (-not ($latest.issues -like '*Hikari timeout boundary delta*')) { throw 'Boundary regression did not detect delta' }
+        }
+    }
+    Boundary 0 'boundary-before.json' 1799999998
+    Boundary 0 'boundary-after.json' 1800000061
+    $boundary=Get-Content "$directory/boundary-after.json" -Raw | ConvertFrom-Json
+    $boundary.series[0].pool='replacement-pool'; Json $boundary 'boundary-after.json'; Verify 'failed'
+    $boundary.series[0].pool='HikariPool-1'; $boundary.series=$boundary.series[0..2]
+    Json $boundary 'boundary-after.json'; Verify 'failed'
+    Boundary 0 'boundary-after.json' 1800000061
+    # A wider diagnostic range must not override this trial's stable boundary.
+    $series[-1].values[-1][1]='2'
+    Json @{status='success';data=@{result=$series}} 'prometheus.json'
+    Verify 'requires_review'
+    Remove-Item -LiteralPath "$directory/boundary-after.json"
     Verify 'failed'
-    $series[-1].values[-1][1]='0'
-    Json @{status='success';data=@{result=$series}} 'prometheus.json'
+    Boundary 0 'boundary-after.json' 1800000061
     $metrics.target_payment_ms=@{values=@{'p(95)'=9000}}
     Json @{metrics=$metrics} 'k6-summary.json'
     Verify 'requires_review'
@@ -110,6 +137,11 @@ try {
     Add-Content "$directory/raw.json" '{"type":"Point","metric":"target_latency","data":{"value":3000,"tags":{"stage":"warmup_4"}}}'
     $series[-1].values[0][1]='2'; $series[-1].values[-1][1]='2'
     Json @{status='success';data=@{result=$series}} 'prometheus.json'
+    Verify 'passed'
+    Boundary 1 'boundary-after.json' 1800000061
+    Verify 'failed' # Warmup receives the identical hard delta check.
+    Boundary 3 'boundary-before.json' 1799999998
+    Boundary 3 'boundary-after.json' 1800000061
     Verify 'passed'
     $metrics.target_unexpected.thresholds.'rate==0'.ok=$false
     Json @{metrics=$metrics} 'k6-summary.json'

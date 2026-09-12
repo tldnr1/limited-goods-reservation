@@ -105,7 +105,7 @@ try {
         New-Item -ItemType Directory -Path "$testRoot/$path" -Force | Out-Null
     }
     Copy-Item "$sourceRoot/ops/performance.ps1","$sourceRoot/ops/reset-db.ps1" "$testRoot/ops"
-    Copy-Item "$PSScriptRoot/target.ps1","$PSScriptRoot/target-trial.ps1","$PSScriptRoot/target-warmup-cleanup.ps1","$PSScriptRoot/target-state.sql","$PSScriptRoot/target-timeline.sql" "$testRoot/ops/performance"
+    Copy-Item "$PSScriptRoot/target.ps1","$PSScriptRoot/target-trial.ps1","$PSScriptRoot/target-hikari.ps1","$PSScriptRoot/target-warmup-cleanup.ps1","$PSScriptRoot/target-state.sql","$PSScriptRoot/target-timeline.sql" "$testRoot/ops/performance"
     Set-Content "$testRoot/gradlew.bat" '@exit /b 0'
     Set-Content "$testRoot/build/libs/limited-goods.jar" 'offline-jar'
     Set-Content "$testRoot/k6/target/offline.js" '// Never executed'

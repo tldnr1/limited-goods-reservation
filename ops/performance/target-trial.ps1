@@ -1,3 +1,5 @@
+. "$PSScriptRoot/target-hikari.ps1"
+
 function Wait-TargetSuccessDrain([string]$directory) {
     # Keep the baseline observation window, then bound SUCCESS drain by actual DB deadlines.
     Start-Sleep -Seconds 30
@@ -89,6 +91,7 @@ COMMIT;
     }
     if (-not (Test-Path "$directory/observer-ready")) { throw 'Observer readiness timed out' }
     $network=@((Invoke-Docker @('inspect',$ids.nginx) | ConvertFrom-Json))[0].NetworkSettings.Networks.PSObject.Properties.Name | Select-Object -First 1
+    Save-TargetHikariBoundary "$directory/boundary-before.json"
     $loadStarted=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     Save-Json @{observationStart=$observationStart;dockerStart=$loadStarted;status='running'} "$directory/phases.json"
     $arguments=@('run','--rm','--name',$generatorName,'--network',$network,'--cpus','1.5','--memory','1g',
@@ -102,6 +105,7 @@ COMMIT;
     Set-Content "$directory/k6-exit.txt" $loadExit
     $loadFinished=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     $drainReason=Wait-TargetSuccessDrain $directory
+    Save-TargetHikariBoundary "$directory/boundary-after.json"
     $match=Select-String -Path "$directory/k6.log" -Pattern 'TARGET_MEASUREMENT_START=(\d+)' | Select-Object -First 1
     if (-not $match) { throw 'k6 measurement boundary missing' }
     $measurementStart=[double]$match.Matches[0].Groups[1].Value / 1000
