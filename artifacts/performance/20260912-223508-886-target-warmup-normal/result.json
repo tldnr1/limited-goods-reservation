@@ -1,0 +1,66 @@
+{
+  "capacity": {
+    "backlogSlope": 0.09047814078278069,
+    "maxPending": 7.0,
+    "confirmedPerSecond": 6.635063657403918,
+    "acceptedPerSecond": 6.725541798186698,
+    "maxOldestSeconds": 1.086315,
+    "sampleSeconds": 33.15718
+  },
+  "saleAlignmentSeconds": null,
+  "issues": [
+    "k6 exited nonzero",
+    "Missing/failed threshold: target_payment_rejected: rate==0",
+    "Missing/failed threshold: target_unexpected: rate==0",
+    "target_payment_rejected: rate==0",
+    "target_unexpected: rate==0",
+    "HTTP/DB payment count mismatch: accepted=260, confirmed=262, succeeded=262. Check response loss/retries.",
+    "Warmup must durably confirm every actual arrival: started=273, held=273, accepted=260, orders=273, attempts=262, confirmed=262",
+    "Hikari timeout boundary delta must be zero (increase/reset): [\"payment:8080\",\"HikariPool-1\"] delta=13"
+  ],
+  "automatedChecksPassed": false,
+  "warmupWindows": [
+    {
+      "backlog": [
+        {
+          "at": "2026-09-12T22:38:12.038355+09:00",
+          "pending": 0,
+          "oldestPendingSeconds": 0
+        },
+        {
+          "at": "2026-09-12T22:38:17.808163+09:00",
+          "pending": 1,
+          "oldestPendingSeconds": 0.060332
+        }
+      ],
+      "httpSamples": 463,
+      "stage": "warmup_3",
+      "p95": 56.270407,
+      "p99": 165.51739
+    },
+    {
+      "backlog": [
+        {
+          "at": "2026-09-12T22:38:23.412963+09:00",
+          "pending": 1,
+          "oldestPendingSeconds": 0.168171
+        },
+        {
+          "at": "2026-09-12T22:38:28.679949+09:00",
+          "pending": 3,
+          "oldestPendingSeconds": 0.151145
+        }
+      ],
+      "httpSamples": 489,
+      "stage": "warmup_4",
+      "p95": 23.586693,
+      "p99": 78.994854
+    }
+  ],
+  "status": "failed",
+  "manualReview": [
+    "Inspect per-endpoint/status p95/p99, 429/503, READY versus actual purchase rate, Redis latency/CPU, DB lock/Hikari and generator resources.",
+    "Sustained capacity needs stable backlog/age within the supply window and 3 independent trials; drain alone is insufficient. Worker contract is SUCCESS confirmation deadlines and recovering backlog, not fixed jobs/s.",
+    "For return/late/PG scenarios inspect timeline and state samples. Sampled projection timing is not an exact release-event timestamp; do not certify <=5s from coarse samples."
+  ]
+}

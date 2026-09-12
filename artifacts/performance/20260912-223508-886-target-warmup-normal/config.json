@@ -1,0 +1,18 @@
+{
+  "variant": "normal",
+  "reset": true,
+  "durationSeconds": 40,
+  "scenario": "warmup",
+  "vus": 40,
+  "users": 270,
+  "stock": 400,
+  "seed": 20260911,
+  "reservationRate": 25,
+  "maxVus": 40,
+  "mockPgDelayMs": 0,
+  "waitingRate": 25,
+  "rps": 10,
+  "runId": "3fca84996d5a4db0ac2b2c956916aa9d-warmup",
+  "permits": 8,
+  "paymentRps": 40
+}
