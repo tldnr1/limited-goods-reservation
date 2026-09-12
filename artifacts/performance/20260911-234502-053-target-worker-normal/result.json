@@ -1,0 +1,24 @@
+{
+  "capacity": null,
+  "issues": [
+    "k6 exited nonzero",
+    "Missing/failed threshold: target_unexpected: rate<=0.001",
+    "Missing/failed threshold: target_payment_rejected: rate==0",
+    "Missing/failed threshold: target_payment_ms: p(95)<=1000",
+    "Missing/failed threshold: dropped_iterations: count==0",
+    "target_unexpected: rate<=0.001",
+    "dropped_iterations: count==0",
+    "target_payment_ms: p(95)<=1000",
+    "target_payment_rejected: rate==0",
+    "Actual arrivals differ from configured workload",
+    "Accepted payments not fully confirmed after drain",
+    "Review incomplete: 다음 오류로 JSON 변환에 실패했습니다. Unexpected end when deserializing object. Path 'inventory[0]', line 1, position 687."
+  ],
+  "automatedChecksPassed": false,
+  "manualReview": [
+    "Inspect per-endpoint/status p95/p99, 429/503, READY versus actual purchase rate, Redis latency/CPU, DB lock/Hikari and generator resources.",
+    "Sustained capacity needs stable backlog/age within the supply window and 3 independent trials; drain alone is insufficient. Worker 32/s required, 40/s normal target.",
+    "For return/late/PG scenarios inspect timeline and state samples. Sampled projection timing is not an exact release-event timestamp; do not certify <=5s from coarse samples."
+  ],
+  "status": "failed"
+}

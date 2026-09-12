@@ -1,0 +1,17 @@
+{
+  "runId": "585cf2a796f14eb38b80660703cc013b",
+  "scenario": "worker",
+  "variant": "normal",
+  "rps": 10,
+  "durationSeconds": 30,
+  "stock": 1000,
+  "users": 50000,
+  "paymentRps": 40,
+  "vus": 10,
+  "maxVus": 50,
+  "waitingRate": 25,
+  "reservationRate": 25,
+  "permits": 8,
+  "seed": 20260911,
+  "reset": true
+}

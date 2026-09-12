@@ -1,0 +1,3 @@
+{"container":{"BlockIO":"49.5MB / 0B","CPUPerc":"2.48%","Container":"b2b6cc419f59","ID":"b2b6cc419f59","MemPerc":"1.86%","MemUsage":"19MiB / 1GiB","Name":"goods-target-k6","NetIO":"29.2kB / 32.6kB","PIDs":"17"},"at":"2026-09-11T14:47:41.0846777+00:00"}
+{"container":{"BlockIO":"49.5MB / 0B","CPUPerc":"2.44%","Container":"b2b6cc419f59","ID":"b2b6cc419f59","MemPerc":"1.91%","MemUsage":"19.6MiB / 1GiB","Name":"goods-target-k6","NetIO":"79.7kB / 78.5kB","PIDs":"17"},"at":"2026-09-11T14:47:50.6259888+00:00"}
+{"container":{"BlockIO":"49.5MB / 0B","CPUPerc":"2.40%","Container":"b2b6cc419f59","ID":"b2b6cc419f59","MemPerc":"1.96%","MemUsage":"20.08MiB / 1GiB","Name":"goods-target-k6","NetIO":"118kB / 122kB","PIDs":"17"},"at":"2026-09-11T14:48:00.2167836+00:00"}

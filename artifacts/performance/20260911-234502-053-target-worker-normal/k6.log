@@ -1,0 +1,113 @@
+
+         /\      Grafana   /?얄?  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ?얄? 
+  /          \   |   (  |  (??  |
+ / __________ \  |_|\_\  \_____/ 
+
+     execution: local
+        script: /scripts/worker.js
+        output: json (/results/raw.json)
+
+     scenarios: (100.00%) 1 scenario, 50 max VUs, 7m30s max duration (incl. graceful stop):
+              * payments: 10.00 iterations/s for 30s (maxVUs: 10-50, exec: pay, gracefulStop: 7m0s)
+
+time="2026-09-11T14:47:37Z" level=info msg="TARGET_MEASUREMENT_START=1789138057548" source=console
+
+running (0m01.0s), 10/10 VUs, 0 complete and 0 interrupted iterations
+payments   [   3% ] 10/10 VUs  01.0s/30s  10.00 iters/s
+
+running (0m02.0s), 15/15 VUs, 0 complete and 0 interrupted iterations
+payments   [   7% ] 15/15 VUs  02.0s/30s  10.00 iters/s
+
+running (0m03.0s), 20/20 VUs, 0 complete and 0 interrupted iterations
+payments   [  10% ] 20/20 VUs  03.0s/30s  10.00 iters/s
+
+running (0m04.0s), 15/23 VUs, 12 complete and 0 interrupted iterations
+payments   [  13% ] 15/23 VUs  04.0s/30s  10.00 iters/s
+
+running (0m05.0s), 18/23 VUs, 19 complete and 0 interrupted iterations
+payments   [  17% ] 18/23 VUs  05.0s/30s  10.00 iters/s
+time="2026-09-11T14:47:42Z" level=warning msg="Request Failed" error="Post \"http://checkout-nginx/api/orders/fcd59f1d-fb2c-46ec-927f-932561e8be7b/payments\": request timeout"
+time="2026-09-11T14:47:42Z" level=warning msg="Request Failed" error="Post \"http://checkout-nginx/api/orders/7f58aaa0-0158-43dc-87d4-1e57cbfe6520/payments\": request timeout"
+time="2026-09-11T14:47:42Z" level=warning msg="Request Failed" error="Post \"http://checkout-nginx/api/orders/1f9226bc-547e-4d02-93ac-e7dfbd588857/payments\": request timeout"
+time="2026-09-11T14:47:43Z" level=warning msg="Request Failed" error="Post \"http://checkout-nginx/api/orders/b83c8e8e-2b9b-4d91-a8f6-f930bb879b41/payments\": request timeout"
+
+running (0m06.0s), 18/23 VUs, 29 complete and 0 interrupted iterations
+payments   [  20% ] 18/23 VUs  06.0s/30s  10.00 iters/s
+
+running (0m07.0s), 19/23 VUs, 38 complete and 0 interrupted iterations
+payments   [  23% ] 19/23 VUs  07.0s/30s  10.00 iters/s
+
+running (0m08.0s), 19/23 VUs, 48 complete and 0 interrupted iterations
+payments   [  27% ] 19/23 VUs  08.0s/30s  10.00 iters/s
+
+running (0m09.0s), 13/23 VUs, 64 complete and 0 interrupted iterations
+payments   [  30% ] 13/23 VUs  09.0s/30s  10.00 iters/s
+
+running (0m10.0s), 06/23 VUs, 81 complete and 0 interrupted iterations
+payments   [  33% ] 06/23 VUs  10.0s/30s  10.00 iters/s
+
+running (0m11.0s), 00/23 VUs, 97 complete and 0 interrupted iterations
+payments   [  37% ] 00/23 VUs  11.0s/30s  10.00 iters/s
+
+running (0m12.0s), 00/23 VUs, 107 complete and 0 interrupted iterations
+payments   [  40% ] 00/23 VUs  12.0s/30s  10.00 iters/s
+
+running (0m13.0s), 00/23 VUs, 117 complete and 0 interrupted iterations
+payments   [  43% ] 00/23 VUs  13.0s/30s  10.00 iters/s
+
+running (0m14.0s), 00/23 VUs, 127 complete and 0 interrupted iterations
+payments   [  47% ] 00/23 VUs  14.0s/30s  10.00 iters/s
+
+running (0m15.0s), 00/23 VUs, 137 complete and 0 interrupted iterations
+payments   [  50% ] 00/23 VUs  15.0s/30s  10.00 iters/s
+
+running (0m16.0s), 00/23 VUs, 147 complete and 0 interrupted iterations
+payments   [  53% ] 00/23 VUs  16.0s/30s  10.00 iters/s
+
+running (0m17.0s), 00/23 VUs, 157 complete and 0 interrupted iterations
+payments   [  57% ] 00/23 VUs  17.0s/30s  10.00 iters/s
+
+running (0m18.0s), 00/23 VUs, 167 complete and 0 interrupted iterations
+payments   [  60% ] 00/23 VUs  18.0s/30s  10.00 iters/s
+
+running (0m19.0s), 00/23 VUs, 177 complete and 0 interrupted iterations
+payments   [  63% ] 00/23 VUs  19.0s/30s  10.00 iters/s
+
+running (0m20.0s), 00/23 VUs, 187 complete and 0 interrupted iterations
+payments   [  67% ] 00/23 VUs  20.0s/30s  10.00 iters/s
+
+running (0m21.0s), 00/23 VUs, 197 complete and 0 interrupted iterations
+payments   [  70% ] 00/23 VUs  21.0s/30s  10.00 iters/s
+
+running (0m22.0s), 00/23 VUs, 207 complete and 0 interrupted iterations
+payments   [  73% ] 00/23 VUs  22.0s/30s  10.00 iters/s
+
+running (0m23.0s), 00/23 VUs, 217 complete and 0 interrupted iterations
+payments   [  77% ] 00/23 VUs  23.0s/30s  10.00 iters/s
+
+running (0m24.0s), 00/23 VUs, 227 complete and 0 interrupted iterations
+payments   [  80% ] 00/23 VUs  24.0s/30s  10.00 iters/s
+
+running (0m25.0s), 00/23 VUs, 237 complete and 0 interrupted iterations
+payments   [  83% ] 00/23 VUs  25.0s/30s  10.00 iters/s
+
+running (0m26.0s), 00/23 VUs, 247 complete and 0 interrupted iterations
+payments   [  87% ] 00/23 VUs  26.0s/30s  10.00 iters/s
+
+running (0m27.0s), 00/23 VUs, 257 complete and 0 interrupted iterations
+payments   [  90% ] 00/23 VUs  27.0s/30s  10.00 iters/s
+
+running (0m28.0s), 00/23 VUs, 267 complete and 0 interrupted iterations
+payments   [  93% ] 00/23 VUs  28.0s/30s  10.00 iters/s
+
+running (0m29.0s), 00/23 VUs, 277 complete and 0 interrupted iterations
+payments   [  97% ] 00/23 VUs  29.0s/30s  10.00 iters/s
+
+running (0m30.0s), 00/23 VUs, 287 complete and 0 interrupted iterations
+payments   [ 100% ] 00/23 VUs  30.0s/30s  10.00 iters/s
+
+running (0m30.1s), 00/23 VUs, 288 complete and 0 interrupted iterations
+payments ??[ 100% ] 00/23 VUs  30s  10.00 iters/s
+time="2026-09-11T14:48:07Z" level=error msg="thresholds on metrics 'dropped_iterations, target_payment_ms, target_payment_rejected, target_unexpected' have been crossed"

@@ -1,0 +1,7 @@
+Exception: D:\Code\limited-goods-reservation\ops\performance\target.ps1:185
+Line |
+ 185 |  … "$directory/observer-error.txt")) { throw 'Observer startup failed' }
+     |                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~에서
+     | Observer startup failed
+
+

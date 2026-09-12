@@ -1,0 +1,6 @@
+Get-Content: 
+Line |
+   9 |          $db=Get-Content "$PSScriptRoot/target-state.sql" -Raw | & doc …
+     |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~에서
+     | 경로 'D:\target-state.sql'이(가) 없으므로 찾을 수 없습니다.
+
