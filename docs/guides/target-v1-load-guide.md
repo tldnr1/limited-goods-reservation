@@ -1,8 +1,9 @@
 # Target v1 단계별 부하 실행 가이드
 
-이 문서는 **사용자가 실행할 Target 전용 절차**다. 자동화 작성 과정에서는 k6, 반복 HTTP, 포화 시험,
-실제 300초 대기를 실행하지 않았다. 실행 경로와 수집기는 정적·오프라인 검증 대상이며 실제 컨테이너 부하로 검증되지는 않았다.
-과거 baseline 명령은 [load-test-guide](load-test-guide.md), 시나리오 그림은 [아키텍처 위의 부하 흐름](target-v1-load-scenario.md)을 본다.
+이 문서는 **사용자가 실행할 Target 전용 절차**다. 과거 cold Worker와 첫 단계형 Warmup을 실제 실행했으며,
+[2026-09-12 Warmup](../reviews/warmup-20260912-review.md)은 Payment 초기 오류로 실패했다.
+건수 판정 수정 후 동일 조건 재실행, embedded warmup 통과 후 측정, 성능 목표 달성 및 실제 300초 반환 시험은 아직 대기 중이다.
+과거 baseline 명령은 [load-test-guide](load-test-guide.md), 시나리오 그림은 [아키텍처 위의 부하 흐름](../architecture/target-v1-load-scenario.md)을 본다.
 
 ## 1. 실행 경계
 
@@ -76,15 +77,17 @@ Cold-start 결과도 deployment/startup characteristic으로 보존하고 steady
 
 ### Stage 0과 embedded warmup
 
-`-Scenario warmup`은 2/s×10초 → 5/s×10초 → 10/s×10초 → 10/s×10초의 신규 사용자 270명을 실행한다.
+`-Scenario warmup`은 2/s×10초 → 5/s×10초 → 10/s×10초 → 10/s×10초의 계획상 신규 사용자 270명을 실행한다.
 각 구간 preAllocatedVUs=maxVUs=40, warmup stock=400이며 측정용 Stock/Vus와 분리한다.
 실제 Waiting→READY→purchase→HELD 직후 SUCCESS 202→Worker→Mock PG→CONFIRMED 경로를 검증한다.
 Business think time은 적용하지 않는다. Stage 0 앞에 embedded warmup을 중복 실행하지 않는다.
 
 `pwsh -NoProfile -File ./ops/performance.ps1 -Mode target -Action Run -Reset -Scenario warmup`
 
-PASS는 정확한 270명 유입, dropped/unexpected/Hikari timeout delta/restart/OOM/불변식 위반=0,
-270개 구매·결제의 durable state와 CONFIRMED 연결, pending=0 및 SUCCESS deadline 위반=0이다.
+도착 수 검사는 constant-arrival-rate 시나리오별 종료 경계의 추가 1회를 허용한다. Warmup은 270~274회,
+Business는 계획 수+0~3회(abandon은 +0~4회), Isolation은 +0~2회, 단일 시나리오는 +0~1회다.
+계획보다 적은 도착이나 dropped는 허용하지 않는다. PASS는 실제 시작 수=완료 수=구매 수=결제 접수 수=DB 주문·시도·CONFIRMED 수,
+dropped/unexpected/Hikari timeout delta/restart/OOM/불변식 위반=0, pending=0 및 SUCCESS deadline 위반=0이다.
 Latency는 PASS threshold가 아니며 마지막 두 10/s 구간의 HTTP p95/p99와 backlog 표본은 result.json의 warmupWindows로 남긴다.
 이는 저부하 hot path를 반복해 본 측정을 시작할 상태를 만든 증거이며 JIT 완전 최적화나 capacity 인증이 아니다.
 
@@ -96,7 +99,7 @@ process start/restart는 각 trial의 Prometheus window에서 별도로 확인�
 
 Embedded warmup PASS 후 sale 한정 FK 순서 삭제 → goods:perf:* Redis 정리 → 측정 fixture 생성 순서다.
 Catalog publisher의 shared transaction advisory lock과 cleanup의 exclusive lock(74190321)이 이전 projection 완료를 기다려 재발행 race를 막는다.
-Cleanup은 perf DB·단일 warmup sale·270 CONFIRMED를 검사한다. reset-db/Compose 재기동은 사용하지 않는다.
+Cleanup은 perf DB·단일 warmup sale과 실제 시작 수만큼의 전체 주문·CONFIRMED·성공 결제 시도를 검사한다. reset-db/Compose 재기동은 사용하지 않는다.
 Measured before-db/observer/Prometheus window는 정리 후 시작하며 warmup 누적 counter는 delta로 분리한다.
 Warmup/본 측정 k6 이름은 각각 goods-target-warmup-k6 / goods-target-k6이며 실패/중단 시 해당 child와 observer를 정리한다.
 
@@ -112,7 +115,7 @@ Delay는 store.accept의 durable receipt commit 이후, 응답/LOST_RESPONSE 이
 
 | 단계 / 실행 파일 | 공급 방법 | 분리하는 것 / 한계 |
 |---|---|---|
-| warmup / `k6/target/warmup.js` | 고정 270명·stock 400·4단계 저부하 | cold-start부터 실제 hot path를 검증하는 Stage 0. capacity SLO 아님 |
+| warmup / `k6/target/warmup.js` | 계획 270명(도착 허용 270~274회)·stock 400·4단계 저부하 | cold-start부터 실제 hot path를 검증하는 Stage 0. capacity SLO 아님 |
 | worker / `k6/target/worker.js` | SQL로 미결제 HELD 주문을 준비하고 Payment API에 `Rps`건/초 접수 | READY·구매 gate를 경유하지 않는 기존 주문. Worker+DB+Mock PG와 Payment 접수 경로의 용량. API 공급 자체가 막히면 Worker 단독 한계라고 해석하지 않음 |
 | waiting / `k6/target/waiting.js` | 초당 `Rps`명의 새 브라우저가 join 후 Retry-After+jitter로 poll | 구매/결제 없음. READY는 미사용 만료. `abandon`이면 절반이 join 직후 이탈 |
 | reservation / `k6/target/reservation.js` | 새 브라우저 → 실제 Waiting READY → 명시적 purchase | 충분한 재고, 결제 없음. 대기 시간을 purchase HTTP 지연과 분리. READY 공급 부족이면 DB 포화점으로 해석하지 않음 |
@@ -193,8 +196,8 @@ PG 컨테이너 중지/네트워크 단절/프로세스 kill은 수행하지 않
 
 ## 4. 수집 지표와 판정
 
-다음 표는 새 계약에 맞춘 자동 검사다. 실제 Docker+k6 통합/성능은 미검증이며 capacity는 자동 PASS로 선언하지 않는다.
-역할별 계약의 기준은 [Target v1 SLO](target-v1.md#성능-계약과-측정-조건)다. Primary latency는 variant=normal 및 MockPgDelayMs=0일 때만 적용한다.
+다음 표는 새 계약에 맞춘 자동 검사다. 실제 실패 실행은 보존하지만 새 warmup/steady-state 계약의 통과는 미검증이며 capacity는 자동 PASS로 선언하지 않는다.
+역할별 계약의 기준은 [Target v1 SLO](../architecture/target-v1.md#성능-계약과-측정-조건)다. Primary latency는 variant=normal 및 MockPgDelayMs=0일 때만 적용한다.
 
 | 단계 | 주요 지표 | 자동 검사 (normal/delay 0 latency) | 확정한 SLO / 추가 판정 |
 |---|---|---|---|
@@ -264,15 +267,16 @@ Redis catalog와 poll 응답 시간을 대조한다. 재고가 원래 남아 있
 | phases.json | 관측 시작, k6 setup 시각, 공급 종료, 전체 브라우저 종료, drain 종료. 공급 구간과 grace/drain을 분리 |
 | k6.log / k6-exit.txt / k6-summary.json / raw.json | 실행 로그·threshold 결과·요청 및 사용자 지표. raw의 endpoint/status 태그로 성공/거절 p95/p99·초당 유입 계산 |
 | db-samples.jsonl / before-db.json / after-db.json | confirmed/pending/oldest age·락 waiter·DB 활동·판매별 재고·정합성 |
-| timeline.json | 주문 생성/300초 만료/결제 접수/최초 PG 시각과 결과. 정확한 최종 확정 시각 필드는 없음 |
+| timeline.json | 주문 생성/점유 만료/결제 접수/최초 PG 시각·결과와 terminal_at/confirmation_deadline. terminal_at은 결과 반영 트랜잭션 안에서 기록하며 DB commit timestamp 자체는 아님 |
 | redis-samples.jsonl / redis-slowlog.txt | INFO, queue/READY/live/stale 수, catalog 값, slowlog. 응답 손실·정리 제한과 자원 비용 해석 |
 | resources.jsonl / generator-resources.jsonl / before-containers.json / after-containers.json | 서비스/생성기 CPU·memory·network, 컨테이너 ID·재시작·OOM |
 | prometheus.json | Waiting 2개·Reservation·Payment·Worker·Mock PG의 HTTP/JVM/process/Hikari/Worker histogram 시계열 |
+| boundary-before.json / boundary-after.json | 각 trial의 k6 직전 / bounded drain 이후 Hikari instant snapshot. 네 DB 역할의 instance+pool별 delta=0, 경계 이후 scrape·누락·불일치·counter 감소 검사 |
 | observer.log / observer-error.txt / collection-errors.txt / error.txt / services.log | 관측기·실행·서비스 오류. 최초 오류와 후속 수집 오류를 함께 보존 |
-| result.json | 자동 검사 실패 또는 **requires_review**. 단독으로 성능 합격을 선언하지 않음 |
+| result.json | 실패는 **failed**, warmup 자동 검증 통과는 **passed**, 다른 시나리오는 **requires_review**. capacity 합격은 별도 수동 판정 |
 
 Prometheus scrape/query step은 1초다. 별도 표본 수집은 component에서 작업 완료 후 5초,
-Business에서 1초 쉬므로 **실제 간격은 Docker/SQL 명령 시간만큼 더 길다**. 각 파일의 실제 timestamp를 사용한다.
+Business/Warmup에서 1초 쉬므로 **실제 간격은 Docker/SQL 명령 시간만큼 더 길다**. 각 파일의 실제 timestamp를 사용한다.
 관측 SQL은 perf 연결 하나씩을 쓰고 집계를 실행하며 Redis 관측 EVAL도 commandstats에 포함된다.
 관측 비용을 제외한 순수 제품 CPU라고 주장하지 않는다. 동등 비교에서는 설정을 고정한다.
 Redis INFO latency는 누적 지표이고 slowlog에 항목이 없다는 것이 지연 0을 뜻하지 않는다.
@@ -280,7 +284,7 @@ Redis INFO latency는 누적 지표이고 slowlog에 항목이 없다는 것이 
 DB 표본은 SQL 결과 전체를 JSON으로 검증한 뒤 한 줄로 직렬화한다. 여러 재고 행이 있는 경우에도 JSONL 한 줄은 표본 하나다.
 HTTP에서 관측한 202 건수와 DB 확정 건수의 불일치는 응답 유실 가능성과 함께 확인한다.
 DB 확정 건수가 더 많다는 이유만으로 Worker 미처리라고 해석하지 않으며, 자동 건수 대조 실패는 유지한다.
-첫 Worker 실행의 JSONL 수정 및 실제 초기 요청 실패 분석은 [실행 분석](../artifacts/target-v1/20260911-worker-diagnosis/review.md)을 참고한다.
+첫 Worker 실행의 JSONL 수정 및 실제 초기 요청 실패 분석은 [실행 분석](../../artifacts/target-v1/20260911-worker-diagnosis/review.md)을 참고한다.
 
 ```powershell
 # 저장한 결과만 다시 판정. Docker/HTTP/k6 호출 없음.
@@ -299,13 +303,16 @@ pwsh -File ./ops/performance/target-review.ps1 -Directory ./artifacts/performanc
 pwsh -NoProfile -File ./ops/performance/target-command-test.ps1
 pwsh -NoProfile -File ./ops/performance/target-lifecycle-test.ps1
 pwsh -NoProfile -File ./ops/performance/target-review-test.ps1
+pwsh -NoProfile -File ./ops/performance/target-hikari-test.ps1
 pwsh -NoProfile -File ./ops/performance/target-warmup-test.ps1
 node --experimental-vm-modules ./ops/performance/target-static-test.mjs
 ```
 
 - command: Docker 함수 이름 충돌, Check 호출/인자 전달, 작업 디렉터리·환경 복원, 실패 시 중단을 모의 검사한다.
 - lifecycle: 임시 workspace에서 Docker/HTTP/Git과 빌드를 대체해 단일 기동·무빌드 재실행·상태 보존·초기화 순서·실패 차단·수집 잠금을 검사한다. 실제 부하 진입 전 멈춘다.
-- review: 정상 자료의 수동 판정 유지, 미확정·threshold 실패/누락·Hikari timeout·증거 누락을 검사한다.
+- review: 실제 도착 수 전체의 완료·영속 상태 대조, 시나리오별 경계 추가 허용, 누락·과다 도착·threshold 실패·Hikari delta·증거 누락을 검사한다.
+- hikari: fresh instant snapshot, bounded retry, baseline 실패 시 load 차단과 warmup/measurement 독립 경계를 검사한다.
+- warmup: 실제 시작 수 기준 cleanup guard, 실패 warmup의 측정 진입 차단 및 bounded drain을 검사한다.
 - static: k6 모듈·HTTP·시계·sleep을 대체해 각 시나리오와 재시도·입장권·300초 시간 계약, 두 VU 문맥의 주문 파일 단일 로드·주문 선택을 검사한다.
 
 관측 작업의 실제 PowerShell 프로세스 경계는 아래 검사로 확인한다. Docker는 자식 프로세스에서도 모의 처리하며,

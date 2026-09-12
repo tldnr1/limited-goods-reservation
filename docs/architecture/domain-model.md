@@ -13,6 +13,8 @@ erDiagram
 sale_items는 현재 재고 수량과 가격/인당 제한을 함께 가진다.
 order_items는 주문 당시 단가와 수량을 고정한다. reservations는 주문 전체의 점유 기한을 가진다.
 payment_attempts는 재시도마다 별도 UUID와 상태/lease를 가진다.
+terminal_at은 SUCCEEDED/FAILED 결과 반영 시각이며 reservations.confirmation_deadline과 대조한다.
+이 값은 트랜잭션 내부 기록 시각으로 DB commit timestamp 자체는 아니다.
 
 DB CHECK로 음수 재고와 total 합계를 검사한다.
 UNIQUE(user_id,idempotency_key)로 구매 멱등성, UNIQUE(order_id,idempotency_key)로 결제 멱등성을 보강한다.

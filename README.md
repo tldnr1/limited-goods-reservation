@@ -12,9 +12,11 @@ PostgreSQL이 재고의 기준 상태를 보관하며, 선택적으로 Redis Lua
 ## Target v1 첫 구현
 
 대기/점유/결제/Worker 역할 분리, 300초 점유, 짧은 READY 입장권, Worker 연속 작업 공급을 추가했다.
-대규모 성능 목표는 아직 미검증이다. 계약·제약과 실행법은 [Target v1](docs/target-v1.md)을 따른다.
-성능 시험 준비는 [Target 단계별 실행 가이드](docs/target-v1-load-guide.md),
-부하가 지나가는 구조는 [Mermaid 시나리오](docs/target-v1-load-scenario.md)를 본다. 실제 Target 부하는 아직 실행 검증 전이다.
+대규모 성능 목표는 아직 미검증이다. 계약·제약과 실행법은 [Target v1](docs/architecture/target-v1.md)을 따른다.
+성능 시험 준비는 [Target 단계별 실행 가이드](docs/guides/target-v1-load-guide.md),
+부하가 지나가는 구조는 [Mermaid 시나리오](docs/architecture/target-v1-load-scenario.md)를 본다.
+첫 단계형 Warmup은 Payment 초기 오류로 실패했으며, 건수 판정 수정 후 재실행과 steady-state 성능 검증을 기다리고 있다.
+[실행 분석](docs/reviews/warmup-20260912-review.md)에 확인된 현상과 원인 후보를 구분했다.
 
 ```powershell
 .\ops\target.ps1 -Action Start
@@ -72,7 +74,7 @@ Mock PG 시나리오는 SUCCESS / FAILURE / DELAYED_SUCCESS / LOST_RESPONSE / UN
 ## DB와 초기화
 
 PostgreSQL 컨테이너 하나에 dev/test/perf DB를 분리한다. Redis 키는 goods:dev:, goods:test:, goods:perf:다.
-Flyway V1/V2는 각 DB에 첫 연결할 때 적용한다. Hibernate는 validate만 한다.
+Flyway는 각 DB에 연결할 때 아직 적용하지 않은 마이그레이션을 실행한다. Hibernate는 validate만 한다.
 Mock PG receipt는 해당 DB에 있으므로 DB 초기화와 함께 초기화된다.
 
 ```powershell
@@ -89,6 +91,8 @@ perf DB 최초 마이그레이션은 docker compose --env-file ops/perf.env up -
 
 ## 문서
 
+용도별 전체 문서는 [docs 목차](docs/README.md)에서 찾는다.
+
 읽기 전용 준비 확인: `pwsh -NoProfile -File ./ops/performance.ps1`.
 Target 준비 확인은 여기에 `-Mode target`을 추가한다. 아래 기본 명령은 baseline용이다.
 perf 초기화·기동과 단일 실험 기록은 같은 스크립트의 `Prepare` / `Run`으로 분리했다.
@@ -99,4 +103,4 @@ Target은 `Prepare`로 데이터 삭제 없이 배포하고, 반복 실험은 `R
 - [FastAPI 경험에서 Spring 코드 읽기](docs/learning.md)
 - [자원 예산·성능 목표·검증 범위](docs/performance.md)
 - [Java 성능 실험 결과와 분석](artifacts/performance/README.md)
-- [Git Bash에서 기능 확인과 향후 부하테스트 준비](docs/load-test-guide.md)
+- [Git Bash에서 기능 확인과 향후 부하테스트 준비](docs/guides/load-test-guide.md)

@@ -1,12 +1,12 @@
 # 부하테스트 실행 가이드 — Git Bash
 
 이 문서는 **baseline/gate 구매 실험**의 실행법과 이력을 보존한다. READY 입장권을 사용하는 Target v1은
-[별도 실행 가이드](target-v1-load-guide.md)와 [시나리오 아키텍처](target-v1-load-scenario.md)를 따른다.
+[별도 실행 가이드](target-v1-load-guide.md)와 [시나리오 아키텍처](../architecture/target-v1-load-scenario.md)를 따른다.
 아래 명령·수치를 Target의 단계별 부하나 측정 결과로 사용하지 않는다.
 
 300/300 고정 판정 수정 후 사용자 실행에서 워밍업 301건과 본 측정 602건이 모두 확정됐다.
 초기 지연은 예열 자료로 남기고, 응답 시간 목표는 본 측정에 적용한다.
-실행별 조건·결과·한계는 [실험 기록](../artifacts/performance/README.md)에 보존한다. 아래 실행 명령은 동일하다.
+실행별 조건·결과·한계는 [실험 기록](../../artifacts/performance/README.md)에 보존한다. 아래 실행 명령은 동일하다.
 
 ## 현재 준비된 것
 
@@ -14,7 +14,7 @@ Java/Spring 구매·점유·결제·만료, API 2개/Nginx/Worker/Mock PG,
 PostgreSQL의 dev/test/perf DB, Redis gate, 기능 테스트 22개가 있다.
 공통 실행은 `ops/performance.ps1`, 요청 패턴은 `k6/purchase-spike.js`와 `k6/capacity.js`가 담당한다.
 워밍업과 본 측정이 공유하는 요청 흐름은 `k6/lib/purchase-flow.js`에 있다.
-코드 읽기는 [learning.md](learning.md), 자원·합격 기준은 [performance.md](performance.md)를 본다.
+코드 읽기는 [learning.md](../learning.md), 자원·합격 기준은 [performance.md](../performance.md)를 본다.
 
 ## 1. 지금 가능한 읽기 전용 확인
 

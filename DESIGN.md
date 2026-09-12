@@ -1,6 +1,6 @@
 # 설계
 
-Target v1의 역할 분리·입장권과 현재 검증 범위는 [target-v1.md](docs/target-v1.md)를 따른다.
+Target v1의 역할 분리·입장권과 현재 검증 범위는 [target-v1.md](docs/architecture/target-v1.md)를 따른다.
 이 문서의 API1/API2 실행도는 오버레이 없는 baseline 구성이다.
 
 Java 21, Spring Boot 3.5.16, Spring MVC, JPA/Hibernate, HikariCP, Flyway를 사용한다.

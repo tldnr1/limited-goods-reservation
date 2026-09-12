@@ -1,5 +1,9 @@
 # 초기 지연을 구분하는 방법
 
+이 문서는 기존 **baseline harness**의 Diagnostics 절차다. Target의 역할별 자원·단계형 warmup과
+혼용하지 않는다. 현재 실행법은 [Target 가이드](target-v1-load-guide.md), 최근 Payment 초기 오류는
+[2026-09-12 분석](../reviews/warmup-20260912-review.md)을 따른다.
+
 AdmissionGate OFF, 구매 10 RPS/30초, VU 20, API별 Hikari 8/Tomcat 40, timeout 1초를 유지한다.
 Run -Diagnostics를 선택하면 구매별 단계 로그와 워밍업·본 측정 DB 관측기를 켠다. Check는 읽기 전용이다.
 이 옵션은 원인 진단용이다. 일반 capacity 탐색은 OFF로 수행하고, 경계 발견 후 같은 조건 또는 바로 아래 조건을
@@ -89,6 +93,6 @@ Nginx의 연결 수는 DB 풀/쿼리 비용을 의미하지 않는다. DB hot-ro
 
 근거: [nginx least_conn/random 공식 문서](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#random).
 변경 당시 nginx 1.28 이미지에서 -t 구문 검증을 수행했다. 후속 사용자 실행의 분포와 결과는
-[실험 기록](../artifacts/performance/README.md)에 보존하며 배정 변경 하나의 인과 효과로 단정하지 않는다.
+[실험 기록](../../artifacts/performance/README.md)에 보존하며 배정 변경 하나의 인과 효과로 단정하지 않는다.
 AdmissionGate, 풀·스레드·타임아웃, 워밍업 패턴, 구매 트랜잭션의 비즈니스 실행 순서는 유지한다.
 전후 효과를 분리하려면 같은 관측 조건의 fa3103f와 이후 커밋을 비교한다. 과거 미계측 실행과 직접 성능 향상을 주장하지 않는다.

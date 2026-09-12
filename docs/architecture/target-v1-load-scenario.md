@@ -1,7 +1,7 @@
 # Target v1 — 아키텍처 위에서 보는 부하 시나리오
 
 **현재 위치: 기능 구현·계약 검증 완료 → 단계별 성능 시험 준비. 아래 그림은 시험 설계이며 측정 결과가 아니다.**
-명령·수집 파일·판정 기준은 [Target 실행 가이드](target-v1-load-guide.md), 역할 계약은 [Target v1](target-v1.md)을 따른다.
+명령·수집 파일·판정 기준은 [Target 실행 가이드](../guides/target-v1-load-guide.md), 역할 계약은 [Target v1](target-v1.md)을 따른다.
 빨간 노드는 그 시험의 부하 발생원, 파란 노드는 주요 관측 대상이다. 점선은 fixture/주기 작업이다.
 모든 역할은 같은 호스트를 사용하며 PostgreSQL·CPU·메모리·네트워크를 공유한다.
 핵심 계약은 Waiting/READY에서 대량 유입을 흡수해 PostgreSQL 재고 경로의 진입률을 통제하고,

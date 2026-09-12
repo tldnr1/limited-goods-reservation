@@ -1,8 +1,8 @@
 # 포트폴리오 evidence / claim ledger
 
-기준선: `e217daa` 이후 Hikari boundary 보강까지 반영.
-발전 서사는 [portfolio-evolution](portfolio-evolution.md), 현재 성능 계약은 [performance](performance.md)를 따른다.
-**새 Target v1 steady-state 성능은 measurement pending이다. 이번 작업은 실제 부하를 실행하지 않았다.**
+기준선: Hikari boundary 보강(`33128be`), 2026-09-12 첫 Warmup 실패와 실제 도착 수 기준 판정까지 반영.
+발전 서사는 [portfolio-evolution](portfolio-evolution.md), 현재 성능 계약은 [performance](../performance.md)를 따른다.
+**새 Target v1 steady-state 성능은 measurement pending이다. 첫 Warmup은 실행했지만 실패했고, 건수 판정 수정 후 재실행은 대기 중이다.**
 
 - TYPE 1 — MEASURED: 실제 실험 또는 기능 검증에서 확인한 범위만 주장한다. 문제 재현도 포함하며 성능 개선과 구분한다.
 - TYPE 2 — IMPLEMENTED / PENDING MEASUREMENT: 설계·구현 사실만 주장한다. offline test 성공은 부하 효과의 실측이 아니다.
@@ -67,7 +67,7 @@
 - 문제 / 요구사항: 구매 성공부터 결제 접수·최종 확정까지 전체 흐름이 이어지는지 확인.
 - 당시 판단: 예열과 본 측정을 분리하고 실제 성공 수를 DB와 대조.
 - 변경 내용: baseline warmup 및 측정 evidence 수집. 실행 코드 `bcfebec`.
-- Evidence: [실행 분석](../artifacts/performance/20260909-204228-733-baseline-purchase-spike/review.md), [집계와 raw SHA-256](../artifacts/performance/20260909-204228-733-baseline-purchase-spike/measured-metrics.json), [최종 재고](../artifacts/performance/20260909-204228-733-baseline-purchase-spike/after-inventory.txt), [DB](../artifacts/performance/20260909-204228-733-baseline-purchase-spike/after-db.txt).
+- Evidence: [실행 분석](../../artifacts/performance/20260909-204228-733-baseline-purchase-spike/review.md), [집계와 raw SHA-256](../../artifacts/performance/20260909-204228-733-baseline-purchase-spike/measured-metrics.json), [최종 재고](../../artifacts/performance/20260909-204228-733-baseline-purchase-spike/after-inventory.txt), [DB](../../artifacts/performance/20260909-204228-733-baseline-purchase-spike/after-db.txt).
 - 측정 결과: warmup 10 RPS/30초 301건 후 본 측정 10 RPS/60초 602건 구매·접수·확정. purchase p99=17.75859996ms, payment acceptance p95=9.59478485ms. 오류/dropped=0. 본 측정 판매 sold=602/held=0, 전체 DB 903건은 warmup 301건을 포함한다.
 - 현재 안전하게 사용할 수 있는 문장: “Java baseline의 예열 후 10 RPS/60초 단일 실행에서 602건 모두 확정하고 구매 p99 17.76ms, 결제 접수 p95 9.59ms를 확인했다.”
 - 아직 사용하면 안 되는 문장: “최대 capacity를 입증했다.” “예열만으로 지연을 X% 개선했다.”
@@ -81,7 +81,7 @@
 - 문제 / 요구사항: 빠른 HTTP 접수가 판매 확정 용량을 의미하는지 확인.
 - 당시 판단: 접수 지연과 비동기 backlog·확정 시계열을 분리하고 dispatch 코드와 대조.
 - 변경 내용: capacity 검토에 pending·oldest age·최종 확정을 포함. 이후 immediate refill 구현 효과는 TYPE 2로 분리한다.
-- Evidence: [실행 조건](../artifacts/performance/20260909-230854-201-baseline-capacity/run.json), [결과](../artifacts/performance/20260909-230854-201-baseline-capacity/capacity-result.json), [HTTP summary](../artifacts/performance/20260909-230854-201-baseline-capacity/summary.json), [시계열](../artifacts/performance/20260909-230854-201-baseline-capacity/order-progress.txt), [당시 Worker](https://github.com/tldnr1/limited-goods-reservation/blob/76183486371c2ce60eab98d173c9c9dad67ded8d/src/main/java/com/limitedgoods/worker/Worker.java).
+- Evidence: [실행 조건](../../artifacts/performance/20260909-230854-201-baseline-capacity/run.json), [결과](../../artifacts/performance/20260909-230854-201-baseline-capacity/capacity-result.json), [HTTP summary](../../artifacts/performance/20260909-230854-201-baseline-capacity/summary.json), [시계열](../../artifacts/performance/20260909-230854-201-baseline-capacity/order-progress.txt), [당시 Worker](https://github.com/tldnr1/limited-goods-reservation/blob/76183486371c2ce60eab98d173c9c9dad67ded8d/src/main/java/com/limitedgoods/worker/Worker.java).
 - 측정 결과: Gate OFF, stock 10,000, warmup 10/s·30초 후 40/s·60초 공급. acceptance 2,401, payment p95=9.476324ms, backlog max=1,473. 유효 첫 표본 14:12:50.275474Z의 confirmed=4와 마지막 14:14:20.274138Z의 1,392로 `(1392-4)/89.998664=15.422451/s`. 이후 최종 DB 검사 confirmed=1,424이며 전체 통과하지 않았다.
 - 현재 안전하게 사용할 수 있는 문장: “40/s 공급에서 빠른 HTTP 접수와 비동기 확정 처리량이 별개임을 확인했고, 약 15.4/s 시계열을 최대 4건·fixed-delay 250ms의 약 16/s 제출 상한과 연결했다.”
 - 아직 사용하면 안 되는 문장: “Worker가 40/s를 달성했다.” “처리량을 2.5배 개선했다.”
@@ -95,7 +95,7 @@
 - 문제 / 요구사항: 실제 Start-Job에서 observer가 `D:\target-state.sql`을 찾아 startup 실패.
 - 당시 판단: mock/offline 호출만으로 스크립트 파일 문맥의 차이를 잡지 못했다.
 - 변경 내용: `1f23e63`에서 absolute script path를 자식 프로세스에서 호출하도록 수정하고 observer process 회귀 검사 추가.
-- Evidence: [원본 error](../artifacts/performance/20260911-232830-531-target-worker-normal/error.txt), [observer error](../artifacts/performance/20260911-232830-531-target-worker-normal/observer-error.txt), [수정 commit](https://github.com/tldnr1/limited-goods-reservation/commit/1f23e63), [observer test](../ops/performance/target-observer-test.ps1). 원본 보관 commit `e217daa`.
+- Evidence: [원본 error](../../artifacts/performance/20260911-232830-531-target-worker-normal/error.txt), [observer error](../../artifacts/performance/20260911-232830-531-target-worker-normal/observer-error.txt), [수정 commit](https://github.com/tldnr1/limited-goods-reservation/commit/1f23e63), [observer test](../../ops/performance/target-observer-test.ps1). 원본 보관 commit `e217daa`.
 - 측정 결과: 1회 harness integration 실패, k6 본 측정 전 중단. 서비스 성능 측정값 없음.
 - 현재 안전하게 사용할 수 있는 문장: “실제 PowerShell Job 경계에서만 발생한 observer 경로 오류를 찾아 절대 경로 호출과 자식 프로세스 회귀 검사로 보강했다.”
 - 아직 사용하면 안 되는 문장: “서비스 성능 병목을 해결했다.”
@@ -109,7 +109,7 @@
 - 문제 / 요구사항: 기동 직후 측정을 steady-state capacity로 해석하면 초기 오류가 섞임.
 - 당시 판단: Payment 실패와 Worker 완료를 분리하고 오류 발생 시점을 확인.
 - 변경 내용: `d1b4b50`에서 DB JSONL framing 및 HTTP/DB 불일치 진단 수정, 원본을 보존한 별도 재분석. 이후 warmup 효과는 TYPE 2다.
-- Evidence: [config](../artifacts/performance/20260911-234502-053-target-worker-normal/config.json), [k6 summary](../artifacts/performance/20260911-234502-053-target-worker-normal/k6-summary.json), [Prometheus](../artifacts/performance/20260911-234502-053-target-worker-normal/prometheus.json), [DB](../artifacts/performance/20260911-234502-053-target-worker-normal/after-db.json), [분석·원본 해시](../artifacts/target-v1/20260911-worker-diagnosis/review.md), [source.json](../artifacts/target-v1/20260911-worker-diagnosis/source.json).
+- Evidence: [config](../../artifacts/performance/20260911-234502-053-target-worker-normal/config.json), [k6 summary](../../artifacts/performance/20260911-234502-053-target-worker-normal/k6-summary.json), [Prometheus](../../artifacts/performance/20260911-234502-053-target-worker-normal/prometheus.json), [DB](../../artifacts/performance/20260911-234502-053-target-worker-normal/after-db.json), [분석·원본 해시](../../artifacts/target-v1/20260911-worker-diagnosis/review.md), [source.json](../../artifacts/target-v1/20260911-worker-diagnosis/source.json).
 - 측정 결과: Worker normal 10 RPS/30초, VUs 10/MaxVUs 50, reset=true, embedded warmup 없음. 288 iterations, dropped=13, 결제 HTTP 292회 중 202=228/500=60/client timeout=4. Payment Hikari 0→60. DB attempts/succeeded/confirmed=232, pending/failed=0. 전체 시도 p95=2032.06228135ms이며 accepted-only 수치가 아니다.
 - 현재 안전하게 사용할 수 있는 문장: “기동 직후 Payment path의 초기 오류를 관측하고 cold-start와 steady-state capacity 측정을 분리할 필요를 확인했다.”
 - 아직 사용하면 안 되는 문장: “Worker는 10 RPS도 처리하지 못한다.” “단계형 warmup으로 문제가 해결됐다.”
@@ -123,7 +123,7 @@
 - 문제 / 요구사항: 점유·결제·멱등·응답 유실·UNKNOWN의 상태 계약을 성능과 별도로 확인.
 - 당시 판단: 실제 PostgreSQL/Redis와 제어 시계 기능 검사 및 소량 HTTP smoke가 필요.
 - 변경 내용: Target 역할과 상태 계약 구현, READY 만료/유실 응답/지연 성공 등 기능 검사.
-- Evidence: [39 tests 집계](../artifacts/target-v1/20260910-functional/tests.json), [smoke](../artifacts/target-v1/20260910-functional/smoke.json), [검증 범위](../artifacts/target-v1/20260910-functional/review.md), [ContractTest](../src/test/java/com/limitedgoods/ContractTest.java).
+- Evidence: [39 tests 집계](../../artifacts/target-v1/20260910-functional/tests.json), [smoke](../../artifacts/target-v1/20260910-functional/smoke.json), [검증 범위](../../artifacts/target-v1/20260910-functional/review.md), [ContractTest](../../src/test/java/com/limitedgoods/ContractTest.java).
 - 측정 결과: 당시 39 tests, failures/errors=0. smoke 4건 CONFIRMED, sold=4/held=0/available=0. 미사용 READY는 실제 11초 후 EXPIRED, ghost hold=0.
 - 현재 안전하게 사용할 수 있는 문장: “실제 DB 기반 기능 테스트와 소량 smoke로 점유·결제 상태 계약을 검증했다.”
 - 아직 사용하면 안 되는 문장: “부하·장애 상황에서도 복구 시간과 성능을 보장한다.”
@@ -132,7 +132,7 @@
 
 ## TYPE 2 — 구현 완료, 효과 실측 대기
 
-아래 항목의 측정 결과는 모두 **미측정**이다. 기능/회귀 테스트가 있어도 새 steady-state 성능 검증으로 승격하지 않는다.
+아래 항목의 설계 효과와 새 steady-state 성능은 **검증 대기**다. 실패 실행이나 일부 계측의 동작 확인이 전체 효과를 증명하지는 않는다.
 
 ### 9. Waiting / READY admission
 
@@ -141,7 +141,7 @@
 - 문제 / 요구사항: 대량 유입이 재고 DB 트랜잭션으로 직접 전달되는 것을 제어.
 - 당시 판단: 진입권과 재고 원장을 분리하고 downstream 공급률을 제한.
 - 변경 내용: DB connection을 사용하지 않는 Waiting role, Redis WAITING/READY, WaitingRate. READY는 permission이며 stock hold가 아니다. PostgreSQL authoritative inventory 유지.
-- Evidence: [WaitingService](../src/main/java/com/limitedgoods/waiting/WaitingService.java), [Waiting profile](../src/main/resources/application-waiting.yml), [Target 계약](target-v1.md), 구현 `4256c69`.
+- Evidence: [WaitingService](../../src/main/java/com/limitedgoods/waiting/WaitingService.java), [Waiting profile](../../src/main/resources/application-waiting.yml), [Target 계약](../architecture/target-v1.md), 구현 `4256c69`.
 - 측정 결과: 미측정.
 - 현재 안전하게 사용할 수 있는 문장: “Redis 기반 Waiting/READY 계층을 분리하고 READY를 재고 점유가 아닌 제한된 구매 진입권으로 설계했다.”
 - 아직 사용하면 안 되는 문장: “50,000명 유입을 안정적으로 처리했다.” “DB 부하를 X% 줄였다.”
@@ -155,7 +155,7 @@
 - 문제 / 요구사항: 재고 hot-row 경로의 유입 및 동시 점유를 제한.
 - 당시 판단: Redis gate는 DB 보호, PostgreSQL 트랜잭션은 authoritative hold를 담당.
 - 변경 내용: ReservationRate/permits, 짧은 critical section, 새 주문 응답 재조회 3개 제거.
-- Evidence: [AdmissionGate](../src/main/java/com/limitedgoods/admission/AdmissionGate.java), [PurchaseTransactionService](../src/main/java/com/limitedgoods/purchases/PurchaseTransactionService.java), [설계](../DESIGN.md).
+- Evidence: [AdmissionGate](../../src/main/java/com/limitedgoods/admission/AdmissionGate.java), [PurchaseTransactionService](../../src/main/java/com/limitedgoods/purchases/PurchaseTransactionService.java), [설계](../../DESIGN.md).
 - 측정 결과: 미측정.
 - 현재 안전하게 사용할 수 있는 문장: “구매 진입률과 동시 실행 수를 제한하고 DB 재고 트랜잭션의 임계 구간을 줄이도록 구현했다.”
 - 아직 사용하면 안 되는 문장: “25/s capacity를 검증했다.” “락 병목을 해결했다.”
@@ -169,7 +169,7 @@
 - 문제 / 요구사항: PG 응답 지연이 사용자 접수 HTTP 연결을 직접 점유하지 않게 분리.
 - 당시 판단: 접수와 성공은 다른 상태이며 accepted SUCCESS의 deadline까지 관측해야 함.
 - 변경 내용: DB 저장 후 202, Worker에서 PG 호출, terminal_at 및 confirmationDeadline evidence.
-- Evidence: [PaymentService](../src/main/java/com/limitedgoods/payments/PaymentService.java), [Worker](../src/main/java/com/limitedgoods/worker/Worker.java), [timeline SQL](../ops/performance/target-timeline.sql), evidence 보강 `8797ec5`.
+- Evidence: [PaymentService](../../src/main/java/com/limitedgoods/payments/PaymentService.java), [Worker](../../src/main/java/com/limitedgoods/worker/Worker.java), [timeline SQL](../../ops/performance/target-timeline.sql), evidence 보강 `8797ec5`.
 - 측정 결과: 미측정. baseline의 무지연 저부하 성공을 새 PG 지연 효과로 사용하지 않는다.
 - 현재 안전하게 사용할 수 있는 문장: “결제를 DB에 영속 접수한 뒤 외부 PG 처리를 Worker로 분리해 PG 대기를 결제 접수 요청과 분리했다.”
 - 아직 사용하면 안 되는 문장: “PG 200ms 지연에서도 성능 저하 없이 처리했다.”
@@ -183,7 +183,7 @@
 - 문제 / 요구사항: 외부 응답 지연의 영향을 재현할 실험 장치 필요.
 - 당시 판단: durable receipt commit 이후에 지연시켜 DB 트랜잭션 내 sleep과 구분.
 - 변경 내용: MOCK_PG_DELAY_MS 0~5000ms, store transaction 반환 뒤 response delay. 기본값은 변경하지 않았다.
-- Evidence: [MockPaymentController](../src/main/java/com/limitedgoods/mockpg/MockPaymentController.java), [MockPaymentStore](../src/main/java/com/limitedgoods/mockpg/MockPaymentStore.java), 구현 `8797ec5`.
+- Evidence: [MockPaymentController](../../src/main/java/com/limitedgoods/mockpg/MockPaymentController.java), [MockPaymentStore](../../src/main/java/com/limitedgoods/mockpg/MockPaymentStore.java), 구현 `8797ec5`.
 - 측정 결과: 미측정.
 - 현재 안전하게 사용할 수 있는 문장: “Mock PG가 영속 처리 후 트랜잭션 밖에서 응답 지연을 주도록 구현해 후속 지연 실험을 준비했다.”
 - 아직 사용하면 안 되는 문장: “PG 지연에서도 안정성을 입증했다.”
@@ -197,7 +197,7 @@
 - 문제 / 요구사항: 기존 dispatch당 최대 4건·250ms가 만든 공급 상한.
 - 당시 판단: 작업이 남아 있으면 빈 슬롯이 다음 schedule을 기다릴 필요가 없음.
 - 변경 내용: 각 슬롯이 claim→process→next claim을 반복하고 scheduler는 빈 슬롯 refill/빈 큐 재확인 담당.
-- Evidence: [현재 Worker](../src/main/java/com/limitedgoods/worker/Worker.java), [WorkerTest](../src/test/java/com/limitedgoods/WorkerTest.java), [구현 당시 기능 기록](../artifacts/target-v1/20260910-functional/review.md), `4256c69`.
+- Evidence: [현재 Worker](../../src/main/java/com/limitedgoods/worker/Worker.java), [WorkerTest](../../src/test/java/com/limitedgoods/WorkerTest.java), [구현 당시 기능 기록](../../artifacts/target-v1/20260910-functional/review.md), `4256c69`.
 - 측정 결과: 미측정. 기존 15.422451/s 관측은 5번의 변경 전 결과다.
 - 현재 안전하게 사용할 수 있는 문장: “Worker 슬롯이 완료 직후 다음 작업을 가져오도록 바꿔 코드상 4건/250ms 제출 상한을 제거했다.”
 - 아직 사용하면 안 되는 문장: “Worker 40/s 달성.” “처리량 X→Y 개선.”
@@ -211,12 +211,12 @@
 - 문제 / 요구사항: cold-start 초기 오류와 steady-state 측정이 혼합됨.
 - 당시 판단: 단순 대기 대신 전체 요청 경로의 안전성·영속 완료를 검증.
 - 변경 내용: 2→5→10→10 RPS 각 10초, 270 users. Waiting→Reservation→Payment→Worker→Mock PG→CONFIRMED. embedded warmup PASS 후 데이터 cleanup, 동일 JVM의 measured trial. 각 trial의 Hikari boundary도 독립 저장.
-- Evidence: [warmup.js](../k6/target/warmup.js), [orchestration](../ops/performance/target.ps1), [cleanup](../ops/performance/target-warmup-cleanup.ps1), [warmup test](../ops/performance/target-warmup-test.ps1), `8797ec5` 및 이번 boundary 변경.
-- 측정 결과: 미측정. 새 Stage 0 실제 실행 전이다.
+- Evidence: [warmup.js](../../k6/target/warmup.js), [orchestration](../../ops/performance/target.ps1), [cleanup](../../ops/performance/target-warmup-cleanup.ps1), [warmup test](../../ops/performance/target-warmup-test.ps1), `8797ec5` 및 boundary 보강 `33128be`.
+- 측정 결과: 초기 오류 해소 효과는 검증 대기. [첫 Stage 0](../reviews/warmup-20260912-review.md)은 실제 272회 도착·완료, Payment Hikari delta=18로 실패했다. 고정 270건 판정은 수정했으나 전체 실제 도착의 결제 성공과 warmup PASS는 아직 없다.
 - 현재 안전하게 사용할 수 있는 문장: “전체 구매·결제 경로를 단계형으로 예열하고 안전성 검증 후 같은 JVM에서 본 측정을 시작하도록 구현했다.”
 - 아직 사용하면 안 되는 문장: “warmup으로 초기 오류를 해결했다.”
 - 제한 / caveat: cold 결과도 별도 보존한다. JVM을 재기동해도 DB/OS 캐시는 남을 수 있다.
-- TYPE 1 승격 조건: 새 실제 Warmup Validation의 arrivals=270, dropped/unexpected=0, purchase/payment durable 연결, 270 CONFIRMED, pending/correctness/Hikari delta/restart/OOM=0. 먼저 Stage 0 안전성만 승격하고 steady-state 성능은 별도 측정.
+- TYPE 1 승격 조건: 새 실제 Warmup Validation의 계획 arrivals=270(경계 추가 허용 270~274), dropped/unexpected=0, 실제 시작 수 전체의 purchase/payment durable 연결과 CONFIRMED, pending/correctness/Hikari delta/restart/OOM=0. 먼저 Stage 0 안전성만 승격하고 steady-state 성능은 별도 측정.
 
 ### 15. Isolation 비교
 
@@ -225,7 +225,7 @@
 - 문제 / 요구사항: Waiting 폭주가 기존 결제 경로에 주는 영향 확인.
 - 당시 판단: 동일 Payment 공급에 Waiting만 추가한 비교가 필요.
 - 변경 내용: Worker-only와 Isolation 시나리오 및 역할별 자원/pool 분리.
-- Evidence: [isolation.js](../k6/target/isolation.js), [worker.js](../k6/target/worker.js), [Target compose](../compose.target.yml), [시나리오](target-v1-load-scenario.md).
+- Evidence: [isolation.js](../../k6/target/isolation.js), [worker.js](../../k6/target/worker.js), [Target compose](../../compose.target.yml), [시나리오](../architecture/target-v1-load-scenario.md).
 - 측정 결과: 미측정.
 - 현재 안전하게 사용할 수 있는 문장: “Waiting 유입을 추가했을 때 Payment 경로가 유지되는지 동일 결제 workload로 비교하도록 구성했다.”
 - 아직 사용하면 안 되는 문장: “Isolation으로 성능 저하를 X% 이하로 제한했다.”
@@ -239,7 +239,7 @@
 - 문제 / 요구사항: 순간 관심 유입과 실제 판매 완료를 함께 평가.
 - 당시 판단: 관심 사용자 수·stock hold·PG 확정은 서로 다른 지표.
 - 변경 내용: 50,000 interested users, stock 1,000; 0~5초 30k, 5~15초 15k, 15~60초 5k. saleStart+60초 initial HELD, +120초 ≥95% CONFIRMED 목표.
-- Evidence: [business.js](../k6/target/business.js), [review](../ops/performance/target-review.ps1), [현재 성능 계약](performance.md), `edd2044`/`8797ec5`.
+- Evidence: [business.js](../../k6/target/business.js), [review](../../ops/performance/target-review.ps1), [현재 성능 계약](../performance.md), `edd2044`/`8797ec5`.
 - 측정 결과: 미측정.
 - 현재 안전하게 사용할 수 있는 문장: “관심 사용자 50,000명과 재고 1,000개를 가정하고 유입·초기 점유·판매 확정의 시간 기준을 나눠 검증 workload를 설계했다.”
 - 아직 사용하면 안 되는 문장: “50,000명 동시 처리 성공.” “50,000 RPS 처리.” “새 Target 목표 달성.”
@@ -253,7 +253,7 @@
 - 문제 / 요구사항: 재시도·응답 유실·UNKNOWN을 중복 성공이나 잘못된 재고 반환으로 만들지 않아야 함.
 - 당시 판단: 동일 사용자/멱등키 replay, 같은 attempt 재확인, 미확정 재고 보유가 필요.
 - 변경 내용: LOST_RESPONSE, UNKNOWN, FAILED, delayed success, duplicate success 방어 및 accepted payment의 time-only stock release 방지. retry 정책은 이번에 확장하지 않았다.
-- Evidence: [PaymentService](../src/main/java/com/limitedgoods/payments/PaymentService.java), [ReservationService](../src/main/java/com/limitedgoods/reservations/ReservationService.java), [ContractTest](../src/test/java/com/limitedgoods/ContractTest.java), [기능 기록](../artifacts/target-v1/20260910-functional/review.md).
+- Evidence: [PaymentService](../../src/main/java/com/limitedgoods/payments/PaymentService.java), [ReservationService](../../src/main/java/com/limitedgoods/reservations/ReservationService.java), [ContractTest](../../src/test/java/com/limitedgoods/ContractTest.java), [기능 기록](../../artifacts/target-v1/20260910-functional/review.md).
 - 측정 결과: 부하/failure capacity는 미측정. 기능 계약 검증은 8번 TYPE 1의 제한된 범위다.
 - 현재 안전하게 사용할 수 있는 문장: “결제 시도를 영속화하고 유실 응답을 같은 attempt로 재확인하며 UNKNOWN의 재고를 시간만으로 반환하지 않도록 구현했다.”
 - 아직 사용하면 안 되는 문장: “장애 복구 시간을 X% 단축했다.” “모든 장애에서 자동 복구한다.”
@@ -267,11 +267,11 @@
 - 문제 / 요구사항: range 첫 scrape 전 timeout을 놓치거나 실패 HTTP가 성공 접수 지연에 섞이는 관측 오류.
 - 당시 판단: 명시적 경계와 성공 응답만의 지연, terminal 시각으로 판정 근거를 고정해야 함.
 - 변경 내용: 각 trial의 boundary-before/after, stable instance+pool key, freshness·누락·중복·reset 검사. Prometheus instant query와 timestamp()를 같은 평가에서 수집하고 15회 × 요청 timeout 2초 + 사이 1초 대기로 제한한다. after는 bounded drain 이후 scrape를 요구한다. range evidence는 진단용으로 유지한다. 기존 accepted-only/terminal_at/saleStart 보강도 구현 근거다.
-- Evidence: [Hikari helper](../ops/performance/target-hikari.ps1), [trial](../ops/performance/target-trial.ps1), [review test](../ops/performance/target-review-test.ps1), [collection test](../ops/performance/target-hikari-test.ps1), [static test](../ops/performance/target-static-test.mjs). 기존 보강 `8797ec5`, boundary는 이번 미커밋 변경.
-- 측정 결과: 실제 통합 부하는 미측정. offline에서는 flat range라도 boundary 증가 실패, 누적 3→3 허용, 감소/series 불일치 실패와 baseline 실패 시 load 차단을 검증했다.
+- Evidence: [Hikari helper](../../ops/performance/target-hikari.ps1), [trial](../../ops/performance/target-trial.ps1), [review test](../../ops/performance/target-review-test.ps1), [collection test](../../ops/performance/target-hikari-test.ps1), [static test](../../ops/performance/target-static-test.mjs). 기존 보강 `8797ec5`, boundary 보강은 `33128be`.
+- 측정 결과: [첫 Warmup](../reviews/warmup-20260912-review.md)에서 실제 boundary 수집과 Payment delta=18 검출을 확인했다. offline에서는 flat range 증가 검출·누적 3→3 허용·감소/불일치 실패·baseline 실패 시 load 차단을 검증했다. 성공 warmup 이후 measurement까지 전체 절차의 실측 통과는 대기 중이다.
 - 현재 안전하게 사용할 수 있는 문장: “각 trial 경계의 timeout counter 차이를 authoritative evidence로 사용하도록 바꾸고 첫 scrape 이전 증가를 놓치는 판정 오류를 offline 회귀 검사로 막았다.”
 - 아직 사용하면 안 되는 문장: “새 warmup/성능 실험에서 Hikari timeout 0을 달성했다.”
-- 제한 / caveat: 실제 Prometheus+k6 통합은 다음 실행에서 검증한다. 같은 pool/instance로 reset 후 counter가 다시 증가해 최종값이 같아지는 경우는 counter 두 값만으로 증명할 수 없으므로 기존 process/container evidence도 유지한다.
+- 제한 / caveat: 실제 실패 실행의 수집은 확인했지만 성공 warmup 이후 측정 경로는 아직 검증하지 못했다. 같은 pool/instance로 reset 후 counter가 다시 증가해 최종값이 같아지는 경우는 counter 두 값만으로 증명할 수 없으므로 기존 process/container evidence도 유지한다.
 - TYPE 1 승격 조건: 실제 standalone/embedded warmup에서 네 DB 역할의 fresh boundary, 실패 시 측정 차단, cleanup 이후 별도 baseline 및 전체 artifact 수집 확인. 성능 claim은 해당 시나리오의 별도 승격 조건을 충족해야 한다.
 
 ## 사용 금지 주장과 승격 절차
