@@ -23,7 +23,7 @@
 
 두 실행은 `e217daa`에서 역사적 evidence로 보관했다. 원본 artifact는 수정하지 않는다.
 legacy result.json의 “Worker 32/s required, 40/s normal target”은 당시 review snapshot이며 현재 계약이 아니다.
-현재 계약은 [performance](../../docs/performance.md), 사용 가능한 주장은 [claim ledger](../../docs/portfolio-evidence.md)를 따른다.
+현재 계약은 [performance](../../docs/performance.md), 사용 가능한 주장은 [claim ledger](../../docs/portfolio/portfolio-evidence.md)를 따른다.
 
 ## Git 보관 범위
 

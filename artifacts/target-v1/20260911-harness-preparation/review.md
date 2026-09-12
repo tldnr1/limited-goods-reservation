@@ -9,7 +9,7 @@
 - Worker / Waiting / Reservation / Isolation / Business 독립 k6 진입점, 시드 고정 사용자 행동.
 - SQL fixture, HTTP/DB/Redis/Prometheus/컨테이너·생성기 관측, 오프라인 결과 판정.
 - 반환 대기 polling 12초→1초. READY·300초 hold·DB 원장·역할 분리 유지.
-- [Target 실행 가이드](../../../docs/target-v1-load-guide.md), [Mermaid 시나리오](../../../docs/target-v1-load-scenario.md), 기존 문서의 baseline/Target 범위 정리.
+- [Target 실행 가이드](../../../docs/guides/target-v1-load-guide.md), [Mermaid 시나리오](../../../docs/architecture/target-v1-load-scenario.md), 기존 문서의 baseline/Target 범위 정리.
 
 ## 수행한 검사
 

@@ -124,6 +124,23 @@ try {
     Verify 'requires_review'
     $latest=Get-Content "$directory/result.json" -Raw | ConvertFrom-Json
     if (-not ($latest.manualReview -like '*Scaled flow/harness validation*')) { throw 'Scaled run claimed 50k SLO' }
+    foreach ($count in @(2400,2401,2402,2403,2404,2399)) {
+        $metrics.target_started.values.count=$count; $metrics.target_finished.values.count=$count
+        Json @{metrics=$metrics} 'k6-summary.json'
+        Verify $(if ($count -ge 2400 -and $count -le 2403) {'requires_review'} else {'failed'})
+    }
+    Json @{scenario='business';variant='abandon';mockPgDelayMs=0;users=2400;stock=1} 'config.json'
+    foreach ($count in @(2405,2406)) {
+        $metrics.target_started.values.count=$count; $metrics.target_finished.values.count=$count
+        Json @{metrics=$metrics} 'k6-summary.json'
+        Verify $(if ($count -eq 2405) {'requires_review'} else {'failed'})
+    }
+    Json @{scenario='isolation';variant='normal';mockPgDelayMs=0;rps=20;paymentRps=20;durationSeconds=60} 'config.json'
+    foreach ($count in @(2402,2403)) {
+        $metrics.target_started.values.count=$count; $metrics.target_finished.values.count=$count
+        Json @{metrics=$metrics} 'k6-summary.json'
+        Verify $(if ($count -eq 2402) {'requires_review'} else {'failed'})
+    }
     # Warmup validates safety/durability, not capacity latency. Accumulated stable counters are allowed.
     Json @{scenario='warmup';variant='normal';mockPgDelayMs=0} 'config.json'
     foreach ($name in @('target_started','target_finished','target_payment_accepted','target_held')) { $metrics[$name]=@{values=@{count=270}} }
@@ -143,9 +160,46 @@ try {
     Boundary 3 'boundary-before.json' 1799999998
     Boundary 3 'boundary-after.json' 1800000061
     Verify 'passed'
+    # Actual arrivals, including the observed 272, must all reach durable confirmation.
+    foreach ($count in @(269,270,271,272,273,274,275)) {
+        foreach ($name in @('target_started','target_finished','target_payment_accepted','target_held')) { $metrics[$name].values.count=$count }
+        foreach ($field in @('orders','attempts','confirmed','succeeded','successAccepted','successConfirmed')) { $state[$field]=$count }
+        Json @{metrics=$metrics} 'k6-summary.json'; Json $state 'after-db.json'
+        Verify $(if ($count -ge 270 -and $count -le 274) {'passed'} else {'failed'})
+    }
+    foreach ($name in @('target_started','target_finished','target_payment_accepted','target_held')) { $metrics[$name].values.count=272 }
+    foreach ($field in @('orders','attempts','confirmed','succeeded','successAccepted','successConfirmed')) { $state[$field]=272 }
+    Json @{metrics=$metrics} 'k6-summary.json'; Json $state 'after-db.json'
+    foreach ($name in @('target_finished','target_held','target_payment_accepted')) {
+        $metrics[$name].values.count=271; Json @{metrics=$metrics} 'k6-summary.json'; Verify 'failed'
+        $metrics[$name].values.count=272
+    }
+    Json @{metrics=$metrics} 'k6-summary.json'
+    foreach ($field in @('orders','attempts','confirmed','succeeded','successAccepted','successConfirmed')) {
+        $state[$field]=271; Json $state 'after-db.json'; Verify 'failed'; $state[$field]=272
+    }
+    Json $state 'after-db.json'
+    $metrics.dropped_iterations.thresholds.'count==0'.ok=$false
+    Json @{metrics=$metrics} 'k6-summary.json'; Verify 'failed'
+    $metrics.dropped_iterations.thresholds.'count==0'.ok=$true
+    Json @{metrics=$metrics} 'k6-summary.json'
+    Boundary 4 'boundary-after.json' 1800000061
+    Verify 'failed' # Extra legitimate arrivals never excuse a Hikari timeout.
+    Boundary 3 'boundary-after.json' 1800000061
     $metrics.target_unexpected.thresholds.'rate==0'.ok=$false
     Json @{metrics=$metrics} 'k6-summary.json'
     Verify 'failed'
+    # 20260912 warmup: valid arrival count, but real acceptance/Hikari failures remain failures.
+    $metrics.target_payment_accepted.values.count=254
+    foreach ($field in @('attempts','confirmed','succeeded','successAccepted','successConfirmed')) { $state[$field]=258 }
+    Json @{metrics=$metrics} 'k6-summary.json'; Json $state 'after-db.json'
+    Boundary 0 'boundary-before.json' 1799999998
+    Boundary 18 'boundary-after.json' 1800000061
+    Verify 'failed'
+    $latest=Get-Content "$directory/result.json" -Raw | ConvertFrom-Json
+    if (($latest.issues -like '*Actual arrivals differ*') -or
+        -not ($latest.issues -like '*every actual arrival*') -or
+        -not ($latest.issues -like '*Hikari timeout boundary delta*')) { throw 'Observed 272-arrival failure was misclassified' }
     Remove-Item -LiteralPath "$directory/prometheus.json"
     Verify 'failed'
     "$checks offline result-review checks passed."

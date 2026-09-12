@@ -2,6 +2,11 @@
 function Remove-TargetWarmup([string]$WarmupDirectory) {
     $result=Get-Content "$WarmupDirectory/result.json" -Raw | ConvertFrom-Json
     if ($result.status -ne 'passed') { throw 'Warmup validation failed; cleanup/measurement prohibited' }
+    $summary=Get-Content "$WarmupDirectory/k6-summary.json" -Raw | ConvertFrom-Json
+    $actual=0L
+    if (-not [long]::TryParse([string]$summary.metrics.target_started.values.count,[ref]$actual) -or $actual -le 0) {
+        throw 'Missing/invalid actual warmup arrival count; cleanup prohibited'
+    }
     $fixture=Get-Content "$WarmupDirectory/fixture.json" -Raw | ConvertFrom-Json
     $saleId=[Guid]$fixture.sale.id
     $cleanup=@"
@@ -13,7 +18,9 @@ BEGIN
  IF current_database()<>'limited_goods_perf'
     OR (SELECT count(*) FROM sales)<>1
     OR NOT EXISTS (SELECT 1 FROM sales WHERE id='$saleId')
-    OR (SELECT count(*) FROM orders WHERE sale_id='$saleId' AND status='CONFIRMED')<>270
+    OR (SELECT count(*) FROM orders WHERE sale_id='$saleId')<>$actual
+    OR (SELECT count(*) FROM orders WHERE sale_id='$saleId' AND status='CONFIRMED')<>$actual
+    OR (SELECT count(*) FROM payment_attempts p JOIN orders o ON o.id=p.order_id WHERE o.sale_id='$saleId')<>$actual
     OR EXISTS (SELECT 1 FROM orders o JOIN payment_attempts p ON p.order_id=o.id
                WHERE o.sale_id='$saleId' AND (p.status<>'SUCCEEDED' OR p.terminal_at IS NULL))
  THEN RAISE EXCEPTION 'Warmup cleanup guard failed'; END IF;

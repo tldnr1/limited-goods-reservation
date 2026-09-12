@@ -56,8 +56,10 @@ try {
         $expected=if ($warmup) {270} elseif ($config.scenario -eq 'business') { $config.users+$(if ($config.variant -eq 'abandon') {$config.stock} else {0}) }
             elseif ($config.scenario -eq 'isolation') { ($config.rps+$config.paymentRps)*$config.durationSeconds }
             else { $config.rps*$config.durationSeconds }
-        $tolerance=if ($config.scenario -in @('business','warmup')) {0} elseif ($config.scenario -eq 'isolation') {2} else {1}
-        Require ($started -ge $expected -and $started -le $expected+$tolerance) 'Actual arrivals differ from configured workload'
+        # constant-arrival-rate can include one extra arrival at each scenario boundary.
+        # Retain the lower bound and dropped=0; never hide missing work behind a percentage tolerance.
+        $tolerance=if ($warmup) {4} elseif ($config.scenario -eq 'business') {if ($config.variant -eq 'abandon') {4} else {3}} elseif ($config.scenario -eq 'isolation') {2} else {1}
+        Require ($started -ge $expected -and $started -le $expected+$tolerance) "Actual arrivals differ from configured workload: expected=$expected..$($expected+$tolerance), started=$started"
         $held=$summary.metrics.target_held.values.count
         $accepted=$summary.metrics.target_payment_accepted.values.count
         if ($config.scenario -in @('warmup','worker','isolation')) {
@@ -70,7 +72,7 @@ try {
         Require ($state.successPending -eq 0) 'SUCCESS pending remains after bounded drain'
         Require ($state.successAccepted -eq $state.successConfirmed) 'Accepted SUCCESS did not become CONFIRMED'
         if ($warmup) {
-            Require ($held -eq 270 -and $accepted -eq 270 -and $state.orders -eq 270 -and $state.attempts -eq 270 -and $state.confirmed -eq 270) 'Warmup must durably confirm all 270 users'
+            Require ($held -eq $started -and $accepted -eq $started -and $state.orders -eq $started -and $state.attempts -eq $started -and $state.confirmed -eq $started) "Warmup must durably confirm every actual arrival: started=$started, held=$held, accepted=$accepted, orders=$($state.orders), attempts=$($state.attempts), confirmed=$($state.confirmed)"
             Require (Test-Path "$Directory/raw.json") 'Missing cold-start warmup raw evidence'
         }
         if ($config.scenario -eq 'waiting') { Require ($state.orders -eq 0 -and $state.attempts -eq 0) 'Waiting created durable orders/payments' }

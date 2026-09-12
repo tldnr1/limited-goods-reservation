@@ -44,10 +44,18 @@ try {
     Assert ($caught -and $calls.Count -eq 0) 'Failed warmup reached cleanup'
     Set-Content "$directory/result.json" '{"status":"passed"}'
     Set-Content "$directory/fixture.json" '{"sale":{"id":"00000000-0000-0000-0000-000000000001"}}'
+    foreach ($invalid in @($null,0,-1,'272.5','bad')) {
+        @{metrics=@{target_started=@{values=@{count=$invalid}}}} | ConvertTo-Json -Depth 5 | Set-Content "$directory/k6-summary.json"
+        $calls.Clear(); $caught=$null
+        try { Remove-TargetWarmup $directory } catch { $caught=$_ }
+        Assert ($caught -and $calls.Count -eq 0) 'Invalid actual count reached cleanup'
+    }
+    Set-Content "$directory/k6-summary.json" '{"metrics":{"target_started":{"values":{"count":272}}}}'
     Remove-TargetWarmup $directory
     Assert (($calls -join ',') -eq 'delete,scan,redis-delete') 'Cleanup order must be committed DB delete, then Redis'
     Assert ($cleanupSql -like '*pg_advisory_xact_lock(74190321)*' -and $cleanupSql -like '*count(*) FROM sales)<>1*') 'Missing publisher/foreign-sale guard'
     Assert ($cleanupSql -notmatch 'TRUNCATE' -and $cleanupSql -match "DELETE FROM orders WHERE sale_id='00000000-0000-0000-0000-000000000001'") 'Cleanup not scoped to warmup sale'
+    Assert (([regex]::Matches($cleanupSql,'<>272')).Count -eq 3 -and $cleanupSql -notmatch '270') 'Cleanup must check all orders, confirmations and attempts against actual arrivals'
     # Execute the actual orchestrator tail with trial/cleanup boundaries mocked.
     $text=Get-Content "$PSScriptRoot/target.ps1" -Raw
     $from=$text.IndexOf('    $warmupConfig=@{} + $config')
@@ -69,7 +77,7 @@ try {
     Assert ($caught -and ($calls -join ',') -eq 'warmup') 'Warmup failure reached measurement'
     $Scenario='warmup'; $failWarmup=$false; $calls.Clear(); & $orchestrate
     Assert (($calls -join ',') -eq 'warmup') 'Standalone warmup recursively warmed up'
-    '10 offline warmup/cleanup/drain checks passed.'
+    '16 offline warmup/cleanup/drain checks passed.'
 } finally {
     $resolved=[IO.Path]::GetFullPath($directory)
     if ($resolved.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath()),[StringComparison]::OrdinalIgnoreCase) -and (Split-Path $resolved -Leaf) -match '^target-warmup-[a-f0-9]{32}$') {
