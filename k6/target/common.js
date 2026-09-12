@@ -9,6 +9,12 @@ export const fixture = JSON.parse(open(__ENV.TARGET_FIXTURE));
 // Keep the small sale metadata per VU; parse the large order list only once per k6 process.
 const orders = new SharedArray('target-payment-orders', () => JSON.parse(open(__ENV.TARGET_ORDERS)));
 export function setup() {
+  if (config.scenario === 'business') {
+    const saleStart = Date.parse(fixture.sale.opensAt);
+    if (!Number.isFinite(saleStart)) throw new Error('Business sale opensAt missing');
+    sleep(Math.max(0, (saleStart - Date.now()) / 1000));
+    console.log(`TARGET_SALE_START=${saleStart}`);
+  }
   const startedAt = Date.now();
   console.log(`TARGET_MEASUREMENT_START=${startedAt}`);
   return { startedAt };
@@ -27,11 +33,24 @@ const purchaseFailures = new Rate('target_purchase_rejected');
 const latency = new Trend('target_latency', true);
 const acceptedLatency = new Trend('target_purchase_accepted_ms', true);
 const paymentLatency = new Trend('target_payment_ms', true);
+const paymentAcceptedLatency = new Trend('target_payment_accepted_ms', true);
+
+export const primaryNormal = config.variant === 'normal' && Number(config.mockPgDelayMs || 0) === 0;
+export function waitingThresholds() {
+  return Object.fromEntries(['waiting_join', 'waiting_poll'].flatMap(endpoint => [
+    [`target_latency{endpoint:${endpoint}}`, ['p(99)<=1000']],
+    [`target_unexpected{endpoint:${endpoint}}`, ['rate==0']],
+  ]));
+}
+export function paymentThresholds() {
+  return { target_payment_accepted_ms: ['p(95)<=1000'],
+    'target_unexpected{endpoint:payment_accept}': ['rate==0'] };
+}
 
 export function thresholds(extra = {}) {
   return {
     dropped_iterations: ['count==0'],
-    target_unexpected: ['rate<=0.001'],
+    ...(primaryNormal ? { target_unexpected: ['rate<=0.001'] } : {}),
     ...extra,
   };
 }
@@ -63,7 +82,7 @@ function request(method, path, body, user, key, name, ticket) {
       !(response.status === 409 && known409.includes(value.code)));
   unexpected.add(bad, { endpoint: name });
   outcomes.add(1, { endpoint: name, status: String(response.status), result: value.state || value.code || 'ok' });
-  latency.add(response.timings.duration, { endpoint: name, status: String(response.status) });
+  latency.add(response.timings.duration, { endpoint: name, status: String(response.status), stage: exec.scenario.name });
   return { response, value };
 }
 
@@ -76,7 +95,11 @@ export function payment(order, index, scenario = 'SUCCESS') {
   for (let attempt = 0; attempt < 5; attempt++) {
     result = request('POST', `/api/orders/${order.id}/payments`, { scenario }, order.user, 'payment', 'payment_accept');
     paymentLatency.add(result.response.timings.duration);
-    if (result.response.status === 202) { accepted.add(1); break; }
+    if (result.response.status === 202) {
+      accepted.add(1);
+      paymentAcceptedLatency.add(result.response.timings.duration, { stage: exec.scenario.name });
+      break;
+    }
     if (![0, 429, 503].includes(result.response.status)) break;
     sleep(Math.pow(2, attempt) * 0.1 + fraction(index, attempt) * 0.25);
   }
@@ -153,7 +176,7 @@ export function browser(purchase = false, pay = false, timing = {}) {
         sleep(Math.max(0, (Date.parse(order.holdExpiresAt) - Date.now()) / 1000 - 1));
       } else if (config.variant === 'burst') {
         sleep(Math.max(0, 60 - (Date.now() - timing.startedAt) / 1000));
-      } else if (!returning) {
+      } else if (!returning && config.scenario !== 'warmup') {
         sleep(1 + behavior * 44);
       }
       const pg = config.variant === 'pg-failure'

@@ -1,4 +1,4 @@
-param([string]$Directory,[string]$Postgres,[string]$Redis,[string[]]$Containers,[int]$IntervalSeconds=5)
+param([string]$Directory,[string]$Postgres,[string]$Redis,[string[]]$Containers,[int]$IntervalSeconds=5,[string]$GeneratorName='goods-target-k6')
 $ErrorActionPreference='Stop'
 $PSNativeCommandUseErrorActionPreference=$false
 try {
@@ -16,7 +16,7 @@ try {
         $stats=& docker stats --no-stream --format '{{json .}}' @Containers
         if ($LASTEXITCODE -ne 0) { throw 'Resource sampling failed' }
         @{at=$at;containers=@($stats | ForEach-Object { $_ | ConvertFrom-Json })} | ConvertTo-Json -Compress -Depth 8 | Add-Content "$Directory/resources.jsonl"
-        $generator=& docker ps --filter 'name=^/goods-target-k6$' -q
+        $generator=& docker ps --filter "name=^/$GeneratorName$" -q
         if ($LASTEXITCODE -ne 0) { throw 'Generator lookup failed' }
         if ($generator) {
             $generatorStats=& docker stats --no-stream --format '{{json .}}' $generator

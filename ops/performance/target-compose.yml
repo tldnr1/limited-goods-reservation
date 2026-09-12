@@ -1,5 +1,8 @@
 # Performance-only settings; production role and ticket contracts remain enabled.
 services:
+  mock-pg:
+    environment:
+      MOCK_PG_DELAY_MS: ${MOCK_PG_DELAY_MS:-0}
   api1:
     environment:
       APP_WAITING_RATE: ${TARGET_WAITING_RATE:-25}

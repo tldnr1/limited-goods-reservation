@@ -7,7 +7,7 @@
 핵심 계약은 Waiting/READY에서 대량 유입을 흡수해 PostgreSQL 재고 경로의 진입률을 통제하고,
 재고 점유는 PostgreSQL 원장으로 보장하며, durable acceptance 이후 Worker가 비동기 결제를 처리해 PG 지연·폭주의 전파를 막는 것이다.
 Primary performance SLO는 warmup 이후 steady-state와 선언한 resource budget 기준이며 아직 미검증이다.
-현재 Run -Reset은 JVM 재기동 직후 자동 warmup 없이 측정하므로 steady-state 증거로 쓰지 않는다.
+Run -Reset은 JVM 재기동 → warmup 검증 → 데이터 정리 → 동일 JVM 본 측정 순서다. 이전 자동 warmup 없는 결과는 steady-state 증거로 쓰지 않는다.
 Cold-start는 deployment/startup characteristic으로 보존하고 steady-state capacity와 별도 기록한다. 비교 시 warmup/reset 조건을 맞춘다.
 Local 자원 배분은 초기 hypothesis이며 harness integration·obvious bottleneck·logic/rate/pool mismatch 확인에 사용한다.
 최종 portfolio claim은 generator/server 분리, fixed/declared resource envelope, 동일 workload와 대표 조건 반복 결과로 검증한다.
@@ -15,7 +15,7 @@ Local 자원 배분은 초기 hypothesis이며 harness integration·obvious bott
 
 ```mermaid
 flowchart LR
-  W[1 Worker 용량] --> Q[2 Waiting 용량] --> R[3 Reservation 용량]
+  Z[0 Warmup Validation] --> W[1 Worker 용량] --> Q[2 Waiting 용량] --> R[3 Reservation 용량]
   R --> I[4 런타임 격리] --> B[5 한정 판매 Business]
   B --> E[실측 근거와 남은 한계 기록]
 ```
@@ -45,7 +45,7 @@ Primary contract는 accepted SUCCESS마다 confirmationDeadline(현재 Mock: acc
 drain 후 성공 시나리오 pending=0이다. 공급 종료 후 backlog가 계속 증가하거나 회복하지 못하면 실패다.
 oldest pending age와 deadline 잔여 예산을 함께 본다. 기존 약32/s 최소 요구는 폐기하며 40/s·125/s는 capacity probe/stress input일 뿐이다.
 Payment API는 durable acceptance를 책임진다. 정상 성공 202 accepted-only p95≤1초,
-Hikari timeout/unexpected 5xx/client timeout=0 및 durable DB state를 확인한다. 현재 혼합 `target_payment_ms`의 수정은 다음 작업이다.
+Hikari timeout/unexpected 5xx/client timeout=0 및 durable DB state를 확인한다. `target_payment_accepted_ms`로 판정하며 혼합 `target_payment_ms`는 진단용으로 유지한다.
 
 ## 2. Waiting — 대량 유입을 DB 밖에서 흡수하는 비용
 

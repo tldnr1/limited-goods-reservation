@@ -23,14 +23,14 @@ Burst/후속 PG delay는 normal latency SLO를 일률 적용하지 않고 accept
 retry/failure의 primary 계약은 멱등성·중복 방지·durable state·올바른 복구다. 반환 후 재구매 ≤5초는 secondary/stretch 목표이며,
 holdExpiresAt → release commit → AVAILABLE projection → READY → purchase → 새 HELD commit의 정확한 timestamp 없이는 인증하지 않는다.
 
-현재 Target Run -Reset은 JVM 재기동 직후 자동 warmup 없이 측정하므로 steady-state SLO 증거가 아니다.
+Target Run -Reset은 JVM 재기동 후 단계형 warmup을 검증하고 데이터 정리 뒤 같은 JVM에서 측정한다. 이전 자동 warmup 없는 결과는 steady-state SLO 증거가 아니다.
 Cold-start 결과도 deployment/startup characteristic으로 보존하고 steady-state capacity와 별도 기록하며 비교 시험의 warmup/reset 조건을 맞춘다.
 현재 local resource 배분과 25/s / 25/s / permit 8은 초기 hypothesis이며 변경하지 않는다. SLO는 resource budget과 함께만 의미가 있다.
 Local 결과는 harness integration·obvious bottleneck·logic/rate/pool mismatch와 수정 필요 여부를 확인한다.
 최종 claim은 generator/server 분리, fixed/declared resource envelope, 동일 workload와 대표 조건 반복 실행으로 검증한다.
 AWS instance type이나 최종 resource 숫자는 아직 정하지 않는다. 전체 계약은 [Target v1](target-v1.md)을 따른다.
 
-아래는 초기부터 완성된 설계를 따랐다는 주장이 아니라, 실험에서 발견한 문제에 따라 판단 기준을 발전시킨 기록이다. archive 수치는 해당 버전의 결과이며 현재 Java와 성능을 직접 비교하지 않는다. Target v1의 역할 분리·입장권·시간 계약은 구현됐지만 새 성능 목표는 아직 미달성이다.
+아래는 초기부터 완성된 설계를 따랐다는 주장이 아니라, 실험에서 발견한 문제에 따라 판단 기준을 발전시킨 기록이다. archive 수치는 해당 버전의 결과이며 현재 Java와 성능을 직접 비교하지 않는다. Target v1의 역할 분리·입장권·시간 계약은 구현됐지만 새 성능 목표는 아직 미검증이다.
 
 ## 1. 동시성 실패 재현 → 정합성 전략 비교 · 이전 Java v1~v2
 
@@ -66,7 +66,7 @@ AWS instance type이나 최종 resource 숫자는 아직 정하지 않는다. �
 
 - **문제:** 순간 구매 유입과 결제 확정을 함께 보호한 반복 검증 및 변경 전후 개선 수치가 아직 없다.
 - **원인·판단:** 외부 유입·점유·결제의 처리율과 시간 예산이 다르므로 실행 역할을 분리했다. Worker의 4건/250ms 공급 상한은 코드상 제거했으며, 실제 지속 처리량과 새로운 병목은 측정 전이다.
-- **해결·대안·한계:** DB 큐·현재 재고 모델을 유지한 채 Waiting/Reservation/Payment/Worker, READY 입장권, 300초 점유·접수+70초 PG 창을 구현하고 기능 계약을 검증했다. [기능 근거](../artifacts/target-v1/20260910-functional/review.md). 다음은 Worker → Waiting → Reservation → Isolation → 50,000명 Business 순서다. 기존 약32/s 최소 요구는 폐기하고 40/s·125/s는 capacity probe/stress input으로만 둔다. Worker primary는 backlog와 accepted SUCCESS별 deadline이다. confirmed/s·accepted/s·pending count·oldest age·active slots·job/PG time·Worker/Mock PG/PostgreSQL CPU·Hikari를 관측한다. [단계별 harness](target-v1-load-guide.md)는 새 SLO 검증 전이며, 자동 warmup·202 accepted-only metric·판정 정합화는 후속 구현이다. 현재 기존 주문 fixture는 공급 기간 최대180초다. 과거 계획의 단일5분 시험은 시간에 맞춘 fixture 보충이 필요하다. 대표 조건3회·개선율은 실제 반복/동일 조건 전후 측정 뒤 기록한다. MQ·unit별 재고와 catalog 최적화는 관측된 병목이 있을 때 검토한다.
+- **해결·대안·한계:** DB 큐·현재 재고 모델을 유지한 채 Waiting/Reservation/Payment/Worker, READY 입장권, 300초 점유·접수+70초 PG 창을 구현하고 기능 계약을 검증했다. [기능 근거](../artifacts/target-v1/20260910-functional/review.md). 다음은 Warmup Validation → Worker → Waiting → Reservation → Isolation → 50,000명 Business 순서다. 기존 약32/s 최소 요구는 폐기하고 40/s·125/s는 capacity probe/stress input으로만 둔다. Worker primary는 backlog와 accepted SUCCESS별 deadline이다. confirmed/s·accepted/s·pending count·oldest age·active slots·job/PG time·Worker/Mock PG/PostgreSQL CPU·Hikari를 관측한다. [단계별 harness](target-v1-load-guide.md)는 새 SLO 검증 전이며, 단계형 warmup/Validation·202 accepted-only metric·terminal timestamp/deadline·saleStart 판정과 MockPgDelayMs를 구현했다. 실제 Docker+k6 통합과 성능 달성은 미검증이다. 현재 기존 주문 fixture는 공급 기간 최대180초다. 과거 계획의 단일5분 시험은 시간에 맞춘 fixture 보충이 필요하다. 대표 조건3회·개선율은 실제 반복/동일 조건 전후 측정 뒤 기록한다. MQ·unit별 재고와 catalog 최적화는 관측된 병목이 있을 때 검토한다.
 
 ---
 

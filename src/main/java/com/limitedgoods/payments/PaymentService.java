@@ -66,6 +66,7 @@ public class PaymentService {
             return;
         }
         attempt.status=result.name();
+        if(attempt.terminal()) attempt.terminalAt=clock.instant();
         attempt.leaseUntil=null;
         attempt.nextCheckAt=clock.instant().plusSeconds(1);
         if(result==Result.SUCCEEDED) reservations.confirm(order);

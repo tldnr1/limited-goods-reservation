@@ -2,7 +2,7 @@
 
 ## 현재 Target v1 검증 방향
 
-기능 구현·계약 검증 이후, **Worker → Waiting → Reservation → Isolation → Business** 순서로 측정한다.
+기능 구현·계약 검증 이후, **Warmup Validation → Worker → Waiting → Reservation → Isolation → Business** 순서로 측정한다.
 [Target 실행 가이드](target-v1-load-guide.md)에 각 단계의 독립 실행·수집 지표·자동/수동 판정이 있고,
 [시나리오 아키텍처](target-v1-load-scenario.md)는 부하가 지나가는 역할을 시각화한다.
 자동화 준비는 실제 성능 검증과 구분한다. 이번 준비 작업에서는 실제 부하나 wall-clock 300초 시험을 하지 않았다.
@@ -20,11 +20,11 @@ Waiting의 READY 발급률은 유입 조절이고 Reservation rate/permit은 DB 
 역할별 풀 분리가 물리적 독립성이나 기동 장애 독립성을 뜻하지 않는다. catalog 전체 조회 최적화는 현재 보류한다.
 아래 baseline 수치·실행 이력은 변경 전 근거로 보존하며 Target 달성값으로 인용하지 않는다.
 
-Primary performance SLO는 warmup 이후 steady-state 기준이다. 현재 Target Run -Reset은 JVM을 재기동한 직후 자동 warmup 없이
-측정하므로 현재 방식의 결과를 steady-state SLO 증거로 사용하지 않는다. Cold-start 결과도 deployment/startup characteristic으로
+Primary performance SLO는 warmup 이후 steady-state 기준이다. Target Run -Reset은 재기동 후 단계형 warmup/Validation을 수행하고
+데이터 정리 후 동일 JVM에서 측정한다. 이전 자동 warmup 없는 결과는 steady-state 증거로 쓰지 않는다. Cold-start 결과도 deployment/startup characteristic으로
 보존하고 steady-state capacity와 별도로 기록한다. DB/OS 캐시가 남을 수 있으며 동일 비교 시험은 동일한 warmup/reset 조건을 사용한다.
-단계형 warmup, Mock PG delay, 202 accepted-only metric 구현은 후속 작업이다. 현재 혼합 `target_payment_ms`와
-`target-review.ps1`의 legacy 처리율 안내/자동 판정은 새 계약에 아직 맞지 않으며 이번에는 변경하지 않는다.
+단계형 warmup/Validation, MockPgDelayMs(기본 0, 0~5000ms), 202 accepted-only metric, terminal_at/deadline evidence와 saleStart 판정을 구현했다.
+혼합 `target_payment_ms`는 진단용이며 review의 legacy 32/40 처리율 요구를 제거했다. 실제 k6 통합/성능 검증은 아직 하지 않았다.
 
 ## Baseline 실행 이력의 범위
 

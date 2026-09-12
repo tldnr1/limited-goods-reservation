@@ -24,7 +24,7 @@ $initialize={
             }
             return $arguments[4..14] | ForEach-Object { @{Name=$_} | ConvertTo-Json -Compress }
         }
-        if ($arguments[0] -eq 'ps' -and $arguments[2] -eq 'name=^/goods-target-k6$') { return }
+        if ($arguments[0] -eq 'ps' -and $arguments[2] -in @('name=^/goods-target-k6$','name=^/goods-target-warmup-k6$')) { return }
         if ($arguments[0] -eq 'exec' -and $arguments[1] -eq 'id-redis') {
             switch ($arguments[3]) {
                 'INFO' { return 'redis_version:offline' }
@@ -39,7 +39,7 @@ $initialize={
     }
     function Start-Sleep {
         param($Seconds)
-        $expected=if ((Split-Path $Directory -Leaf) -like 'business-*') {1} else {5}
+        $expected=if ((Split-Path $Directory -Leaf) -match '^(business|warmup)-') {1} else {5}
         if ($Seconds -ne $expected) { throw 'Sampling interval was lost' }
         # End after one sample without sleeping or running load.
         Set-Content -LiteralPath "$Directory/stop-observer" 'offline-stop'
@@ -97,21 +97,21 @@ try {
     New-Item -ItemType Directory -Path $scriptDirectory,"$testRoot/unrelated" -Force | Out-Null
     Copy-Item -LiteralPath "$PSScriptRoot/target-observe.ps1","$PSScriptRoot/target-state.sql" -Destination $scriptDirectory
     $tokens=$null; $errors=$null
-    $ast=[System.Management.Automation.Language.Parser]::ParseFile("$PSScriptRoot/target.ps1",[ref]$tokens,[ref]$errors)
+    $ast=[System.Management.Automation.Language.Parser]::ParseFile("$PSScriptRoot/target-trial.ps1",[ref]$tokens,[ref]$errors)
     Assert ($errors.Count -eq 0) 'Target parse error'
     $launch=@($ast.FindAll({param($node) $node -is [System.Management.Automation.Language.CommandAst] -and $node.GetCommandName() -eq 'Start-Job'},$true))
     Assert ($launch.Count -eq 1) 'Expected one Target observer launch'
     # Use the actual production expression from a relocated script, not a duplicate launcher.
-    Set-Content -LiteralPath "$scriptDirectory/launch.ps1" -Value ('param($directory,$ids,$Scenario)' + "`n" + $launch[0].Extent.Text)
+    Set-Content -LiteralPath "$scriptDirectory/launch.ps1" -Value ('param($directory,$ids,$Scenario)' + "`n" + '$generatorName=if ($Scenario -eq ''warmup'') {''goods-target-warmup-k6''} else {''goods-target-k6''}' + "`n" + $launch[0].Extent.Text)
     Push-Location "$testRoot/unrelated"
     try {
-        foreach ($scenario in @('worker','waiting','reservation','isolation','business')) { Invoke-Case $scenario }
+        foreach ($scenario in @('warmup','worker','waiting','reservation','isolation','business')) { Invoke-Case $scenario }
         Invoke-Case 'worker' 'docker'
         Invoke-Case 'worker' 'json'
         Remove-Item -LiteralPath "$scriptDirectory/target-state.sql"
         Invoke-Case 'worker' 'sql'
     } finally { Pop-Location }
-    '8 observer process checks passed (real Start-Job; mocked Docker; no HTTP, k6, or sleeps).'
+    '9 observer process checks passed (real Start-Job; mocked Docker; no HTTP, k6, or sleeps).'
 } finally {
     if ($job) { Stop-Job $job; Remove-Job $job }
     $resolved=[IO.Path]::GetFullPath($testRoot)

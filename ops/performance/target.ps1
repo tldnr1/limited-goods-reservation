@@ -1,11 +1,11 @@
 #requires -Version 7.0
 param(
     [ValidateSet('Check','Prepare','Run')][string]$Action='Check',
-    [ValidateSet('worker','waiting','reservation','isolation','business')][string]$Scenario='worker',
+    [ValidateSet('warmup','worker','waiting','reservation','isolation','business')][string]$Scenario='worker',
     [ValidateSet('normal','burst','late-payment','abandon','retry','pg-failure')][string]$Variant='normal',
     [int]$Rps=0,[int]$DurationSeconds=60,[int]$Stock=1000,[int]$Users=50000,[int]$PaymentRps=40,
     [int]$Vus=100,[int]$MaxVus=2000,[int]$WaitingRate=25,[int]$ReservationRate=25,[int]$Permits=8,
-    [int]$Seed=20260911,[switch]$Diagnostics,[switch]$Reset
+    [ValidateRange(0,5000)][int]$MockPgDelayMs=0,[int]$Seed=20260911,[switch]$Diagnostics,[switch]$Reset
 )
 $ErrorActionPreference='Stop'
 $PSNativeCommandUseErrorActionPreference=$false
@@ -15,9 +15,6 @@ $services=@('api1','api2','reservation','payment','worker','mock-pg')
 $apps=@('nginx','checkout-nginx')+$services
 $saved=@{}
 $directory=$null
-$observer=$null
-$loadStarted=$null
-$loadExit=$null
 $ids=@{}
 $executionLock=$null
 function Invoke-Docker([string[]]$Arguments) {
@@ -31,7 +28,7 @@ function Sql([string]$Statement) {
     return $output
 }
 function Assert-NoOtherWork {
-    foreach ($name in @('goods-k6','goods-target-k6')) {
+    foreach ($name in @('goods-k6','goods-target-k6','goods-target-warmup-k6')) {
         if (Invoke-Docker @('ps','--filter',"name=^/$name$",'-q')) { throw "$name 실행 중. 먼저 종료하세요." }
     }
     foreach ($service in $services) {
@@ -66,6 +63,7 @@ function Assert-Ready([switch]$WaitForScrape) {
         $expected=@()
         if ($service -in @('api1','api2')) { $expected=@("APP_WAITING_RATE=$WaitingRate") }
         if ($service -eq 'reservation') { $expected=@("RESERVATION_RATE=$ReservationRate","ADMISSION_PERMITS=$Permits") }
+        if ($service -eq 'mock-pg') { $expected=@("MOCK_PG_DELAY_MS=$MockPgDelayMs") }
         foreach ($setting in $expected) { if ($info.Config.Env -notcontains $setting) { throw "Prepare 설정과 불일치: $setting" } }
     }
     $query=[Uri]::EscapeDataString('up{job="target"}')
@@ -79,6 +77,8 @@ function Assert-Ready([switch]$WaitForScrape) {
 }
 function Save-Json($Value,[string]$Path) { $Value | ConvertTo-Json -Depth 30 | Set-Content $Path -Encoding utf8 }
 
+. (Join-Path $PSScriptRoot 'target-trial.ps1')
+. (Join-Path $PSScriptRoot 'target-warmup-cleanup.ps1')
 Push-Location $root
 try {
     if ($Diagnostics) { throw 'Target은 공통 관측을 항상 수집합니다. baseline -Diagnostics를 혼용하지 마세요.' }
@@ -87,13 +87,13 @@ try {
     if ($Action -eq 'Run') {
         if ($DurationSeconds -lt 1 -or $DurationSeconds -gt 180 -or $Vus -lt 1 -or $MaxVus -lt $Vus -or $PaymentRps -lt 1 -or
             $Stock -lt 1 -or $Stock -gt 1000000 -or $Users -lt 10 -or $Users -gt 50000 -or $Users % 10 -ne 0 -or
-            ($Scenario -ne 'business' -and ($Rps -lt 1 -or $Rps -gt 100000))) { throw '잘못된 부하 설정. 실행 가이드의 범위를 확인하세요.' }
+            ($Scenario -notin @('business','warmup') -and ($Rps -lt 1 -or $Rps -gt 100000))) { throw '잘못된 부하 설정. 실행 가이드의 범위를 확인하세요.' }
         if ($Scenario -ne 'business' -and $Variant -ne 'normal' -and -not ($Scenario -in @('waiting','isolation') -and $Variant -eq 'abandon')) {
             throw '이 variant는 Business 전용입니다. Waiting/Isolation은 normal 또는 abandon만 지원합니다.'
         }
         if ($Scenario -eq 'reservation' -and $Stock -lt $Rps*$DurationSeconds) { throw 'Reservation은 전체 유입 이상 재고를 지정하세요.' }
     }
-    foreach ($entry in @{DB_NAME='limited_goods_perf';APP_ENV='perf';ADMISSION_ENABLED='true';TARGET_WAITING_RATE="$WaitingRate";TARGET_RESERVATION_RATE="$ReservationRate";TARGET_PERMITS="$Permits"}.GetEnumerator()) {
+    foreach ($entry in @{DB_NAME='limited_goods_perf';APP_ENV='perf';ADMISSION_ENABLED='true';TARGET_WAITING_RATE="$WaitingRate";TARGET_RESERVATION_RATE="$ReservationRate";TARGET_PERMITS="$Permits";MOCK_PG_DELAY_MS="$MockPgDelayMs"}.GetEnumerator()) {
         $saved[$entry.Key]=[Environment]::GetEnvironmentVariable($entry.Key,'Process')
         [Environment]::SetEnvironmentVariable($entry.Key,$entry.Value,'Process')
     }
@@ -124,13 +124,12 @@ try {
     $runId=[Guid]::NewGuid().ToString('N')
     $directory=Join-Path $root "artifacts/performance/$(Get-Date -Format yyyyMMdd-HHmmss-fff)-target-$Scenario-$Variant"
     New-Item -ItemType Directory $directory | Out-Null
-    $config=[ordered]@{runId=$runId;scenario=$Scenario;variant=$Variant;rps=$Rps;durationSeconds=$DurationSeconds;stock=$Stock;users=$Users;paymentRps=$PaymentRps;vus=$Vus;maxVus=$MaxVus;waitingRate=$WaitingRate;reservationRate=$ReservationRate;permits=$Permits;seed=$Seed;reset=[bool]$Reset}
+    $config=[ordered]@{runId=$runId;scenario=$Scenario;variant=$Variant;rps=$Rps;durationSeconds=$DurationSeconds;stock=$Stock;users=$Users;paymentRps=$PaymentRps;vus=$Vus;maxVus=$MaxVus;waitingRate=$WaitingRate;reservationRate=$ReservationRate;permits=$Permits;seed=$Seed;mockPgDelayMs=$MockPgDelayMs;reset=[bool]$Reset}
     Save-Json $config "$directory/config.json"
     Invoke-Docker ($compose+@('config')) | Set-Content "$directory/compose.yaml"
     git rev-parse HEAD | Set-Content "$directory/commit.txt"
     git diff HEAD | Set-Content "$directory/working-tree.patch"
     git status --short | Set-Content "$directory/git-status.txt"
-    Copy-Item k6/target -Destination "$directory/scripts" -Recurse
     Copy-Item ops/performance/target*.ps1,ops/performance/target*.sql -Destination $directory
     Get-FileHash build/libs/limited-goods.jar | Select-Object Algorithm,Hash | ConvertTo-Json | Set-Content "$directory/jar-hash.json"
     if ($Reset) {
@@ -144,112 +143,24 @@ try {
         Invoke-Docker ($compose+@('up','-d','--no-build','--pull','never','--wait','--wait-timeout','300'))
         Assert-Ready -WaitForScrape
     }
-    Save-Json (Invoke-Docker (@('inspect')+@($ids.Values)) | ConvertFrom-Json) "$directory/before-containers.json"
-    # Fixture sales and held orders are setup, excluded from the measured arrival window.
-    $saleBody=@{name="target-$runId";opensAt=[DateTimeOffset]::UtcNow.AddSeconds(-10).ToString('o');items=@(@{name='goods';price=10000;total=$Stock;perUserLimit=1})}
-    $sale=Invoke-RestMethod 'http://127.0.0.1:8082/api/sales' -Method Post -ContentType 'application/json' -Body ($saleBody | ConvertTo-Json -Depth 5) -TimeoutSec 5
-    $orders=@()
-    if ($Scenario -in @('worker','isolation')) {
-        $count=($DurationSeconds * $(if ($Scenario -eq 'worker') { $Rps } else { $PaymentRps }))+1
-        if ($count -gt 1000000) { throw 'Payment fixture exceeds maximum stock' }
-        $saleBody.name="payment-$runId"; $saleBody.items[0].total=$count
-        $paymentSale=Invoke-RestMethod 'http://127.0.0.1:8082/api/sales' -Method Post -ContentType 'application/json' -Body ($saleBody | ConvertTo-Json -Depth 5) -TimeoutSec 5
-        $saleId=[Guid]$paymentSale.id; $itemId=[Guid]$paymentSale.items[0].id
-        # State-consistent setup only. All measured payment acceptance still goes through Payment API.
-        $seedSql=@"
-BEGIN;
-CREATE TEMP TABLE fixture_orders AS SELECT gen_random_uuid() id,n FROM generate_series(0,$($count-1)) n;
-INSERT INTO orders SELECT id,'fixture-'||n,'$saleId','purchase','$saleId' || ':' || '$itemId' || '=1','PAYMENT_PENDING',10000,now() FROM fixture_orders;
-INSERT INTO order_items SELECT gen_random_uuid(),id,'$itemId',1,10000 FROM fixture_orders;
-INSERT INTO reservations SELECT id,'ACTIVE',now()+interval '300 seconds',NULL FROM fixture_orders;
-UPDATE sale_items SET available=0,held=total WHERE id='$itemId';
-SELECT json_agg(json_build_object('id',id,'user','fixture-'||n) ORDER BY n) FROM fixture_orders;
-COMMIT;
-"@
-        $orders=@(Sql $seedSql | ConvertFrom-Json)
+    $warmupConfig=@{} + $config
+    $warmupConfig.scenario='warmup'; $warmupConfig.variant='normal'; $warmupConfig.stock=400
+    $warmupConfig.users=270; $warmupConfig.durationSeconds=40; $warmupConfig.vus=40; $warmupConfig.maxVus=40
+    $warmupConfig.rps=10; $warmupConfig.runId="$runId-warmup"
+    if ($Scenario -eq 'warmup') {
+        Invoke-TargetTrial $warmupConfig $directory
+    } else {
+        $warmupDirectory=Join-Path $directory 'warmup'
+        Invoke-TargetTrial $warmupConfig $warmupDirectory
+        Remove-TargetWarmup $warmupDirectory
+        # No up/restart/reset after this boundary. Keep all warmed JVMs running.
+        Invoke-TargetTrial (@{} + $config) $directory
     }
-    Save-Json @{sale=$sale} "$directory/fixture.json"
-    ConvertTo-Json -InputObject @($orders) -Depth 5 | Set-Content "$directory/orders.json" -Encoding utf8
-    # Bounded readiness check, not a workload: projection must exist before measurement.
-    $projected=$false
-    for ($i=0;$i -lt 10;$i++) {
-        $value=Invoke-Docker @('exec',$ids.redis,'redis-cli','GET',"goods:perf:catalog:$($sale.id)")
-        if ($value -match ':AVAILABLE$') { $projected=$true; break }
-        Start-Sleep -Milliseconds 250
-    }
-    if (-not $projected) { throw 'Sale projection not ready' }
-    Sql (Get-Content "$PSScriptRoot/target-state.sql" -Raw) | Set-Content "$directory/before-db.json"
-    $observationStart=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    # -FilePath runs script text without its file context. Invoke the absolute path in the child instead.
-    $observer=Start-Job -ScriptBlock {
-        param([string]$ObserverPath,[hashtable]$ObserverParameters)
-        & $ObserverPath @ObserverParameters
-    } -ArgumentList "$PSScriptRoot/target-observe.ps1",@{
-        Directory=$directory;Postgres=$ids.postgres;Redis=$ids.redis;Containers=@($ids.Values)
-        IntervalSeconds=$(if ($Scenario -eq 'business') { 1 } else { 5 })
-    }
-    for ($i=0;$i -lt 20 -and -not (Test-Path "$directory/observer-ready");$i++) {
-        if ($observer.State -eq 'Failed' -or (Test-Path "$directory/observer-error.txt")) { throw 'Observer startup failed' }
-        Start-Sleep -Seconds 1
-    }
-    if (-not (Test-Path "$directory/observer-ready")) { throw 'Observer readiness timed out' }
-    $network=@((Invoke-Docker @('inspect',$ids.nginx) | ConvertFrom-Json))[0].NetworkSettings.Networks.PSObject.Properties.Name | Select-Object -First 1
-    $loadStarted=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    Save-Json @{observationStart=$observationStart;dockerStart=$loadStarted;status='running'} "$directory/phases.json"
-    $arguments=@('run','--rm','--name','goods-target-k6','--network',$network,'--cpus','1.5','--memory','1g',
-        '--mount',"type=bind,source=$directory/scripts,target=/scripts,readonly",
-        '--mount',"type=bind,source=$directory,target=/results",
-        '-e','TARGET_CONFIG=/results/config.json','-e','TARGET_FIXTURE=/results/fixture.json','-e','TARGET_ORDERS=/results/orders.json',
-        'grafana/k6:0.54.0','run','--out','json=/results/raw.json',"/scripts/$Scenario.js")
-    Write-Output "실제 부하: $Scenario / $Variant. 자동 상승/재실행 없음. 결과: $directory"
-    & docker @arguments 2>&1 | Tee-Object "$directory/k6.log"
-    $loadExit=$LASTEXITCODE
-    Set-Content "$directory/k6-exit.txt" $loadExit
-    $loadFinished=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    # Success or threshold failure: keep an equal, bounded drain observation window.
-    Start-Sleep -Seconds 30
-    $match=Select-String -Path "$directory/k6.log" -Pattern 'TARGET_MEASUREMENT_START=(\d+)' | Select-Object -First 1
-    if (-not $match) { throw 'k6 measurement boundary missing' }
-    $measurementStart=[double]$match.Matches[0].Groups[1].Value / 1000
-    Save-Json @{observationStart=$observationStart;measurementStart=$measurementStart;arrivalEnd=$measurementStart+$(if ($Scenario -eq 'business') { if ($Variant -eq 'abandon') {360} else {60} } else {$DurationSeconds});loadFinished=$loadFinished;drainEnd=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds();status='collected'} "$directory/phases.json"
 } catch {
     if ($directory) { $_ | Out-String | Set-Content "$directory/error.txt" }
     throw
 } finally {
-    if ($directory) {
-        if ($observer) {
-            Set-Content "$directory/stop-observer" 'stop'
-            $null=Wait-Job $observer -Timeout 20
-            if ($observer.State -eq 'Running') { Stop-Job $observer }
-            Receive-Job $observer -ErrorAction Continue 2>&1 | Out-File "$directory/observer.log"
-            Remove-Job $observer
-        }
-        # Preserve each independent piece of evidence even after a run/collection failure.
-        $collectors=@{
-            'after-db.json'={ Sql (Get-Content "$PSScriptRoot/target-state.sql" -Raw) };
-            'timeline.json'={ Sql (Get-Content "$PSScriptRoot/target-timeline.sql" -Raw) };
-            'after-containers.json'={ Invoke-Docker (@('inspect')+@($ids.Values)) };
-            'redis-slowlog.txt'={ Invoke-Docker @('exec',$ids.redis,'redis-cli','SLOWLOG','GET','128') };
-            'services.log'={ Invoke-Docker ($compose+@('logs','--no-color','--since',$(if ($loadStarted) {$loadStarted} else {[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()}))) }
-        }
-        foreach ($entry in $collectors.GetEnumerator()) {
-            try { & $entry.Value | Set-Content "$directory/$($entry.Key)" }
-            catch { $_ | Out-String | Add-Content "$directory/collection-errors.txt" }
-        }
-        if ($loadStarted) {
-            try {
-                $query=[Uri]::EscapeDataString('{job="target",__name__=~"up|goods_.*|hikaricp_.*|process_.*|jvm_.*|http_server_requests_.*"}')
-                $end=[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-                Invoke-WebRequest "http://127.0.0.1:9090/api/v1/query_range?query=$query&start=$observationStart&end=$end&step=1" -TimeoutSec 60 -OutFile "$directory/prometheus.json"
-            } catch { $_ | Out-String | Add-Content "$directory/collection-errors.txt" }
-            try { & "$PSScriptRoot/target-review.ps1" -Directory $directory }
-            catch { $_ | Out-String | Add-Content "$directory/collection-errors.txt" }
-        }
-    }
     foreach ($key in $saved.Keys) { [Environment]::SetEnvironmentVariable($key,$saved[$key],'Process') }
     if ($executionLock) { $executionLock.Dispose() }
     Pop-Location
 }
-if ($loadExit -ne 0 -or (Test-Path "$directory/error.txt") -or (Test-Path "$directory/collection-errors.txt")) { throw "실행/수집 실패. $directory 자료를 확인하세요." }
-if ((Get-Content "$directory/result.json" -Raw | ConvertFrom-Json).status -eq 'failed') { throw "자동 검사 실패. $directory/result.json을 확인하세요." }
-Write-Output "수집 완료. result.json의 자동 검사와 수동 판정을 함께 확인하세요: $directory"

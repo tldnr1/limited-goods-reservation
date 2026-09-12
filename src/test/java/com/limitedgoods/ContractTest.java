@@ -140,7 +140,11 @@ class ContractTest {
         var sale=sale(2,2,1); var order=buy(sale,"u","first",2);
         var p=payments.start(order.id(),"u","p1",PaymentService.Scenario.FAILURE);
         payments.apply(p.id(),20000,PaymentService.Result.FAILED);
+        var terminal=jdbc.queryForObject("select terminal_at from payment_attempts where id=?",java.sql.Timestamp.class,p.id()).toInstant();
+        assertThat(terminal).isEqualTo(clock.instant());
         clock.advance(10);
+        payments.apply(p.id(),20000,PaymentService.Result.FAILED);
+        assertThat(jdbc.queryForObject("select terminal_at from payment_attempts where id=?",java.sql.Timestamp.class,p.id()).toInstant()).isEqualTo(terminal);
         payments.start(order.id(),"u","p2",PaymentService.Scenario.SUCCESS);
         assertThat(orders.get(order.id(),"u").holdExpiresAt()).isEqualTo(order.holdExpiresAt());
     }
@@ -148,6 +152,7 @@ class ContractTest {
         var sale=sale(1,1,1); var order=buy(sale,"u","first",1);
         var p=payments.start(order.id(),"u","p",PaymentService.Scenario.UNKNOWN);
         payments.apply(p.id(),10000,PaymentService.Result.UNKNOWN);
+        assertThat(jdbc.queryForObject("select terminal_at from payment_attempts where id=?",java.sql.Timestamp.class,p.id())).isNull();
         clock.advance(320);
         assertThat(reservations.expire(order.id())).isFalse();
         assertThatThrownBy(()->payments.start(order.id(),"u","again",PaymentService.Scenario.SUCCESS))
@@ -206,6 +211,11 @@ class ContractTest {
         clock.advance(4);
         payments.apply(p.id(),work.amount(),pg.accept(work).response().result());
         assertThat(orders.get(order.id(),"u").status()).isEqualTo("CONFIRMED");
+        var terminal=clock.instant();
+        assertThat(jdbc.queryForObject("select terminal_at from payment_attempts where id=?",java.sql.Timestamp.class,p.id()).toInstant()).isEqualTo(terminal);
+        clock.advance(5);
+        payments.apply(p.id(),work.amount(),PaymentService.Result.SUCCEEDED);
+        assertThat(jdbc.queryForObject("select terminal_at from payment_attempts where id=?",java.sql.Timestamp.class,p.id()).toInstant()).isEqualTo(terminal);
     }
     @Test void callbackChecksSecretAndAmount() {
         var order=buy(sale(1,1,1),"u","first",1);
@@ -275,5 +285,28 @@ class ContractTest {
         var protectedPurchases=new PurchaseService(delayed,transactions,tickets,true,new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
         assertThatThrownBy(()->protectedPurchases.purchase("u","key",request,token)).hasMessage("ADMISSION_EXPIRED");
         assertThat(jdbc.queryForObject("select count(*) from orders",Long.class)).isZero();
+    }
+    @Test void targetEvidenceDistinguishesPendingDeadlineAndTerminalTime() throws Exception {
+        var order=buy(sale(1,1,1),"u","key",1);
+        var p=payments.start(order.id(),"u","pay",PaymentService.Scenario.SUCCESS);
+        String sql=java.nio.file.Files.readString(java.nio.file.Path.of("ops/performance/target-state.sql"));
+        var json=new com.fasterxml.jackson.databind.ObjectMapper();
+        jdbc.update("update reservations set confirmation_deadline=now()+interval '60 seconds' where order_id=?",order.id());
+        var pending=json.readTree(jdbc.queryForObject(sql,String.class));
+        assertThat(pending.get("successPending").asInt()).isEqualTo(1);
+        assertThat(pending.get("successDeadlineViolations").asInt()).isZero();
+        jdbc.update("update reservations set confirmation_deadline=now()-interval '1 second' where order_id=?",order.id());
+        assertThat(json.readTree(jdbc.queryForObject(sql,String.class)).get("successDeadlineViolations").asInt()).isEqualTo(1);
+        payments.apply(p.id(),10000,PaymentService.Result.SUCCEEDED);
+        jdbc.update("update reservations set confirmation_deadline=? where order_id=?",java.sql.Timestamp.from(clock.instant().minusSeconds(1)),order.id());
+        var late=json.readTree(jdbc.queryForObject(sql,String.class));
+        assertThat(late.get("successConfirmed").asInt()).isEqualTo(1);
+        assertThat(late.get("successPending").asInt()).isZero();
+        assertThat(late.get("successDeadlineViolations").asInt()).isEqualTo(1);
+        jdbc.update("update reservations set confirmation_deadline=? where order_id=?",java.sql.Timestamp.from(clock.instant()),order.id());
+        assertThat(json.readTree(jdbc.queryForObject(sql,String.class)).get("successDeadlineViolations").asInt()).isZero();
+        var timeline=json.readTree(jdbc.queryForObject(java.nio.file.Files.readString(java.nio.file.Path.of("ops/performance/target-timeline.sql")),String.class));
+        assertThat(timeline.get("payments").get(0).hasNonNull("terminal_at")).isTrue();
+        assertThat(timeline.get("payments").get(0).hasNonNull("confirmation_deadline")).isTrue();
     }
 }

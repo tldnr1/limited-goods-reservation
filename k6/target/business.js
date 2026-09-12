@@ -1,4 +1,4 @@
-import { config, arrival, thresholds, browser } from './common.js';
+import { config, arrival, thresholds, browser, primaryNormal, paymentThresholds, waitingThresholds } from './common.js';
 export { handleSummary, setup } from './common.js';
 const scenarios = {
   opening: arrival(config.users * 0.6, '5s', 'buyPay', '0s', '5s'),
@@ -8,7 +8,8 @@ const scenarios = {
 if (config.variant === 'abandon') {
   scenarios.returning = arrival(config.stock, '60s', 'buyPay', '300s', '60s');
 }
-export const options = { scenarios, thresholds: thresholds({
-  target_purchase_accepted_ms: ['p(99)<=1000'], target_payment_ms: ['p(95)<=1000'],
+export const options = { scenarios, setupTimeout: '120s', thresholds: thresholds({
+  ...(config.variant !== 'late-payment' ? { target_payment_rejected: ['rate==0'] } : {}),
+  ...(primaryNormal ? { target_purchase_accepted_ms: ['p(99)<=1000'], ...paymentThresholds(), ...waitingThresholds() } : {}),
 }) };
 export function buyPay(timing) { browser(true, true, timing); }

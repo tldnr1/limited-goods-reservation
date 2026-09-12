@@ -2,23 +2,26 @@
 $ErrorActionPreference='Stop'
 $directory=Join-Path ([IO.Path]::GetTempPath()) "target-review-$([Guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory $directory | Out-Null
+$checks=0
 function Json($value,$name) { $value | ConvertTo-Json -Depth 20 | Set-Content "$directory/$name" }
 function Verify($expected) {
+    $script:checks++
     & "$PSScriptRoot/target-review.ps1" -Directory $directory | Out-Null
     $result=Get-Content "$directory/result.json" -Raw | ConvertFrom-Json
     if ($result.status -ne $expected) { throw "Expected $expected, got $($result | ConvertTo-Json -Depth 6)" }
 }
 try {
-    Json @{scenario='worker';variant='normal';rps=40;durationSeconds=60} 'config.json'
+    Json @{scenario='worker';variant='normal';mockPgDelayMs=0;rps=40;durationSeconds=60} 'config.json'
     Json @{status='collected';measurementStart=1800000000;arrivalEnd=1800000060} 'phases.json'
-    $state=@{at='2027-01-15T08:00:01Z';inventoryViolations=0;userLimitViolations=0;holdViolations=0;duplicateSuccess=0;waitingDbConnections=0;confirmed=2400;succeeded=2400;pending=0;failed=0;oldestPendingSeconds=0}
+    $state=@{at='2027-01-15T08:00:01Z';inventoryViolations=0;userLimitViolations=0;holdViolations=0;duplicateSuccess=0;waitingDbConnections=0;confirmed=2400;succeeded=2400;pending=0;failed=0;oldestPendingSeconds=0;successAccepted=2400;successConfirmed=2400;successPending=0;successDeadlineViolations=0;terminalEvidenceMissing=0}
     Json $state 'after-db.json'; Json $state 'before-db.json'
     $state | ConvertTo-Json -Compress | Set-Content "$directory/db-samples.jsonl"
     $state.at='2027-01-15T08:00:50Z'
     $state | ConvertTo-Json -Compress | Add-Content "$directory/db-samples.jsonl"
     $metrics=@{}
     foreach ($name in @('target_started','target_finished','target_payment_accepted')) { $metrics[$name]=@{values=@{count=2400}} }
-    $metrics.target_payment_ms=@{thresholds=@{'p(95)<=1000'=@{ok=$true}}}
+    $metrics.target_payment_accepted_ms=@{thresholds=@{'p(95)<=1000'=@{ok=$true}}}
+    $metrics['target_unexpected{endpoint:payment_accept}']=@{thresholds=@{'rate==0'=@{ok=$true}}}
     $metrics.target_payment_rejected=@{thresholds=@{'rate==0'=@{ok=$true}}}
     $metrics.target_unexpected=@{thresholds=@{'rate<=0.001'=@{ok=$true}}}
     $metrics.dropped_iterations=@{thresholds=@{'count==0'=@{ok=$true}}}
@@ -39,11 +42,11 @@ try {
     if (-not ($mismatch.issues -like '*HTTP/DB payment count mismatch*') -or
         ($mismatch.issues -like '*remain pending*')) { throw 'Response loss was misreported as unfinished Worker jobs' }
     $state.confirmed=2400; $state.succeeded=2400; Json $state 'after-db.json'
-    $paymentThreshold=$metrics.target_payment_ms
-    $metrics.Remove('target_payment_ms')
+    $paymentThreshold=$metrics.target_payment_accepted_ms
+    $metrics.Remove('target_payment_accepted_ms')
     Json @{metrics=$metrics} 'k6-summary.json'
     Verify 'failed'
-    $metrics.target_payment_ms=$paymentThreshold
+    $metrics.target_payment_accepted_ms=$paymentThreshold
     $metrics.dropped_iterations.thresholds=@{}
     Json @{metrics=$metrics} 'k6-summary.json'
     Verify 'failed'
@@ -53,17 +56,67 @@ try {
     Json $state 'after-db.json'
     Verify 'failed'
     $state.pending=0; Json $state 'after-db.json'
-    $metrics.target_payment_ms.thresholds.'p(95)<=1000'.ok=$false
+    $metrics.target_payment_accepted_ms.thresholds.'p(95)<=1000'.ok=$false
     Json @{metrics=$metrics} 'k6-summary.json'
     Verify 'failed'
-    $metrics.target_payment_ms.thresholds.'p(95)<=1000'.ok=$true
+    $metrics.target_payment_accepted_ms.thresholds.'p(95)<=1000'.ok=$true
     Json @{metrics=$metrics} 'k6-summary.json'
     $series[-1].values[-1][1]='1'
     Json @{status='success';data=@{result=$series}} 'prometheus.json'
     Verify 'failed'
+    $series[-1].values[-1][1]='0'
+    Json @{status='success';data=@{result=$series}} 'prometheus.json'
+    $metrics.target_payment_ms=@{values=@{'p(95)'=9000}}
+    Json @{metrics=$metrics} 'k6-summary.json'
+    Verify 'requires_review'
+    $state.successDeadlineViolations=1
+    Json $state 'after-db.json'
+    Verify 'failed'
+    $state.successDeadlineViolations=0; $state.successPending=1
+    Json $state 'after-db.json'
+    Verify 'failed'
+    $state.successPending=0; Json $state 'after-db.json'
+    $latest=Get-Content "$directory/result.json" -Raw | ConvertFrom-Json
+    if ($latest.manualReview -match '32/s required|40/s normal target') { throw 'Legacy Worker contract remains' }
+    # Sale opens 100 seconds BEFORE measurement; a measurement-relative check would incorrectly pass.
+    Json @{scenario='business';variant='normal';mockPgDelayMs=0;users=2400;stock=1} 'config.json'
+    Json @{status='collected';saleStart=1799999900;measurementStart=1800000000;arrivalEnd=1800000060} 'phases.json'
+    $metrics.target_held=@{values=@{count=1}}
+    $metrics.target_purchase_accepted_ms=@{thresholds=@{'p(99)<=1000'=@{ok=$true}}}
+    foreach ($endpoint in @('waiting_join','waiting_poll')) {
+        $metrics["target_latency{endpoint:$endpoint}"]=@{thresholds=@{'p(99)<=1000'=@{ok=$true}}}
+        $metrics["target_unexpected{endpoint:$endpoint}"]=@{thresholds=@{'rate==0'=@{ok=$true}}}
+    }
+    Json @{metrics=$metrics} 'k6-summary.json'
+    $state.orders=1; Json $state 'after-db.json'
+    Json @{orders=@(@{created_at='2027-01-15T08:00:01Z'});payments=@(@{status='SUCCEEDED';terminal_at='2027-01-15T08:00:30Z'})} 'timeline.json'
+    Verify 'failed'
+    $latest=Get-Content "$directory/result.json" -Raw | ConvertFrom-Json
+    if (-not ($latest.issues -like '*saleStart +60*') -or -not ($latest.issues -like '*saleStart +120*')) { throw 'Business ignored saleStart' }
+    Json @{status='collected';saleStart=1800000000;measurementStart=1800000000;arrivalEnd=1800000060} 'phases.json'
+    Verify 'requires_review'
+    $latest=Get-Content "$directory/result.json" -Raw | ConvertFrom-Json
+    if (-not ($latest.manualReview -like '*Scaled flow/harness validation*')) { throw 'Scaled run claimed 50k SLO' }
+    # Warmup validates safety/durability, not capacity latency. Accumulated stable counters are allowed.
+    Json @{scenario='warmup';variant='normal';mockPgDelayMs=0} 'config.json'
+    foreach ($name in @('target_started','target_finished','target_payment_accepted','target_held')) { $metrics[$name]=@{values=@{count=270}} }
+    $metrics=@{target_started=$metrics.target_started;target_finished=$metrics.target_finished;target_payment_accepted=$metrics.target_payment_accepted;
+        target_held=$metrics.target_held;target_unexpected=@{thresholds=@{'rate==0'=@{ok=$true}}};
+        target_payment_rejected=@{thresholds=@{'rate==0'=@{ok=$true}}};dropped_iterations=@{thresholds=@{'count==0'=@{ok=$true}}}}
+    Json @{metrics=$metrics} 'k6-summary.json'
+    $state.orders=270; $state.attempts=270; $state.confirmed=270; $state.succeeded=270; $state.successAccepted=270; $state.successConfirmed=270
+    Json $state 'after-db.json'
+    Set-Content "$directory/raw.json" '{"type":"Point","metric":"target_latency","data":{"value":2000,"tags":{"stage":"warmup_3"}}}'
+    Add-Content "$directory/raw.json" '{"type":"Point","metric":"target_latency","data":{"value":3000,"tags":{"stage":"warmup_4"}}}'
+    $series[-1].values[0][1]='2'; $series[-1].values[-1][1]='2'
+    Json @{status='success';data=@{result=$series}} 'prometheus.json'
+    Verify 'passed'
+    $metrics.target_unexpected.thresholds.'rate==0'.ok=$false
+    Json @{metrics=$metrics} 'k6-summary.json'
+    Verify 'failed'
     Remove-Item -LiteralPath "$directory/prometheus.json"
     Verify 'failed'
-    '8 offline result-review checks passed.'
+    "$checks offline result-review checks passed."
 } finally {
     # Delete only this test's newly created, resolved temporary directory.
     $resolved=[IO.Path]::GetFullPath($directory)

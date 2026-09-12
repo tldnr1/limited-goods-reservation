@@ -1,3 +1,4 @@
 app:
   mock.enabled: true
+  mock.delay-ms: ${MOCK_PG_DELAY_MS:0}
   worker.enabled: false

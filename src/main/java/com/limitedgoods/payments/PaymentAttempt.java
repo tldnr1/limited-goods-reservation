@@ -13,6 +13,7 @@ public class PaymentAttempt {
     public Instant createdAt;
     public Instant nextCheckAt;
     public Instant leaseUntil;
+    public Instant terminalAt;
     protected PaymentAttempt() {}
     public PaymentAttempt(UUID order,String key,String scenario,long amount,Instant now) {
         id=UUID.randomUUID(); orderId=order; idempotencyKey=key; this.scenario=scenario;

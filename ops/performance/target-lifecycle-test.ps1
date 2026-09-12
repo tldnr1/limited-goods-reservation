@@ -32,7 +32,7 @@ function docker {
             $service=$id -replace '^id-',''
             @{Id=$id;State=@{Running=[bool]$mockRunning[$service];Health=@{Status='healthy'}};Config=@{Env=@(
                 'DB_URL=jdbc:postgresql://postgres:5432/limited_goods_perf','REDIS_NAMESPACE=goods:perf:',
-                "SPRING_PROFILES_ACTIVE=$($profiles[$service])",'APP_WAITING_RATE=25','RESERVATION_RATE=25','ADMISSION_PERMITS=8')}}
+                "SPRING_PROFILES_ACTIVE=$($profiles[$service])",'APP_WAITING_RATE=25','RESERVATION_RATE=25','ADMISSION_PERMITS=8','MOCK_PG_DELAY_MS=0')}}
         }
         return ConvertTo-Json -InputObject @($info) -Depth 6
     }
@@ -105,7 +105,7 @@ try {
         New-Item -ItemType Directory -Path "$testRoot/$path" -Force | Out-Null
     }
     Copy-Item "$sourceRoot/ops/performance.ps1","$sourceRoot/ops/reset-db.ps1" "$testRoot/ops"
-    Copy-Item "$PSScriptRoot/target.ps1","$PSScriptRoot/target-state.sql","$PSScriptRoot/target-timeline.sql" "$testRoot/ops/performance"
+    Copy-Item "$PSScriptRoot/target.ps1","$PSScriptRoot/target-trial.ps1","$PSScriptRoot/target-warmup-cleanup.ps1","$PSScriptRoot/target-state.sql","$PSScriptRoot/target-timeline.sql" "$testRoot/ops/performance"
     Set-Content "$testRoot/gradlew.bat" '@exit /b 0'
     Set-Content "$testRoot/build/libs/limited-goods.jar" 'offline-jar'
     Set-Content "$testRoot/k6/target/offline.js" '// Never executed'
@@ -125,6 +125,8 @@ try {
         $calls.IndexOf('SNAPSHOT timeline') -lt $calls.IndexOf('TRUNCATE perf')) 'Reset preceded evidence capture'
     Assert ((Count-Commands '*--pull never*') -eq 1) 'Repeat run can pull images'
     Assert ((Count-Commands 'FIXTURE boundary') -eq 1) 'Run failed before measurement boundary'
+    Invoke-Case @{Action='Run';Reset=$true;Scenario='warmup'} 'OFFLINE_BOUNDARY'
+    Assert ((Count-Commands 'FIXTURE boundary') -eq 1 -and (Count-Commands '* up *') -eq 1) 'Standalone warmup lifecycle changed'
 
     $mockMode='existing-data'
     Invoke-Case @{Action='Run';Scenario='worker';Rps=10} 'Run -Reset'
@@ -170,7 +172,7 @@ try {
     try { & "$testRoot/ops/reset-db.ps1" -Environment perf -AppsStopped | Out-Null } catch { $caught=$_ }
     finally { Pop-Location }
     Assert ($caught -and "$caught" -like '*모든 앱이 중단*' -and (Count-Commands 'TRUNCATE*') -eq 0) 'AppsStopped bypassed running-app guard'
-    '13 offline lifecycle checks passed (no Docker, real HTTP, k6, build, or waits).'
+    '14 offline lifecycle checks passed (no Docker, real HTTP, k6, build, or waits).'
 } finally {
     $resolved=[IO.Path]::GetFullPath($testRoot)
     $tempRoot=[IO.Path]::GetFullPath([IO.Path]::GetTempPath())

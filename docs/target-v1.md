@@ -10,10 +10,10 @@
 ## 성능 계약과 측정 조건
 
 Primary performance SLO는 **warmup 이후 steady-state**와 선언한 resource budget을 전제로 한다.
-현재 Target `Run -Reset`은 JVM을 재기동하고 자동 warmup 없이 즉시 측정하므로 그 결과를 steady-state SLO 증거로 사용하지 않는다.
+Target `Run -Reset`은 재기동 후 단계형 warmup을 검증하고 데이터를 정리한 뒤 같은 JVM에서 본 측정을 시작한다. 이전 자동 warmup 없는 결과는 steady-state SLO 증거로 사용하지 않는다.
 Cold-start 결과는 deployment/startup characteristic으로 보존하고 steady-state capacity와 별도로 기록한다.
 DB/OS 캐시는 남을 수 있으므로 완전히 cold한 환경이라는 뜻은 아니다. 동일 비교 시험은 동일한 warmup/reset 조건을 사용한다.
-단계형 warmup과 202 accepted-only metric, Mock PG delay는 다음 구현 작업이며 이번 문서 변경에서는 구현하지 않는다.
+단계형 warmup/독립 Validation, 202 accepted-only metric, terminal timestamp/deadline evidence, configurable Mock PG delay를 구현했다. 실제 Docker+k6 통합 및 성능 달성은 미검증이다.
 
 ### 대표 workload와 hard correctness
 
@@ -45,8 +45,8 @@ Waiting 성공은 PostgreSQL 연결 증가 없이 Redis/Waiting tier에서 유�
 Waiting traffic 증가가 durable DB order/payment 생성에 비례 전파되지 않는 것이다.
 Waiting READY rate / Reservation rate / permit의 현재 25/s / 25/s / 8은 용량 보호 policy knob의 측정 전 초기값이며 SLO가 아니다.
 
-Payment API는 PG 결과를 기다리는 요청이 아니라 durable acceptance를 책임진다. 현재 `target_payment_ms`는 retry/실패 attempt도 섞으므로
-새 202 accepted-only SLO를 인증할 metric으로 사용할 수 없다. 코드와 threshold 정합화는 후속 작업이다.
+Payment API는 durable acceptance를 책임진다. `target_payment_accepted_ms`는 실제 202 attempt만 측정한다.
+기존 `target_payment_ms`는 retry/실패가 섞인 진단 지표로 보존하며 PASS 기준에서 제외한다.
 Mock PG 최초 호출 허용 창 자체는 기존 기능 정책이며, SUCCESS의 deadline 전 최종 처리 SLO는 그와 별도로 검증해야 한다.
 기한을 놓친 결과를 나중에 복구해도 SLO 실패는 남고, UNKNOWN 보유·같은 attempt 재확인 등의 정합성 동작은 유지한다.
 
@@ -176,7 +176,7 @@ Worker / Waiting / Reservation / Isolation / Business 파일을 분리했으며 
 만료 입장권/Redis 장애 후 DB 재조회, READY 상한·소유권·미사용 만료·이탈 제외,
 Waiting의 DB 없는 기동, Worker 연속 공급·동시성 상한을 확인한다.
 
-남은 일: 단계형 warmup·202 accepted-only 계측과 자동 판정 정합화, 300초 실제 시간 보유 시험,
+남은 일: 새 warmup·계측·자동 판정의 실제 Docker+k6 통합 확인, 300초 실제 시간 보유 시험,
 READY/Reservation 초기 25/s 정책 측정, Worker backlog·각 SUCCESS confirmation deadline 검증,
 결제 집중 시 backlog·최초 PG 지연 검증, 5만 명 통합 부하,
 앞단 폭주 중 결제 SLO, HTTP ingress 제한/브라우저 jitter, 신규 작업과 재확인 처리 예산의 세분화.

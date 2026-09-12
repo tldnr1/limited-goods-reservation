@@ -14,8 +14,8 @@ async function harness(stage, overrides = {}, responses = [], shared = { arrays:
   const sleeps = [];
   const metrics = {};
   const config = { runId: 'offline', scenario: stage, variant: 'normal', rps: 40, paymentRps: 40,
-    durationSeconds: 60, stock: 1000, users: 50000, vus: 100, maxVus: 2000, seed: 20260911, ...overrides };
-  const fixture = { sale: { id: 'sale', items: [{ id: 'item' }] } };
+    mockPgDelayMs: 0, durationSeconds: 60, stock: 1000, users: 50000, vus: 100, maxVus: 2000, seed: 20260911, ...overrides };
+  const fixture = { sale: { id: 'sale', opensAt: new Date(now + (overrides.saleOpenDelayMs || 0)).toISOString(), items: [{ id: 'item' }] } };
   const orders = ['worker', 'isolation'].includes(stage)
     ? [{ id: 'held-order', user: 'fixture-0' }, { id: 'held-order-2', user: 'fixture-1' }] : [];
   let loadingShared = false;
@@ -116,7 +116,7 @@ const paid = () => ({ status: 202, value: { id: 'attempt' } });
   passed++;
 }
 
-for (const stage of ['worker', 'waiting', 'reservation', 'isolation', 'business']) {
+for (const stage of ['warmup', 'worker', 'waiting', 'reservation', 'isolation', 'business']) {
   const h = await harness(stage);
   assert.ok(h.module.options.scenarios);
   assert.equal(h.calls.length, 0, 'Import must not send HTTP');
@@ -197,6 +197,51 @@ for (const stage of ['worker', 'waiting', 'reservation', 'isolation', 'business'
   assert.deepEqual(phases.map(phase => phase.startTime), ['0s', '5s', '15s']);
   const summary = h.module.handleSummary({ metrics: {} });
   assert.ok(summary['/results/k6-summary.json']);
+  passed++;
+}
+{
+  const h = await harness('warmup', {}, [joined(), ready(), held(), paid()]);
+  const stages = Object.values(h.module.options.scenarios);
+  assert.deepEqual(stages.map(s => s.rate), [2, 5, 10, 10]);
+  assert.deepEqual(stages.map(s => s.startTime), ['0s', '10s', '20s', '30s']);
+  assert.ok(stages.every(s => s.duration === '10s' && s.preAllocatedVUs === 40 && s.maxVUs === 40));
+  h.module.buyPay(h.module.setup());
+  assert.equal(h.calls.length, 4);
+  assert.equal(h.sleeps.length, 1, 'Warmup only waits for READY; no think time');
+  assert.equal(h.metrics.target_payment_accepted_ms.length, 1);
+  assert.ok(!h.module.options.thresholds.target_payment_accepted_ms);
+  passed++;
+}
+{
+  const h = await harness('worker', {}, [{status: 503, value: {}}, {status: 429, value: {}}, paid()]);
+  h.module.pay();
+  assert.equal(h.metrics.target_payment_ms.length, 3);
+  assert.equal(h.metrics.target_payment_accepted_ms.length, 1);
+  const failed = await harness('worker', {}, [{status: 400, value: {}}]);
+  failed.module.pay();
+  assert.equal(failed.metrics.target_payment_accepted_ms.length, 0);
+  passed++;
+}
+for (const variant of ['normal', 'burst', 'late-payment', 'abandon', 'retry', 'pg-failure']) {
+  for (const mockPgDelayMs of [0, 200]) {
+    const h = await harness('business', {variant, mockPgDelayMs});
+    assert.equal(Boolean(h.module.options.thresholds.target_payment_accepted_ms), variant === 'normal' && mockPgDelayMs === 0);
+    assert.ok(!h.module.options.thresholds.target_payment_ms);
+  }
+  passed++;
+}
+{
+  const h = await harness('business', {saleOpenDelayMs: 30000});
+  const setup = h.module.setup();
+  assert.equal(setup.startedAt, 1800000030000, 'Business setup must align with actual sale opensAt');
+  assert.equal(h.sleeps[0], 30);
+  passed++;
+}
+for (const stage of ['worker', 'isolation', 'waiting', 'reservation']) {
+  const normal = await harness(stage);
+  const delay = await harness(stage, {mockPgDelayMs: 200});
+  assert.ok(Object.keys(normal.module.options.thresholds).some(key => key.includes('latency') || key.endsWith('_ms')));
+  assert.ok(!Object.keys(delay.module.options.thresholds).some(key => key.includes('latency') || key.endsWith('_ms')));
   passed++;
 }
 console.log(`${passed} offline harness checks passed (no k6, HTTP, or real sleeps).`);

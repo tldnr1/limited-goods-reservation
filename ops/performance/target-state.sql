@@ -7,6 +7,10 @@ WITH inventory AS (
  SELECT o.user_id,i.sale_item_id FROM orders o JOIN order_items i ON i.order_id=o.id
  JOIN sale_items s ON s.id=i.sale_item_id WHERE o.status<>'EXPIRED'
  GROUP BY o.user_id,i.sale_item_id,s.per_user_limit HAVING sum(i.quantity)>s.per_user_limit
+), success AS (
+ SELECT p.*,r.confirmation_deadline,o.status AS order_status
+ FROM payment_attempts p JOIN reservations r ON r.order_id=p.order_id JOIN orders o ON o.id=p.order_id
+ WHERE p.scenario='SUCCESS'
 )
 SELECT json_build_object(
  'at',clock_timestamp(),
@@ -18,6 +22,16 @@ SELECT json_build_object(
  'failed',(SELECT count(*) FROM payment_attempts WHERE status='FAILED'),
  'unknown',(SELECT count(*) FROM payment_attempts WHERE status='UNKNOWN'),
  'pending',(SELECT count(*) FROM payment_attempts WHERE status IN ('CREATED','PROCESSING','UNKNOWN')),
+ 'successAccepted',(SELECT count(*) FROM success),
+ 'successConfirmed',(SELECT count(*) FROM success WHERE status='SUCCEEDED' AND order_status='CONFIRMED' AND terminal_at IS NOT NULL),
+ 'successPending',(SELECT count(*) FROM success WHERE status NOT IN ('SUCCEEDED','FAILED')),
+ 'successDeadlineViolations',(SELECT count(*) FROM success WHERE terminal_at>confirmation_deadline
+   OR (status NOT IN ('SUCCEEDED','FAILED') AND clock_timestamp()>confirmation_deadline)),
+ 'terminalEvidenceMissing',(SELECT count(*) FROM payment_attempts WHERE status IN ('SUCCEEDED','FAILED') AND terminal_at IS NULL),
+ 'oldestSuccessPendingSeconds',(SELECT coalesce(max(extract(epoch FROM clock_timestamp()-created_at)),0) FROM success WHERE status NOT IN ('SUCCEEDED','FAILED')),
+ 'latestSuccessDeadline',(SELECT max(confirmation_deadline) FROM success),
+ 'latestSuccessPendingDeadline',(SELECT max(confirmation_deadline) FROM success WHERE status NOT IN ('SUCCEEDED','FAILED')),
+ 'earliestSuccessPendingDeadline',(SELECT min(confirmation_deadline) FROM success WHERE status NOT IN ('SUCCEEDED','FAILED')),
  'oldestPendingSeconds',(SELECT coalesce(max(extract(epoch FROM clock_timestamp()-created_at)),0) FROM payment_attempts WHERE status IN ('CREATED','PROCESSING','UNKNOWN')),
  'inventoryViolations',(SELECT count(*) FROM inventory WHERE total<>available+held+sold OR held<>expected_held OR sold<>expected_sold),
  'userLimitViolations',(SELECT count(*) FROM limits),

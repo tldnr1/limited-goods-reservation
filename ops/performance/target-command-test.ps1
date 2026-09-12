@@ -12,6 +12,7 @@ if ($ast.Find({ param($node) $node -is [System.Management.Automation.Language.Fu
 $calls=[System.Collections.Generic.List[object]]::new()
 $mode='healthy'
 $expectedRate=25
+$expectedDelay=0
 function Assert($condition,[string]$message) { if (-not $condition) { throw $message } }
 function docker {
     # Any command outside this read-only allowlist fails without invoking Docker.
@@ -21,7 +22,7 @@ function docker {
     $global:LASTEXITCODE=0
     if ($mode -eq 'docker-failure') { $global:LASTEXITCODE=23; return }
     if ($arguments[0] -eq 'ps') {
-        Assert ($arguments[2] -in @('name=^/goods-k6$','name=^/goods-target-k6$')) 'Container filter changed'
+        Assert ($arguments[2] -in @('name=^/goods-k6$','name=^/goods-target-k6$','name=^/goods-target-warmup-k6$')) 'Container filter changed'
         return
     }
     if ($arguments[0] -eq 'compose' -and $arguments -contains 'ps') { return "id-$($arguments[-1])" }
@@ -35,7 +36,7 @@ function docker {
             State=@{Running=$true;Health=@{Status='healthy'}}
             Config=@{Env=@("DB_URL=jdbc:postgresql://postgres:5432/$db",'REDIS_NAMESPACE=goods:perf:',
                 "SPRING_PROFILES_ACTIVE=$($profiles[$service])","APP_WAITING_RATE=$expectedRate",
-                'RESERVATION_RATE=25','ADMISSION_PERMITS=8')}
+                'RESERVATION_RATE=25','ADMISSION_PERMITS=8',"MOCK_PG_DELAY_MS=$expectedDelay")}
         })
     }
     throw "Unexpected Docker command in offline Check: $($arguments -join ' ')"
@@ -68,6 +69,15 @@ try {
     $expectedRate=37
     & (Join-Path $PSScriptRoot '../performance.ps1') -Mode target -Action Check -WaitingRate 37 | Out-Null
     $expectedRate=25
+    $expectedDelay=200
+    & (Join-Path $PSScriptRoot '../performance.ps1') -Mode target -Action Check -Scenario warmup -MockPgDelayMs 200 | Out-Null
+    Check-Fails 'MOCK_PG_DELAY_MS=0'
+    $expectedDelay=0
+    foreach ($invalid in @(-1,5001)) {
+        $calls.Clear(); $caught=$null
+        try { & $target -Action Check -MockPgDelayMs $invalid | Out-Null } catch { $caught=$_ }
+        Assert ($caught -and $calls.Count -eq 0) 'Invalid delay reached Docker'
+    }
     $mode='docker-failure'; Check-Fails 'exit=23'
     Assert ($env:DB_NAME -eq 'command-test-sentinel') 'Environment was not restored after failure'
     $mode='dev'; Check-Fails 'dev/baseline'
@@ -77,7 +87,7 @@ try {
     $caught=$null
     try { & $target -Action Check -Permits 0 | Out-Null } catch { $caught=$_ }
     Assert ($caught -and $calls.Count -eq 0) 'Invalid settings reached Docker'
-    '6 offline command checks passed (mocked Docker/HTTP; no Prepare, Run, or real sleeps).'
+    '10 offline command checks passed (mocked Docker/HTTP; no Prepare, Run, or real sleeps).'
 } finally {
     [Environment]::SetEnvironmentVariable('DB_NAME',$savedDb,'Process')
     Assert ((Get-Location).Path -eq $startLocation) 'Caller location changed'
