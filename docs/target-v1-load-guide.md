@@ -90,7 +90,8 @@ Latency는 PASS threshold가 아니며 마지막 두 10/s 구간의 HTTP p95/p99
 
 다른 모든 Run은 같은 warmup을 먼저 수행한다. warmup/ 하위 폴더에 config, k6-summary, raw, k6.log,
 before/after-db, timeline, before/after-containers, prometheus, phases, result를 독립 보존한다.
-Hikari/프로세스 시작 시각은 warmup 및 본 측정 각각의 Prometheus window 첫/끝 delta로 검사한다.
+Hikari timeout은 warmup과 본 측정 각각의 boundary-before/after snapshot delta로 검사하고,
+process start/restart는 각 trial의 Prometheus window에서 별도로 확인한다.
 실패·수집 누락 시 정리/본 측정으로 진행하지 않는다. 독립 Stage 0은 결과 폴더 자체에 같은 파일을 저장한다.
 
 Embedded warmup PASS 후 sale 한정 FK 순서 삭제 → goods:perf:* Redis 정리 → 측정 fixture 생성 순서다.

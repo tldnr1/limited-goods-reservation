@@ -1,6 +1,6 @@
 # 포트폴리오 evidence / claim ledger
 
-기준: 2026-09-12, main `e217daa554eed9af82ebaef6419c3641cb590d17`와 이번 Hikari boundary 수정.
+기준선: `e217daa` 이후 Hikari boundary 보강까지 반영.
 발전 서사는 [portfolio-evolution](portfolio-evolution.md), 현재 성능 계약은 [performance](performance.md)를 따른다.
 **새 Target v1 steady-state 성능은 measurement pending이다. 이번 작업은 실제 부하를 실행하지 않았다.**
 
@@ -105,7 +105,7 @@
 ### 7. cold/no-warmup Target Worker 실행의 초기 오류 발견
 
 - Status: TYPE 1 — MEASURED
-- Portfolio priority: PRIMARY
+- Portfolio priority: SUPPORTING — warmup 후 동일 Worker 조건의 측정과 연결되면 전후 개선 사례로 PRIMARY 승격 검토.
 - 문제 / 요구사항: 기동 직후 측정을 steady-state capacity로 해석하면 초기 오류가 섞임.
 - 당시 판단: Payment 실패와 Worker 완료를 분리하고 오류 발생 시점을 확인.
 - 변경 내용: `d1b4b50`에서 DB JSONL framing 및 HTTP/DB 불일치 진단 수정, 원본을 보존한 별도 재분석. 이후 warmup 효과는 TYPE 2다.
