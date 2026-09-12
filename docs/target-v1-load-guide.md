@@ -69,8 +69,10 @@ Prepare/Check/Run의 `WaitingRate`, `ReservationRate`, `Permits`는 일치해야
 - `-AppsStopped`는 중단 검사를 생략하지 않는다. 앱이 남아 있으면 삭제를 거절하고, 이미 멈춘 앱에 stop을 중복 호출하지 않는다.
 
 Prepare는 데이터를 보존하지만 앱을 기동하므로 기존 미완료 주문의 Worker 처리가 다시 진행될 수 있다.
-Run -Reset은 앱을 재기동하므로 JVM 예열 상태가 유지되지 않는다. DB/OS 캐시는 남을 수 있어 완전한 cold 환경이라고 부르지 않는다.
-비교 시험은 같은 reset/예열 조건을 사용한다. 성공 응답을 위한 자동 예열은 추가하지 않았다.
+Primary performance SLO는 warmup 이후 steady-state 기준이다. 현재 Run -Reset은 JVM을 재기동한 직후 자동 warmup 없이
+측정하므로 그 결과를 steady-state SLO 증거로 사용하지 않는다. DB/OS 캐시는 남을 수 있어 완전한 cold 환경이라고 부르지 않는다.
+Cold-start 결과도 deployment/startup characteristic으로 보존하고 steady-state capacity와 별도 기록한다.
+비교 시험은 같은 warmup/reset 조건을 사용한다. 단계형 warmup은 다음 구현 작업이며 현재 명령에 예열 단계가 있는 것으로 해석하지 않는다.
 
 ## 2. 단계별 입력과 범위
 
@@ -118,6 +120,10 @@ Business 세 도착 구간은 VU pool을 각각 갖고 대기 시간이 겹친�
 생성기는 1.5 CPU/1GiB로 제한한다. 높은 MaxVus를 적었다고 그 메모리에 모두 들어가는 것은 아니다.
 목표 유입 전에 작은 Users(10의 배수, 최대 50,000)로 생성기·수집을 확인하고, 누락/OOM이면 서버 한계와 구분한다.
 축소 시험 결과는 목표 부하 통과로 기록하지 않는다. 자동 예열은 없으므로 cold/예열 조건을 실행 기록에 명시하고 비교에서 맞춘다.
+성능 SLO는 resource budget과 함께만 의미가 있다. 현재 local quota/pool/rate/concurrency는 측정 전 초기 hypothesis이며 그대로 유지한다.
+Local 결과는 harness integration, obvious bottleneck, logic/rate/pool mismatch와 수정 필요 여부 판단에 사용한다.
+최종 portfolio claim은 generator/server 분리, fixed/declared resource envelope, 동일 workload, 대표 조건 반복 실행으로 검증한다.
+AWS instance type이나 최종 resource 숫자는 아직 정하지 않는다.
 
 ### 생성기 주문 데이터 공유
 
@@ -132,33 +138,63 @@ Business 세 도착 구간은 VU pool을 각각 갖고 대기 시간이 겹친�
 
 | Variant | 행동 | 판정에서 구분할 것 |
 |---|---|---|
-| normal | 점유 후 시드 고정 1~45초 생각 시간 → SUCCESS 결제 | 초기 점유 60초, 120초 내 950/1000 확정, 정상 오류·결제 SLO |
-| burst | 점유 주문의 결제를 측정 시작+60초까지 모았다가 접수 | backlog/oldest age, 최초 PG 호출 지연, 사용자 기한 내 해소. 125/s 고정 달성을 요구하지 않음 |
+| normal | 점유 후 시드 고정 1~45초 생각 시간 → SUCCESS 결제 | sale start +60초 내 초기 stock 1,000개 HELD, +120초 내 950/1000 CONFIRMED, 정상 오류·결제 SLO |
+| burst | 점유 주문의 결제를 측정 시작+60초까지 모았다가 접수 | durable acceptance 유지, backlog/oldest age와 confirmation budget, accepted SUCCESS의 deadline 전 처리. 125/s는 stress input일 뿐 고정 요구가 아님 |
 | late-payment | holdExpiresAt 약 1초 전 결제 시도 | 네트워크/락 때문에 기한 뒤 DB 접수가 되면 HOLD_EXPIRED 가능. 접수된 결제와 만료 반환 경쟁을 timeline/상태로 확인 |
 | abandon | 점유자의 시드 고정 약 20%가 결제하지 않음. +300초 신규 반환 수요 | 실제 만료·반환·재구매. 최초 대기 180초와 hold 300초를 혼동하지 않음 |
 | retry | 일시적 0/429/503은 최대 5회 backoff+jitter. 성공 구매도 같은 키로 1회 재전송 | 같은 주문 ID와 DB 주문 수 유지. 재시도는 최초 사용자 수와 별도 집계 |
 | pg-failure | 시드 고정 SUCCESS 60%, UNKNOWN/FAILURE/LOST_RESPONSE/DELAYED_SUCCESS 각 10% | Mock PG 행동 주입. 영구 UNKNOWN 재고 보유·중복 확정 없음. 정상 950개/120초 판정을 적용하지 않음 |
 
 각 분포는 기대 비율이며 적은 실제 점유 수에서는 정확히 일치하지 않는다. seed 기본값은 20260911이다.
+대표 normal은 50,000명/stock 1,000개/인당 최대 1개, 0~5초 30,000명·5~15초 15,000명·15~60초 5,000명이다.
+Waiting 등록 최대 180초, READY TTL 10초, hold 300초, acceptance 이후 Mock confirmation window 70초를 유지한다.
+50,000명 모두가 60초 안에 구매 결과를 받거나 1초 안에 READY를 받는 계약이 아니다.
+Stress/failure variant 및 후속 PG delay 실험에는 normal latency SLO를 일률 적용하지 않는다.
+Burst/PG delay는 durable acceptance, backlog, oldest pending age의 confirmation budget 침범, accepted SUCCESS의 deadline과 정합성을 본다.
+1,000건 burst를 1초 안에 PG confirmation하는 계약은 없다. retry/LOST_RESPONSE/UNKNOWN/FAILURE는
+idempotency, duplicate prevention, durable state, recovery/reconciliation이 primary 계약이다.
 PG 컨테이너 중지/네트워크 단절/프로세스 kill은 수행하지 않는다. 이는 별도 장애 시험이며 이 variant의 증거로 대체하지 않는다.
 결제 실패 후 새 시도, 악의적인 backoff 무시, 강한 startup fault isolation은 이 harness의 범위 밖이다.
 
 ## 4. 수집 지표와 판정
 
-| 단계 | 주요 지표 | 자동 검사 | 사람이 판정할 기준 |
+다음 표의 자동 검사는 **현재 코드의 동작**이며, 새 SLO 구현 완료를 뜻하지 않는다.
+역할별 계약의 기준은 [Target v1 SLO](target-v1.md#성능-계약과-측정-조건)다. 아래 차이가 남아 있어 현재 자동 결과만으로 새 계약을 인증할 수 없다.
+
+| 단계 | 주요 지표 | 현재 자동 검사 (legacy 포함) | 확정한 SLO / 추가 판정 |
 |---|---|---|---|
 | 공통 | HTTP endpoint/status별 수·p95/p99, 예상 밖 오류, 누락, 재고/주문, 자원·Hikari | dropped=0, 예상 밖 오류 ≤0.1%, 공급/완료 iteration 수, 불변식 0, restart/OOM 없음, Hikari timeout 증가 없음, 수집 완전성 | 거절률과 성공 수를 함께 보고 생성기 제한·관측 비용·표본 공백 확인 |
-| Worker | 성공 확정/s, 처리 시도/s, active slots, PG/job latency, backlog slope/oldest age, DB/Mock PG CPU | 결제 접수 p95≤1초, 접수 전부 확정·pending=0 | 정상 최소 약32/s, 첫 목표 ≥40/s를 공급 구간에서 지속, backlog/age 증가가 지속되지 않음. 동일 조건 3회. drain 성공만으로 통과 금지 |
-| Waiting | join/poll 각각 RPS·p95/p99·429/503, Redis INFO commandstats/latencystats·CPU·memory, queue/live/stale/READY, JVM/Nginx CPU, DB 활동 | 주문/결제 생성 0, Waiting DB 연결 0 | 수천 RPS는 아직 목표. 정한 입력에서 지연이 발산하지 않고 DB 증가가 publisher/관측 비용을 넘어 유입에 비례하지 않는지. p95/p99의 별도 숫자 SLO는 아직 확정하지 않음 |
-| Reservation | 관측 READY/s → purchase 진입/s → 성공/s, gate limited, purchase 성공·거절 지연, lock/Hikari | 성공 purchase p99≤1초, HTTP/DB 주문 수 대조 | READY 공급이 충분했는지 먼저 확인. waiting pacing과 reservation safety ceiling/permit을 한 번에 하나씩 변경하여 원인 분리 |
-| Isolation | 동일 Payment/Worker 지표 + Waiting 유입, 공유 DB·CPU·Hikari | 기존 주문 결제 접수 p95≤1초, 접수 전부 확정 | 같은 PaymentRps의 Worker 시험과 비교. p99도 보고하고 backlog/age·복구를 함께 확인. 결제 SLO 유지가 핵심 |
-| Business | 사용자 단계별 결과, DB 확정 시계열, 반환/재구매 및 최초 PG 지연 | normal만 초기 전체 점유≤60초·95% 확정≤120초, purchase p99/payment p95≤1초; 공통 정합성 | 50,000/1,000 실제 유입, variant별 시간·실패 동작. 반환 가능 시점부터≤5초, 30초 복구, 세 번의 개별 결과 |
+| Worker | confirmed/s, accepted/s, 처리 시도/s, pending count, active slots, PG/job time, backlog slope/oldest pending age, Worker/Mock PG/PostgreSQL CPU, Hikari | 혼합 payment metric p95≤1초, 접수 전부 확정·pending=0 | accepted SUCCESS마다 confirmationDeadline 전에 terminal/CONFIRMED, drain 후 pending=0. 공급 종료 후 backlog가 계속 증가하거나 회복하지 못하면 실패. oldest age와 deadline 관계 관측. 동일 조건 3회, drain만으로 지속 용량 인증 금지 |
+| Waiting | join/poll 각각 RPS·p95/p99·429/503, Redis INFO commandstats/latencystats·CPU·memory, queue/live/stale/READY, JVM/Nginx CPU, DB 활동 | 주문/결제 생성 0, Waiting DB 연결 0 | steady-state 정상 join/poll 개별 HTTP p99≤1초, dropped=0, 정상 Business의 unexpected 5xx/timeout/503=0. 429는 admission/backpressure로 별도 보고. WAITING→READY 전체 시간에 1초 SLO 없음 |
+| Reservation | 관측 READY/s → purchase 진입/s → 성공/s, gate limited, purchase 성공·거절 지연, lock/Hikari | 성공 purchase p99≤1초, HTTP/DB 주문 수 대조 | 실제 READY 후 성공 201 accepted latency p99≤1초, stock correctness/Hikari timeout/restart/OOM=0. 25/s·25/s·permit 8은 초기 보호 정책, SLO 아님 |
+| Isolation | 동일 Payment/Worker 지표 + Waiting 유입, 공유 DB·CPU·Hikari | 혼합 payment metric p95≤1초, 접수 전부 확정 | 동일 payment workload에 Waiting 추가 후 성공 202 p95≤1초, Hikari timeout/unexpected 5xx/timeout=0, SUCCESS deadline 및 correctness 유지. Worker-only 대비 latency/backlog degradation 기록, 임의의 상대 한도 없음 |
+| Business | 사용자 단계별 결과, DB 확정 시계열, 반환/재구매 및 최초 PG 지연 | normal 초기 전체 점유≤60초·95% 확정≤120초; purchase p99/혼합 payment p95≤1초 threshold는 variant에도 적용됨; 공통 정합성 | normal sale start +60초 내 초기 stock 1,000개 HELD, +120초 내 ≥95% CONFIRMED. 성공 201 p99/202 p95≤1초, SUCCESS별 deadline, correctness/Hikari timeout/restart/OOM/dropped=0, 예상 밖 오류≤0.1%. 대표 조건 3회 |
+
+모든 normal/retry/failure에서 oversell/inventory invariant/per-user limit/invalid·partial hold/중복 성공 결제·확정 위반은 0이다.
+동일 사용자·키·본문 retry는 중복 주문/attempt를 만들지 않는다. Waiting은 durable order/payment를 만들지 않고 DB connection=0이며,
+READY는 재고 점유가 아니다. Redis는 재고·주문·결제 원장이 아니다. accepted payment 주문의 재고는 시간만으로 반환하지 않으며,
+UNKNOWN/LOST_RESPONSE는 같은 attempt로 복구·재확인한다.
+Waiting의 성공은 DB 연결 증가 없는 유입 흡수, READY를 통한 downstream 제어, durable order/payment 생성의 유입 비례 증가 방지다.
+Business 전체 오류≤0.1%가 Waiting 및 normal/isolation Payment의 오류 0 계약을 완화하지 않는다.
+
+Payment API 책임은 durable acceptance다. 성공 202 accepted-only p95≤1초를 측정해야 하며 normal/isolation에서
+Hikari timeout/unexpected 5xx/client timeout=0, accepted payment의 durable DB state를 확인한다. PG 완료까지 HTTP를 붙잡지 않는다.
+현재 `k6/target/common.js`의 `target_payment_ms`는 retry/실패 attempt까지 포함하고 worker/isolation/business 및
+`ops/performance/target-review.ps1`은 그 혼합 metric을 검사한다. 202 전용 계측, Waiting p99·역할별 오류 기준,
+variant별 threshold와 deadline 증거 정합화는 다음 구현 작업이며 이번에는 코드를 변경하지 않는다.
+`target-review.ps1` 출력의 32/s required·40/s normal target도 legacy다. 약32/s 가정은 더 이상 최소 요구가 아니며
+40/s와 125/s는 capacity probe/stress input으로만 남긴다. 서비스 PASS/FAIL 기준으로 사용하지 않는다.
+현재 Business 자동 판정의 60/120초 기준은 `phases.measurementStart`다. 새 계약의 sale start와 같은 기준인지 확인해야 하며,
+두 시각을 증거 없이 동일시하지 않는다. 이 시간 기준 정합화도 후속 구현 대상이다.
 
 `goods.worker.completed`는 UNKNOWN 재확인도 포함하는 **작업 처리 시도** 카운터다.
 실제 성공 처리량은 DB confirmed 증가 및 `goods.payment.results{result="SUCCEEDED"}`와 대조한다.
 `goods.worker.job`은 한 처리 시도의 시간이다. 접수→최초 PG는 timeline의 first_pg_delay_seconds,
 접수→최종 확정은 DB 표본에서 확인되는 상한으로 읽는다. 정확한 terminal timestamp는 현재 저장하지 않는다.
-PG 접수+70초는 최초 호출 허용 기한이며 성능 SLO가 아니다.
+PG 접수+70초는 기존 Mock 최초 호출 허용 정책이다. 새 SUCCESS SLO는 같은 confirmationDeadline 전에 최종 terminal/CONFIRMED까지 요구한다.
+최초 PG 호출만 기한 내였거나 drain 후 최종 확정됐다는 사실만으로 deadline SLO를 인증하지 않는다.
+현재 coarse DB 표본에 terminal timestamp가 없어 경계를 확정할 수 없다면 미검증으로 남긴다.
+현재 30초 drain은 관측 절차이며 모든 payment의 개별 70초 창 검증이나 고정 30초 복구 SLO를 대신하지 않는다.
 
 ## 5. 반환 시간 정책
 
@@ -168,12 +204,14 @@ FULLY_HELD의 polling 빈도는 증가하므로 Redis/Waiting 부하도 함께 �
 명목 예산은 만료 스캔 약1초 + projection 주기 약1초 + 반환 polling 최대1.25초 + 구매 응답1초 = 약4.25초다.
 fixed-delay 작업 시간·DB 대기·실패가 더해지므로 이 합은 **5초 달성의 증거가 아니다**.
 
-5초 목표는 재고가 반환 가능한 시각(미결제 holdExpiresAt)부터, 활성 구매 후보가 실제 재구매 가능한 시점까지다.
+5초 목표는 **secondary/stretch timing target**이며 primary SLO가 아니다.
+재고가 반환 가능한 시각(미결제 holdExpiresAt)부터 활성 구매 후보의 새 HELD commit까지를 대상으로 한다.
 모든 대기 사용자에게 5초 안에 READY를 보장하지 않는다. 먼 순위/180초 만료/부재 사용자는 별도로 집계한다.
 PG UNKNOWN은 반환 가능 상태가 아니므로 이 기준에 넣지 않는다.
 abandon 실행에서는 초기 FULLY_HELD를 확인하고 timeline의 만료 시각, 재구매 주문 생성 시각,
 Redis catalog와 poll 응답 시간을 대조한다. 재고가 원래 남아 있었거나 대응이 불명확하면 판정 보류한다.
-표본 간격만으로 정확한 DB 반환→projection 지연을 확정하지 않는다. 이 구간의 정확한 계측이 필요하면 그때 이벤트 계측을 추가한다.
+인증에는 `holdExpiresAt → 실제 release commit → catalog AVAILABLE projection → READY 발급 → purchase → 새 HELD commit`의
+정확한 event timestamp가 필요하다. 현재 coarse observer sample만으로 ≤5초 달성을 확정하지 않는다. 계측 추가는 후속 구현이다.
 
 ## 6. 결과 파일과 재검토
 
@@ -212,7 +250,7 @@ pwsh -File ./ops/performance/target-review.ps1 -Directory ./artifacts/performanc
 
 대표 조건을 3회 각각 실행하여 결과를 합치지 않고 남긴다. 먼저 Worker, Waiting, Reservation을 측정하고
 그 결과로 Isolation의 입력을 정한 뒤 Business로 간다. 실제로 확인한 병목만 수정한다.
-아직 Target의 최대 용량·40/s·50,000명·결제 성능 격리·실제 300초 반환을 달성했다고 기록하지 않는다.
+아직 Target의 최대 용량·50,000명 Business SLO·결제 성능 격리·실제 300초 반환을 달성했다고 기록하지 않는다.
 
 ## 7. 부하 없는 스크립트 회귀 검사
 

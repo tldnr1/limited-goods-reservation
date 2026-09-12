@@ -1,6 +1,34 @@
 # 한정 굿즈 예약 시스템 — 문제를 좁혀 온 발전 기록
 
-**최종 목표(미달성):** 제한된 로컬 자원에서 최초 구매 시도 50,000건·재고 1,000개를 대상으로, 정상 PG·충분한 구매 수요 조건에서 120초 내 950개 이상 판매 확정, 결제 접수 p95 1초 이내, 예상 밖 오류 0.1% 이하, 정합성 위반 0건을 검증한다. 최초 유입은 0~5초 30,000건·5~15초 15,000건·15~60초 5,000건을 새 시험안으로 두고, 재시도·조회는 별도 집계한다. **우선 완료할 개선은 정상 결제 확정 40건/초 이상과 backlog 안정성을 검증하는 것**이다.
+**최종 목표(미검증):** 대량 유입을 Waiting/READY에서 흡수해 PostgreSQL 재고 경로의 진입률을 통제하고,
+재고 점유는 PostgreSQL 원장으로 보장하며, durable acceptance 이후 Worker가 비동기로 결제를 처리해 외부 PG 지연·폭주의 전파를 막는다.
+대표 normal workload는 관심 사용자 50,000명·초기 stock 1,000개·인당 최대 1개이며,
+0~5초 30,000명·5~15초 15,000명·15~60초 5,000명이 유입된다. HELD 후 seed 기반 1~45초 think time을 유지한다.
+Waiting 최대 180초, READY TTL 10초, hold 300초, acceptance 이후 Mock confirmation window 70초는 그대로다.
+50,000명은 workload이며 전체 사용자의 1초 내 READY나 60초 내 구매 결과를 약속하지 않는다. 대기는 정상 동작이다.
+
+Warmup 이후 steady-state에서 Waiting 개별 join/poll HTTP p99≤1초, 실제 READY 후 성공 purchase 201 p99≤1초,
+성공 payment 202 accepted-only p95≤1초를 목표로 한다. Business는 sale start +60초 내 초기 stock 1,000개 HELD,
++120초 내 ≥950개 CONFIRMED, correctness/Hikari timeout/restart/OOM/generator dropped iteration=0, 예상 밖 오류≤0.1%다.
+Waiting의 정상 Business unexpected 5xx/timeout/503=0과 Payment normal/isolation unexpected 5xx/client timeout=0은 더 엄격하게 유지한다.
+429는 admission/backpressure로 별도 보고한다. Worker는 accepted SUCCESS별 confirmationDeadline 전 terminal/CONFIRMED와
+drain 후 pending=0, 공급 종료 후 backlog 회복을 검증한다. oldest pending age와 deadline을 함께 본다.
+Isolation은 같은 payment workload에 Waiting을 추가해도 202 p95≤1초, Hikari timeout/unexpected 5xx/timeout=0,
+SUCCESS deadline와 correctness를 유지한다. Worker-only 대비 latency/backlog degradation은 기록하되 임의 상대 한도는 두지 않는다.
+
+모든 normal/retry/failure에서 oversell/inventory invariant/per-user limit/invalid·partial hold/중복 성공 결제·확정 위반=0을 우선한다.
+동일 사용자·키·본문 retry는 중복 주문/attempt를 만들지 않는다. Waiting은 DB connection=0이며 durable order/payment를 만들지 않는다.
+READY는 점유가 아니며 Redis는 원장이 아니다. accepted payment의 재고는 시간만으로 반환하지 않고 UNKNOWN/LOST_RESPONSE는 같은 attempt로 복구한다.
+Burst/후속 PG delay는 normal latency SLO를 일률 적용하지 않고 acceptance 유지·backlog·oldest age와 budget·SUCCESS deadline·정합성을 본다.
+retry/failure의 primary 계약은 멱등성·중복 방지·durable state·올바른 복구다. 반환 후 재구매 ≤5초는 secondary/stretch 목표이며,
+holdExpiresAt → release commit → AVAILABLE projection → READY → purchase → 새 HELD commit의 정확한 timestamp 없이는 인증하지 않는다.
+
+현재 Target Run -Reset은 JVM 재기동 직후 자동 warmup 없이 측정하므로 steady-state SLO 증거가 아니다.
+Cold-start 결과도 deployment/startup characteristic으로 보존하고 steady-state capacity와 별도 기록하며 비교 시험의 warmup/reset 조건을 맞춘다.
+현재 local resource 배분과 25/s / 25/s / permit 8은 초기 hypothesis이며 변경하지 않는다. SLO는 resource budget과 함께만 의미가 있다.
+Local 결과는 harness integration·obvious bottleneck·logic/rate/pool mismatch와 수정 필요 여부를 확인한다.
+최종 claim은 generator/server 분리, fixed/declared resource envelope, 동일 workload와 대표 조건 반복 실행으로 검증한다.
+AWS instance type이나 최종 resource 숫자는 아직 정하지 않는다. 전체 계약은 [Target v1](target-v1.md)을 따른다.
 
 아래는 초기부터 완성된 설계를 따랐다는 주장이 아니라, 실험에서 발견한 문제에 따라 판단 기준을 발전시킨 기록이다. archive 수치는 해당 버전의 결과이며 현재 Java와 성능을 직접 비교하지 않는다. Target v1의 역할 분리·입장권·시간 계약은 구현됐지만 새 성능 목표는 아직 미달성이다.
 
@@ -38,7 +66,7 @@
 
 - **문제:** 순간 구매 유입과 결제 확정을 함께 보호한 반복 검증 및 변경 전후 개선 수치가 아직 없다.
 - **원인·판단:** 외부 유입·점유·결제의 처리율과 시간 예산이 다르므로 실행 역할을 분리했다. Worker의 4건/250ms 공급 상한은 코드상 제거했으며, 실제 지속 처리량과 새로운 병목은 측정 전이다.
-- **해결·대안·한계:** DB 큐·현재 재고 모델을 유지한 채 Waiting/Reservation/Payment/Worker, READY 입장권, 300초 점유·접수+70초 PG 창을 구현하고 기능 계약을 검증했다. [기능 근거](../artifacts/target-v1/20260910-functional/review.md). 다음은 Worker → Waiting → Reservation → Isolation → 50,000명 Business 순서다. 정상 최소 요구 약32/s·첫 검증 목표40/s와 burst의 backlog 기준을 구분한다. [단계별 harness](target-v1-load-guide.md)는 준비됐으나 실행 미검증이며, 현재 기존 주문 fixture는 공급 기간 최대180초다. 과거 계획의 단일5분 시험은 시간에 맞춘 fixture 보충이 필요하다. 대표 조건3회·개선율은 실제 반복/동일 조건 전후 측정 뒤 기록한다. MQ·unit별 재고와 catalog 최적화는 관측된 병목이 있을 때 검토한다.
+- **해결·대안·한계:** DB 큐·현재 재고 모델을 유지한 채 Waiting/Reservation/Payment/Worker, READY 입장권, 300초 점유·접수+70초 PG 창을 구현하고 기능 계약을 검증했다. [기능 근거](../artifacts/target-v1/20260910-functional/review.md). 다음은 Worker → Waiting → Reservation → Isolation → 50,000명 Business 순서다. 기존 약32/s 최소 요구는 폐기하고 40/s·125/s는 capacity probe/stress input으로만 둔다. Worker primary는 backlog와 accepted SUCCESS별 deadline이다. confirmed/s·accepted/s·pending count·oldest age·active slots·job/PG time·Worker/Mock PG/PostgreSQL CPU·Hikari를 관측한다. [단계별 harness](target-v1-load-guide.md)는 새 SLO 검증 전이며, 자동 warmup·202 accepted-only metric·판정 정합화는 후속 구현이다. 현재 기존 주문 fixture는 공급 기간 최대180초다. 과거 계획의 단일5분 시험은 시간에 맞춘 fixture 보충이 필요하다. 대표 조건3회·개선율은 실제 반복/동일 조건 전후 측정 뒤 기록한다. MQ·unit별 재고와 catalog 최적화는 관측된 병목이 있을 때 검토한다.
 
 ---
 
